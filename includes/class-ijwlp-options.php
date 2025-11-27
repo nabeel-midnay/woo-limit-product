@@ -33,20 +33,20 @@ class IJWLP_Options
 		// Handle order status changes from admin or anywhere else
 		// This hook fires whenever order status changes, regardless of what status it changes to/from
 		add_action('woocommerce_order_status_changed', array($this, 'update_limited_edition_status_on_order_status'), 10, 4);
-		
+
 		// Legacy hooks for backwards compatibility (in case order is created before payment)
 		add_action('woocommerce_order_status_processing', array($this, 'update_limited_edition_status_on_order_status'), 10, 1);
 		add_action('woocommerce_order_status_completed', array($this, 'update_limited_edition_status_on_order_status'), 10, 1);
-		
+
 		// AJAX handlers - loaded in both admin and frontend contexts
 		add_action('wp_ajax_ijwlp_add_to_cart', array($this, 'ajax_add_to_cart'));
 		add_action('wp_ajax_nopriv_ijwlp_add_to_cart', array($this, 'ajax_add_to_cart'));
-		
+
 		add_action('wp_ajax_ijwlp_update_cart', array($this, 'ajax_update_cart'));
 		add_action('wp_ajax_nopriv_ijwlp_update_cart', array($this, 'ajax_update_cart'));
-		
+
 		add_action('wp_ajax_ijwlp_clear_in_cart', array($this, 'ajax_clear_in_cart'));
-		
+
 		add_action('wp_ajax_ijwlp_check_number_availability', array($this, 'ajax_check_number_availability'));
 		add_action('wp_ajax_nopriv_ijwlp_check_number_availability', array($this, 'ajax_check_number_availability'));
 	}
@@ -61,24 +61,24 @@ class IJWLP_Options
 	public static function get_setting($key, $default = '')
 	{
 		$advanced_settings = get_option('ijwlp_advanced_settings', array());
-		
+
 		if (!is_array($advanced_settings)) {
 			return $default;
 		}
-		
+
 		// If key doesn't exist, return default
 		if (!isset($advanced_settings[$key])) {
 			return $default;
 		}
-		
+
 		$value = $advanced_settings[$key];
-		
+
 		// If value is empty string and default is provided, return default
 		// This allows intentional empty strings to be used, but provides fallback for unset values
 		if ($value === '' && $default !== '') {
 			return $default;
 		}
-		
+
 		return $value;
 	}
 
@@ -101,14 +101,14 @@ class IJWLP_Options
 		if (!$order) {
 			$order = wc_get_order($order_id);
 		}
-		
+
 		if (!$order) {
 			return;
 		}
 
 		global $wpdb, $table_prefix;
 		$table = $table_prefix . 'woo_limit';
-		
+
 		// Use new status if provided (from woocommerce_order_status_changed), otherwise get from order
 		$order_status = $new_status ? $new_status : $order->get_status();
 
@@ -120,7 +120,7 @@ class IJWLP_Options
 				$order_id,
 				(string) $order_id
 			));
-			
+
 			// Return early since we've deleted the records
 			return;
 		}
@@ -142,7 +142,7 @@ class IJWLP_Options
 			// Get parent product ID
 			$product = wc_get_product($actual_product_id);
 			$parent_product_id = $actual_product_id;
-			
+
 			if ($product && $product->is_type('variation')) {
 				$parent_product_id = $product->get_parent_id();
 			}
@@ -174,7 +174,12 @@ class IJWLP_Options
 				WHERE parent_product_id = %d 
 				AND limit_no = %s 
 				AND (status = 'block' OR order_id = %d)",
-				$order_id, $item_id, $order_status, $parent_product_id, $limited_number, $order_id
+				$order_id,
+				$item_id,
+				$order_status,
+				$parent_product_id,
+				$limited_number,
+				$order_id
 			));
 		}
 
@@ -217,7 +222,7 @@ class IJWLP_Options
 		// Validate limited edition number
 		$check_pro_id = $variation_id > 0 ? $variation_id : $product_id;
 		$product = wc_get_product($check_pro_id);
-		
+
 		if ($product && $product->is_type('variation')) {
 			$parent_product_id = $product->get_parent_id();
 		} else {
@@ -225,7 +230,7 @@ class IJWLP_Options
 		}
 
 		$is_limited = get_post_meta($parent_product_id, '_woo_limit_status', true);
-		
+
 		if ($is_limited === 'yes') {
 			if (empty($limited_number)) {
 				wp_send_json_error(array('message' => __('Please enter a Limited Edition Number.', 'woolimited')));
@@ -234,7 +239,7 @@ class IJWLP_Options
 			// Validate number
 			$start = get_post_meta($parent_product_id, '_woo_limit_start_value', true);
 			$end = get_post_meta($parent_product_id, '_woo_limit_end_value', true);
-			
+
 			if ($start && $end) {
 				$clean_number = intval($limited_number);
 				if ($clean_number < intval($start) || $clean_number > intval($end)) {
@@ -251,7 +256,7 @@ class IJWLP_Options
 			// Check availability
 			$available_numbers = limitedNosAvailable($parent_product_id);
 			$available_array = array_map('trim', explode(',', $available_numbers));
-			
+
 			if (!in_array($limited_number, $available_array) && !in_array(intval($limited_number), $available_array)) {
 				wp_send_json_error(array('message' => __('This Limited Edition Number is not available.', 'woolimited')));
 			}
@@ -296,10 +301,10 @@ class IJWLP_Options
 			// Check for any WooCommerce error notices
 			$notices = wc_get_notices('error');
 			$message = !empty($notices) ? $notices[0]['notice'] : __('Failed to add product to cart.', 'woolimited');
-			
+
 			// Clear notices so they don't show as regular notices
 			wc_clear_notices();
-			
+
 			wp_send_json_error(array('message' => $message));
 		}
 	}
@@ -397,19 +402,19 @@ class IJWLP_Options
 			if (!is_array($new_numbers)) {
 				$new_numbers = array($new_numbers);
 			}
-			
+
 			$new_numbers = array_map('sanitize_text_field', $new_numbers);
 			$cart_item = $cart->get_cart_item($cart_item_key);
-			
+
 			if (!$cart_item) {
 				continue;
 			}
 
 			// Get existing numbers
-			$old_numbers = isset($cart_item['woo_limit']) ? 
-				(is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit'])) : 
+			$old_numbers = isset($cart_item['woo_limit']) ?
+				(is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit'])) :
 				array();
-			
+
 			// Check if numbers actually changed
 			if ($new_numbers === $old_numbers) {
 				continue;
@@ -417,10 +422,10 @@ class IJWLP_Options
 
 			// Validate new number
 			$actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : ($cart_item['variation_id'] > 0 ? $cart_item['variation_id'] : $cart_item['product_id']);
-			
+
 			$product = wc_get_product($actual_pro_id);
 			$parent_product_id = $actual_pro_id;
-			
+
 			if ($product && $product->is_type('variation')) {
 				$parent_product_id = $product->get_parent_id();
 			}
@@ -436,7 +441,7 @@ class IJWLP_Options
 			$end = get_post_meta($parent_product_id, '_woo_limit_end_value', true);
 			$available_numbers = limitedNosAvailable($parent_product_id);
 			$available_array = array_map('trim', explode(',', $available_numbers));
-			
+
 			$item_has_error = false;
 			foreach ($new_numbers as $new_number) {
 				// Validate number is within range
@@ -449,7 +454,7 @@ class IJWLP_Options
 							$start,
 							$end
 						);
-						
+
 						$errors[$cart_item_key] = $error_message;
 						$item_has_error = true;
 						break;
@@ -462,7 +467,7 @@ class IJWLP_Options
 					$clean_number = intval($new_number);
 					if (!in_array($clean_number, $available_array)) {
 						$error_message = sprintf(__('Limited Edition Number %s is not available.', 'woolimited'), $new_number);
-						
+
 						$errors[$cart_item_key] = $error_message;
 						$item_has_error = true;
 						break;
@@ -475,7 +480,7 @@ class IJWLP_Options
 				// Update cart item data
 				$cart_item['woo_limit'] = $new_numbers;
 				$cart->cart_contents[$cart_item_key] = $cart_item;
-				
+
 				// Update database - unblock old numbers, block new numbers
 				$this->update_limited_edition_in_database($cart_item_key, $old_numbers, $new_numbers, $parent_product_id, $actual_pro_id);
 			}
@@ -533,7 +538,7 @@ class IJWLP_Options
 			// Check if any of the new numbers are already blocked or ordered
 			$numbers_to_check = $new_numbers;
 			$blocked_numbers = array();
-			
+
 			foreach ($numbers_to_check as $number) {
 				$existing = $wpdb->get_row($wpdb->prepare(
 					"SELECT id, status, limit_no FROM $table 
@@ -580,7 +585,7 @@ class IJWLP_Options
 		if (!current_user_can('manage_options')) {
 			wp_send_json_error(array('message' => 'forbidden'), 403);
 		}
-		
+
 		check_ajax_referer('ijwlp_clear_in_cart');
 
 		global $table_prefix, $wpdb;
@@ -627,7 +632,7 @@ class IJWLP_Options
 		// Determine parent product ID
 		$check_pro_id = $variation_id > 0 ? $variation_id : $product_id;
 		$product = wc_get_product($check_pro_id);
-		
+
 		if ($product && $product->is_type('variation')) {
 			$parent_product_id = $product->get_parent_id();
 		} else {
@@ -650,7 +655,7 @@ class IJWLP_Options
 
 		// Check number status in database
 		$clean_number = intval($limited_number);
-		
+
 		// Check if number is ordered (sold)
 		$ordered = $wpdb->get_row($wpdb->prepare(
 			"SELECT id, status, order_id, user_id, cart_key FROM $table 
@@ -722,7 +727,7 @@ class IJWLP_Options
 		// Check if number is within valid range
 		$start = get_post_meta($parent_product_id, '_woo_limit_start_value', true);
 		$end = get_post_meta($parent_product_id, '_woo_limit_end_value', true);
-		
+
 		// Check maximum quantity limit (if configured) and compute counts
 		$max_quantity = get_post_meta($parent_product_id, '_woo_limit_max_quantity', true);
 		if (!empty($max_quantity)) {
@@ -881,11 +886,21 @@ class IJWLP_Options
 		));
 
 		if ($existing_record) {
-			// Update existing record with all numbers (comma-separated)
+			// Merge existing numbers with the new ones (avoid duplicates) and update
+			$existing_limit_no = trim($existing_record->limit_no);
+			$existing_numbers = [];
+			if ($existing_limit_no !== '') {
+				$existing_numbers = array_map('trim', explode(',', $existing_limit_no));
+			}
+			// Merge and keep unique values
+			$merged = array_unique(array_merge($existing_numbers, $limited_numbers));
+			$merged = array_filter($merged, 'strlen');
+			$merged_limit_no_string = implode(',', $merged);
+
 			$wpdb->update(
 				$table,
 				array(
-					'limit_no' => $limit_no_string,
+					'limit_no' => $merged_limit_no_string,
 					'time' => current_time('mysql'),
 				),
 				array(
@@ -898,7 +913,7 @@ class IJWLP_Options
 			// Check if any of these numbers are already blocked or ordered by another cart
 			$numbers_to_check = $limited_numbers;
 			$blocked_numbers = array();
-			
+
 			foreach ($numbers_to_check as $number) {
 				$existing = $wpdb->get_row($wpdb->prepare(
 					"SELECT id, status, limit_no FROM $table 
