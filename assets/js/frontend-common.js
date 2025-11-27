@@ -662,10 +662,7 @@
                     },
                 });
 
-                if (
-                    !$("body").hasClass("woocommerce-cart") &&
-                    $input.val() === ""
-                ) {
+                if (!$("body").hasClass("woocommerce-cart")) {
                     // Force suggestions to display immediately on first typing
                     setTimeout(function () {
                         var inst2 = $input.data("autocomplete");
