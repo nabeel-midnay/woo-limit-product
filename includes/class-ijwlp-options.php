@@ -130,6 +130,11 @@ class IJWLP_Options
 			$cart_item_key = $item->get_meta('_cart_item_key');
 			$limited_number = $item->get_meta('Limited Edition Number');
 
+			// Ensure limited_number is a string, not an array
+			if (is_array($limited_number)) {
+				$limited_number = implode(',', $limited_number);
+			}
+
 			if (empty($limited_number)) {
 				continue;
 			}
@@ -153,14 +158,14 @@ class IJWLP_Options
 				$updated = $wpdb->update(
 					$table,
 					array(
-						'order_id' => $order_id,
-						'order_item_id' => $item_id,
+						'order_id' => (string) $order_id,
+						'order_item_id' => (string) $item_id,
 						'status' => 'ordered',
 						'order_status' => $order_status
 					),
 					array(
-						'cart_key' => $cart_item_key,
-						'limit_no' => $limited_number
+						'cart_key' => (string) $cart_item_key,
+						'limit_no' => (string) $limited_number
 					),
 					array('%s', '%s', '%s', '%s'),
 					array('%s', '%s')
@@ -174,12 +179,12 @@ class IJWLP_Options
 				WHERE parent_product_id = %s 
 				AND limit_no = %s 
 				AND (status = 'block' OR order_id = %s)",
-				$order_id,
-				$item_id,
+				(string) $order_id,
+				(string) $item_id,
 				$order_status,
-				$parent_product_id,
-				$limited_number,
-				$order_id
+				(string) $parent_product_id,
+				(string) $limited_number,
+				(string) $order_id
 			));
 		}
 
@@ -187,7 +192,7 @@ class IJWLP_Options
 		$wpdb->update(
 			$table,
 			array('order_status' => $order_status),
-			array('order_id' => $order_id),
+			array('order_id' => (string) $order_id),
 			array('%s'),
 			array('%s')
 		);

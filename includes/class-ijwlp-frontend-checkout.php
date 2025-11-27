@@ -24,6 +24,32 @@ class IJWLP_Frontend_Checkout
 
         // Update status from 'block' to 'ordered' when order is created
         add_action('woocommerce_checkout_order_created', array($this, 'update_limited_edition_status'), 10, 1);
+
+        // Show limited edition number on thank you page
+        add_action('woocommerce_thankyou', array($this, 'show_limited_edition_on_thankyou'), 20, 1);
+    }
+    /**
+     * Display Limited Edition Number on the Thank You page
+     */
+    public function show_limited_edition_on_thankyou($order_id)
+    {
+        if (!$order_id) {
+            return;
+        }
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+        echo '<h3>' . esc_html__('Limited Edition Numbers', 'woo-limit-product') . '</h3>';
+        echo '<ul class="ijwlp-limited-edition-list">';
+        foreach ($order->get_items() as $item) {
+            $limited_number = $item->get_meta('Limited Edition Number');
+            if (!empty($limited_number)) {
+                $product_name = $item->get_name();
+                echo '<li>' . esc_html($product_name) . ': ' . esc_html($limited_number) . '</li>';
+            }
+        }
+        echo '</ul>';
     }
 
     /**
@@ -60,6 +86,12 @@ class IJWLP_Frontend_Checkout
                 continue;
             }
 
+            // Ensure limited_number is a string, not an array
+            if (is_array($limited_number)) {
+                $limited_number = implode(',', $limited_number);
+            }
+
+
             // Get product ID
             $product_id = $item->get_product_id();
             $variation_id = $item->get_variation_id();
@@ -77,14 +109,14 @@ class IJWLP_Frontend_Checkout
             $updated = $wpdb->update(
                 $table,
                 array(
-                    'order_id' => $order_id,
-                    'order_item_id' => $item_id,
+                    'order_id' => (string) $order_id,
+                    'order_item_id' => (string) $item_id,
                     'status' => 'ordered',
                     'order_status' => $order->get_status()
                 ),
                 array(
-                    'cart_key' => $cart_item_key,
-                    'limit_no' => $limited_number,
+                    'cart_key' => (string) $cart_item_key,
+                    'limit_no' => (string) $limited_number,
                     'status' => 'block'
                 ),
                 array('%s', '%s', '%s', '%s'),
@@ -96,14 +128,14 @@ class IJWLP_Frontend_Checkout
                 $updated = $wpdb->update(
                     $table,
                     array(
-                        'order_id' => $order_id,
-                        'order_item_id' => $item_id,
+                        'order_id' => (string) $order_id,
+                        'order_item_id' => (string) $item_id,
                         'status' => 'ordered',
                         'order_status' => $order->get_status()
                     ),
                     array(
-                        'parent_product_id' => $parent_product_id,
-                        'limit_no' => $limited_number,
+                        'parent_product_id' => (string) $parent_product_id,
+                        'limit_no' => (string) $limited_number,
                         'status' => 'block'
                     ),
                     array('%s', '%s', '%s', '%s'),
