@@ -1,0 +1,657 @@
+/**
+ * WooCommerce Limited Product - Frontend Cart Page JavaScript
+ *
+ * Handles cart page interactions for limited edition products
+ *
+ * @package WooCommerce Limited Product
+ */
+
+(function ($) {
+    "use strict";
+
+    $(document).ready(function () {
+        // debounce timer to avoid repeated cart updates when availability checks fire rapidly
+        var cartAvailableTimer = null;
+
+        // Function to setup validation and event listeners for a single input
+        function setupLimitInput($input) {
+            var $wrapper = $input.closest(".woo-limit-field-wrapper");
+            var $errorDiv = $wrapper.find(".woo-limit-message");
+            var productId = $wrapper.data("product-id");
+
+            window.IJWLP_Frontend_Common.setupNumberValidation({
+                $input: $input,
+                $button: null,
+                $errorDiv: $errorDiv,
+                delay: 2000,
+                getProductId: function () {
+                    return productId;
+                },
+                getVariationId: function () {
+                    return 0;
+                },
+                getCartItemKey: function () {
+                    return $input.data("cart-key");
+                },
+                onComplete: function (data) {
+                    // If server reports this number is available, update old-value and trigger cart update
+                    if (data && data.available) {
+                        var currentValue = $input.val().trim();
+                        $input.data("old-value", currentValue);
+                        if (cartAvailableTimer)
+                            clearTimeout(cartAvailableTimer);
+                        cartAvailableTimer = setTimeout(function () {
+                            triggerCartUpdate();
+                            cartAvailableTimer = null;
+                        }, 200);
+                    }
+                },
+            });
+
+            // attach autocomplete to this input
+            try {
+                attachAutocomplete && attachAutocomplete($input);
+            } catch (e) {
+                // fail silently if autocomplete not available
+            }
+        }
+
+        // Initialize all existing limit inputs
+        function initializeAllLimitInputs() {
+            $(".woo-limit-cart-item-wrapper .woo-limit").each(function () {
+                setupLimitInput($(this));
+            });
+        }
+
+        // Run initial setup on page load
+        initializeAllLimitInputs();
+
+        // Re-initialize after WooCommerce updates cart (AJAX refresh)
+        $(document.body).on("updated_cart_totals", function () {
+            initializeAllLimitInputs();
+        });
+
+        // Client-side enforcement: on load and when qty inputs change, ensure per-parent max is respected
+        function showClientNotice(message) {
+            var $wrapper = $(".woocommerce-notices-wrapper");
+            if (!$wrapper.length) {
+                $wrapper = $(
+                    '<div class="woocommerce-notices-wrapper" />'
+                ).prependTo(".woocommerce");
+            }
+            var $msg = $(
+                '<div class="woocommerce-message" role="alert"></div>'
+            ).text(message);
+            $wrapper.prepend($msg);
+            // Auto-remove after 6 seconds
+            setTimeout(function () {
+                $msg.fadeOut(300, function () {
+                    $(this).remove();
+                });
+            }, 6000);
+        }
+
+        // Trigger WooCommerce cart update: click the update button or submit the cart form
+        function triggerCartUpdate() {
+            // Try clicking the update cart button if present
+            var $updateBtn = $(
+                "button[name='update_cart'], input[name='update_cart']"
+            ).first();
+            if ($updateBtn.length) {
+                // give other events a moment to settle
+                setTimeout(function () {
+                    $updateBtn.trigger("click");
+                }, 150);
+                return;
+            }
+
+            // Fallback: submit the cart form if present
+            var $cartForm = $(".woocommerce-cart-form").first();
+            if ($cartForm.length) {
+                setTimeout(function () {
+                    $cartForm.submit();
+                }, 150);
+                return;
+            }
+
+            // Last resort: submit any form with class 'cart'
+            var $form = $("form.cart").first();
+            if ($form.length) {
+                setTimeout(function () {
+                    $form.submit();
+                }, 150);
+            }
+        }
+
+        function collectGroups() {
+            var groups = {};
+            $(".woo-limit-field-wrapper").each(function () {
+                var $w = $(this);
+                var parentId = String($w.data("product-id"));
+                var cartKey = $w.data("cart-item-key");
+                var max = parseInt($w.data("max-quantity") || "", 10);
+
+                // Find qty input by cart key
+                var $qty = $('input[name="cart[' + cartKey + '][qty]"]');
+                if (!$qty.length) {
+                    // fallback: nearest qty input in row
+                    $qty = $w.closest(".cart_item").find("input.qty");
+                }
+
+                var qtyVal = 0;
+                if ($qty.length) {
+                    qtyVal = parseInt($qty.val() || 0, 10) || 0;
+                }
+
+                if (!groups[parentId])
+                    groups[parentId] = {
+                        items: [],
+                        max: isNaN(max) ? null : max,
+                    };
+                groups[parentId].items.push({
+                    cartKey: cartKey,
+                    $qty: $qty,
+                    qty: qtyVal,
+                    $wrapper: $w,
+                });
+            });
+            return groups;
+        }
+
+        function enforceGroups(groups, showMessage) {
+            $.each(groups, function (parentId, info) {
+                var max = info.max;
+                if (!max) return; // no limit configured
+
+                var total = 0;
+                $.each(info.items, function (i, it) {
+                    total += it.qty;
+                });
+                if (total <= max) return;
+
+                var excess = total - max;
+                // reduce starting from last row
+                var rev = info.items.slice().reverse();
+                $.each(rev, function (i, it) {
+                    if (excess <= 0) return;
+                    if (!it.$qty.length) return;
+                    var rowQty = parseInt(it.$qty.val() || 0, 10) || 0;
+                    if (rowQty <= 0) return;
+                    var reduce = Math.min(rowQty, excess);
+                    var newQty = rowQty - reduce;
+                    it.$qty.val(newQty);
+                    // trigger change so WooCommerce picks it up if user will submit
+                    it.$qty.trigger("change");
+                    excess -= reduce;
+                });
+
+                if (showMessage) {
+                    showClientNotice(
+                        ijwlp_frontend.max_message ||
+                            "Maximum quantity reached for a limited product. Quantities adjusted to respect the limit."
+                    );
+                }
+            });
+        }
+
+        // Initialize quantity old values and checkbox UI
+        $("input.qty").each(function () {
+            var $q = $(this);
+            $q.data("old-qty", parseInt($q.val() || 0, 10) || 0);
+        });
+
+        // Inline checkbox UI removed; selection now happens inside the modal only.
+
+        // Open modal with removal details and set pending action
+        var pendingRemoval = null;
+        function openRemoveModal(action) {
+            pendingRemoval = action;
+            var $modal = $("#woo-limit-remove-modal");
+
+            // message area
+            var msgAll =
+                (window.ijwlp_frontend && ijwlp_frontend.modal_remove_all) ||
+                "You are about to remove ALL limited numbers for this item. This will remove the item from the cart.";
+            var msgListTitle =
+                (window.ijwlp_frontend &&
+                    ijwlp_frontend.modal_remove_list_title) ||
+                "You are about to remove the following Limited Edition Number(s):";
+
+            var $message = $modal.find(".woo-limit-modal-message");
+            var $listContainer = $modal.find(".woo-limit-modal-list-container");
+            $listContainer.empty();
+
+            // extract product name from cart row if available
+            var productName =
+                (action && action.productName) ||
+                (action && action.wrapper
+                    ? action.wrapper
+                          .closest(".cart_item")
+                          .find(".product-name a")
+                          .text()
+                    : "") ||
+                "";
+            var escName = $("<div/>").text(productName).html();
+
+            if (action.removeAll) {
+                // Don't show modal for single input removal - handle directly
+                closeRemoveModal();
+                return;
+            } else {
+                $message.html(
+                    "<p><strong>" +
+                        escName +
+                        "</strong></p><p>" +
+                        $("<div/>").text(msgListTitle).html() +
+                        "</p>"
+                );
+                // build list with checkboxes inside modal
+                var $list = $('<div class="woo-limit-modal-list"></div>');
+                var preChecked = action.preChecked || [];
+                for (var i = 0; i < action.numbers.length; i++) {
+                    var num = action.numbers[i] || "";
+                    var esc = $("<div/>").text(num).html();
+                    var $row = $(
+                        '<label style="display:block; margin:4px 0;"></label>'
+                    );
+                    var $cb = $(
+                        '<input type="checkbox" class="woo-limit-modal-select" />'
+                    ).attr("data-number", num);
+                    // pre-check modal boxes only for numbers in preChecked (last N)
+                    if (preChecked.indexOf(String(num)) !== -1) {
+                        $cb.prop("checked", true);
+                    }
+                    $row.append($cb).append(" " + esc);
+                    $list.append($row);
+                }
+                $listContainer.append($list);
+            }
+
+            $modal.show();
+        }
+
+        function closeRemoveModal() {
+            $("#woo-limit-remove-modal").hide();
+            pendingRemoval = null;
+        }
+
+        // Modal confirm/cancel handlers
+        $(document).on("click", "#woo-limit-confirm-remove", function () {
+            if (!pendingRemoval) return closeRemoveModal();
+            var action = pendingRemoval;
+            var $wrapper = action.wrapper;
+            var $qty = $wrapper.closest(".cart_item").find("input.qty");
+            var oldQty = $qty.data("old-qty") || 0;
+
+            // original count of limited inputs before removal
+            var originalCount =
+                action.currentCount ||
+                $wrapper.find(".woo-limit-cart-item input.woo-limit").length;
+
+            // Determine which numbers are selected inside modal
+            var $modal = $("#woo-limit-remove-modal");
+            var $checked = $modal.find(".woo-limit-modal-select:checked");
+
+            var performed = false;
+            if ($checked.length) {
+                var removed = 0;
+                $checked.each(function () {
+                    var num = $(this).data("number");
+                    // find corresponding input in wrapper (by number) and remove its item
+                    var $target = $wrapper
+                        .find(".woo-limit-cart-item input.woo-limit")
+                        .filter(function () {
+                            return String($(this).val()) === String(num);
+                        })
+                        .closest(".woo-limit-cart-item");
+                    if ($target.length) {
+                        $target.remove();
+                        removed++;
+                    }
+                });
+
+                var newQty = Math.max(0, originalCount - removed);
+                $qty.val(newQty).trigger("change");
+                $qty.data("old-qty", newQty);
+                performed = removed > 0;
+            } else if (action.removeAll) {
+                // no specific modal selection but action.removeAll -> remove all
+                $wrapper.find(".woo-limit-cart-item").remove();
+                $qty.val(0).trigger("change");
+                $qty.data("old-qty", 0);
+                performed = true;
+            }
+
+            closeRemoveModal();
+            if (performed) {
+                triggerCartUpdate();
+            }
+        });
+
+        // Click outside modal to close
+        $(document).on("click", "#woo-limit-remove-modal", function (e) {
+            if (e.target.id === "woo-limit-remove-modal") {
+                $(this).hide();
+                pendingRemoval = null;
+            }
+        });
+
+        // Append new limited inputs when qty increases, and prompt modal when qty decreased
+        $(document).on("change", "input.qty", function () {
+            var $qty = $(this);
+            var name = $qty.attr("name") || "";
+            var matches = name.match(/cart\[([^\]]+)\]\[qty\]/);
+            var cartKey = matches ? matches[1] : null;
+            var $wrapper = cartKey
+                ? $(
+                      '.woo-limit-field-wrapper[data-cart-item-key="' +
+                          cartKey +
+                          '"]'
+                  )
+                : $qty.closest(".cart_item").find(".woo-limit-field-wrapper");
+
+            var newQty = parseInt($qty.val() || 0, 10) || 0;
+            var oldQty = parseInt($qty.data("old-qty") || 0, 10) || 0;
+
+            // Update stored old-qty after handling
+            function finalizeQty(q) {
+                $qty.data("old-qty", q);
+            }
+
+            if (!$wrapper || !$wrapper.length) {
+                finalizeQty(newQty);
+                // still enforce groups globally
+                setTimeout(function () {
+                    var groups = collectGroups();
+                    enforceGroups(groups, true);
+                }, 50);
+                return;
+            }
+
+            var max = parseInt($wrapper.data("max-quantity") || "", 10) || null;
+            var $inputs = $wrapper.find(".woo-limit-cart-item input.woo-limit");
+            var currentCount = $inputs.length;
+
+            if (newQty > currentCount) {
+                // increase: append new inputs up to max
+                var toAdd = newQty - currentCount;
+                if (max !== null) {
+                    toAdd = Math.min(toAdd, Math.max(0, max - currentCount));
+                }
+                // Prevent increasing while existing inputs are empty
+                var $existingInputs = $wrapper.find(
+                    ".woo-limit-cart-item input.woo-limit"
+                );
+                var emptyCount = $existingInputs.filter(function () {
+                    return String($(this).val()).trim() === "";
+                }).length;
+                if (emptyCount > 0) {
+                    showClientNotice(
+                        ijwlp_frontend.fill_all_inputs_message ||
+                            "Please fill all existing Limited Edition Number inputs before increasing the quantity."
+                    );
+                    // revert qty to old value
+                    $qty.val(oldQty);
+                    finalizeQty(oldQty);
+                    return;
+                }
+                for (var i = 0; i < toAdd; i++) {
+                    // create new input block
+                    var index = currentCount + i;
+                    var $div = $('<div class="woo-limit-cart-item"></div>');
+                    var $inp = $(
+                        '<input type="number" class="woo-limit" name="woo_limit[' +
+                            cartKey +
+                            '][]" />'
+                    );
+                    $inp.attr("data-cart-key", cartKey);
+                    $inp.attr("data-index", index);
+                    $inp.attr("data-old-value", "");
+                    if ($wrapper.data("start"))
+                        $inp.attr("min", $wrapper.data("start"));
+                    if ($wrapper.data("end"))
+                        $inp.attr("max", $wrapper.data("end"));
+                    $div.append($inp);
+                    // append before available hidden input or message
+                    var $avail = $wrapper
+                        .find(".woo-limit-available-numbers")
+                        .first();
+                    if ($avail.length) {
+                        $avail.before($div);
+                    } else {
+                        $wrapper.append($div);
+                    }
+
+                    // setup validation for new input
+                    setupLimitInput($inp);
+                }
+
+                // No inline checkbox UI; modal-only selection will be used.
+
+                finalizeQty(newQty);
+                // re-run group enforcement without modal
+                setTimeout(function () {
+                    var groups = collectGroups();
+                    enforceGroups(groups, true);
+                }, 50);
+                return;
+            }
+
+            if (newQty < currentCount) {
+                // decrease: determine how many to remove
+                var removeCount = currentCount - newQty;
+                var $allInputs = $wrapper.find(
+                    ".woo-limit-cart-item input.woo-limit"
+                );
+
+                // If the last N inputs are empty, remove them immediately without a modal
+                var $lastInputs = $allInputs.slice(-removeCount);
+                var lastEmpty = true;
+                $lastInputs.each(function () {
+                    if (String($(this).val()).trim() !== "") {
+                        lastEmpty = false;
+                        return false;
+                    }
+                });
+
+                if (removeCount > 0 && lastEmpty) {
+                    // remove the corresponding wrapper blocks
+                    $lastInputs.closest(".woo-limit-cart-item").remove();
+
+                    // update qty to reflect removals and trigger change so WooCommerce picks it up
+                    $qty.data("old-qty", newQty);
+                    $qty.val(newQty).trigger("change");
+
+                    // re-run group enforcement without modal
+                    setTimeout(function () {
+                        var groups = collectGroups();
+                        enforceGroups(groups, true);
+                    }, 50);
+
+                    // trigger a cart update so server persists changes
+                    triggerCartUpdate();
+
+                    return;
+                }
+
+                // otherwise, show modal listing ALL numbers and pre-check the last N
+                // If only one input to remove, remove it directly without modal
+                if (removeCount === 1) {
+                    $allInputs.last().closest(".woo-limit-cart-item").remove();
+                    $qty.data("old-qty", newQty);
+                    $qty.val(newQty).trigger("change");
+                    setTimeout(function () {
+                        var groups = collectGroups();
+                        enforceGroups(groups, true);
+                    }, 50);
+                    triggerCartUpdate();
+                    return;
+                }
+
+                var allNumbers = [];
+                $allInputs.each(function () {
+                    allNumbers.push(String($(this).val()));
+                });
+                var preChecked = [];
+                if (removeCount > 0) {
+                    $allInputs.slice(-removeCount).each(function () {
+                        preChecked.push(String($(this).val()));
+                    });
+                }
+
+                // open modal to confirm removal; modal will show product name and list ALL numbers
+                openRemoveModal({
+                    wrapper: $wrapper,
+                    numbers: allNumbers,
+                    preChecked: preChecked,
+                    removeCount: removeCount,
+                    currentCount: currentCount,
+                    removeAll: removeCount === currentCount,
+                });
+
+                // do not finalize old-qty yet; it'll be set on confirm. If user cancels, modal cancel handler will revert qty.
+                return;
+            }
+
+            // no change in limited inputs needed
+            finalizeQty(newQty);
+            setTimeout(function () {
+                var groups = collectGroups();
+                enforceGroups(groups, true);
+            }, 50);
+        });
+
+        // Run on load (without modal confirmations)
+        var groupsOnLoad = collectGroups();
+        enforceGroups(groupsOnLoad, true);
+
+        // Inline checkbox UI removed; modal-only selection will be used on qty decrease
+
+        // Quantity +/- buttons: handle clicks while respecting validation state
+        function wrapperHasErrors($wrapper) {
+            if (!$wrapper || !$wrapper.length) return false;
+            var $err = $wrapper.find(".woo-limit-message.woo-limit-error");
+            if ($err.length && $err.is(":visible")) return true;
+            var $range = $wrapper.find(".woo-limit-range-info.woo-limit-error");
+            if ($range.length) return true;
+            // any inputs with validation class indicating error?
+            var $invalidInputs = $wrapper.find(".woo-limit.woo-limit-error");
+            if ($invalidInputs.length) return true;
+            return false;
+        }
+
+        function wrapperHasEmptyFields($wrapper) {
+            if (!$wrapper || !$wrapper.length) return false;
+            var empty = false;
+            $wrapper
+                .find(".woo-limit-cart-item input.woo-limit")
+                .each(function () {
+                    if (String($(this).val()).trim() === "") {
+                        empty = true;
+                        return false;
+                    }
+                });
+            return empty;
+        }
+
+        function updateQtyButtonsState($row) {
+            var $wrapper = $row.find(".woo-limit-field-wrapper").first();
+            var invalid =
+                wrapperHasErrors($wrapper) || wrapperHasEmptyFields($wrapper);
+            var $plus = $row
+                .find('.quantity-btn.plus, .quantity-btn[data-action="plus"]')
+                .first();
+            var $minus = $row
+                .find('.quantity-btn.minus, .quantity-btn[data-action="minus"]')
+                .first();
+            if ($plus && $plus.length) $plus.prop("disabled", invalid);
+            if ($minus && $minus.length)
+                $minus.prop("disabled", wrapperHasErrors($wrapper));
+        }
+
+        // Attach listeners to keep buttons up-to-date when limited inputs change
+        $(document).on(
+            "input change blur",
+            ".woo-limit-cart-item input.woo-limit",
+            function () {
+                var $inp = $(this);
+                var $row = $inp.closest(".cart_item");
+                updateQtyButtonsState($row);
+                // also re-enable buttons globally for that row if no issues
+            }
+        );
+
+        // Click handlers for quantity +/- buttons
+        $(document).on(
+            "click",
+            '.quantity-btn.plus, .quantity-btn[data-action="plus"]',
+            function (e) {
+                var $btn = $(this);
+                if ($btn.is(":disabled")) return;
+                var $row = $btn.closest(".cart_item");
+                var $qty = $row.find("input.qty").first();
+                var $wrapper = $row.find(".woo-limit-field-wrapper").first();
+
+                // If errors or empty fields exist, do not allow clicking
+                if (
+                    wrapperHasErrors($wrapper) ||
+                    wrapperHasEmptyFields($wrapper)
+                ) {
+                    $btn.prop("disabled", true);
+                    showClientNotice(
+                        ijwlp_frontend.fix_errors_message ||
+                            "Please fix errors and fill all Limited Edition Number inputs before changing the quantity."
+                    );
+                    return;
+                }
+
+                var current = parseInt($qty.val() || 0, 10) || 0;
+                var max =
+                    parseInt($wrapper.data("max-quantity") || "", 10) || null;
+                if (max !== null && !isNaN(max) && current >= max) {
+                    showClientNotice(
+                        ijwlp_frontend.max_message ||
+                            "Maximum quantity reached for a limited product."
+                    );
+                    return;
+                }
+
+                $qty.val(current + 1).trigger("change");
+                // re-check buttons after change
+                setTimeout(function () {
+                    updateQtyButtonsState($row);
+                }, 50);
+            }
+        );
+
+        $(document).on(
+            "click",
+            '.quantity-btn.minus, .quantity-btn[data-action="minus"]',
+            function (e) {
+                var $btn = $(this);
+                if ($btn.is(":disabled")) return;
+                var $row = $btn.closest(".cart_item");
+                var $qty = $row.find("input.qty").first();
+                var $wrapper = $row.find(".woo-limit-field-wrapper").first();
+
+                // If errors or empty fields exist, do not allow clicking
+                if (wrapperHasErrors($wrapper)) {
+                    $btn.prop("disabled", true);
+                    showClientNotice(
+                        ijwlp_frontend.fix_errors_message ||
+                            "Please fix errors and fill all Limited Edition Number inputs before changing the quantity."
+                    );
+                    return;
+                }
+
+                var current = parseInt($qty.val() || 0, 10) || 0;
+                if (current <= 0) return;
+                $qty.val(Math.max(0, current - 1)).trigger("change");
+                // re-check buttons after change
+                setTimeout(function () {
+                    updateQtyButtonsState($row);
+                }, 50);
+            }
+        );
+    });
+})(jQuery);

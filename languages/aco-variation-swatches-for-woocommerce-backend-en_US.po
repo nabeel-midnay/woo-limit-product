@@ -1,0 +1,76 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=utf-8\n"
+"X-Generator: babel-plugin-makepot\n"
+
+#: backend.js
+msgid "Woo Limit Orders"
+msgstr ""
+
+#: backend.js
+msgid "Woo Limit Settings"
+msgstr ""
+
+#: backend.js
+msgid "No orders found."
+msgstr ""
+
+#: backend.js
+msgid "ID"
+msgstr ""
+
+#: backend.js
+msgid "PRODUCT"
+msgstr ""
+
+#: backend.js
+msgid "USER ID"
+msgstr ""
+
+#: backend.js
+msgid "LIMIT NO"
+msgstr ""
+
+#: backend.js
+msgid "STATUS"
+msgstr ""
+
+#: backend.js
+msgid "ORDER DETAILS"
+msgstr ""
+
+#: backend.js
+msgid "Cross"
+msgstr ""
+
+#: backend.js
+msgid "Blur"
+msgstr ""
+
+#: backend.js
+msgid "Hide"
+msgstr ""
+
+#: backend.js
+msgid "Global Settings"
+msgstr ""
+
+#: backend.js
+msgid "Out Of Stock Variation Style"
+msgstr ""
+
+#: backend.js
+msgid "Out Of Stock Style"
+msgstr ""
+
+#: backend.js
+msgid "Display Swatches on Product Listing Page"
+msgstr ""
+
+#: backend.js
+msgid "Display Orders Labels on Product Listing Page"
+msgstr ""
+
+#: backend.js
+msgid "Save Changes"
+msgstr ""

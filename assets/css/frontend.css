@@ -1,0 +1,274 @@
+/**
+ * WooCommerce Limited Product - Frontend Styles
+ */
+
+/* Limited Edition Number Field Wrapper */
+.woo-limit-field-wrapper {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    position: relative;
+}
+
+.woo-limit-field-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+    font-size: 14px;
+}
+
+.woo-limit-field-label .required {
+    color: #e2401c;
+    margin-left: 3px;
+}
+
+.woo-limit {
+    width: 100%;
+    max-width: 300px;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1.5;
+    transition: border-color 0.3s ease;
+}
+
+.woo-limit:focus {
+    outline: none;
+    border-color: #0073aa;
+    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.1);
+}
+
+.woo-limit:invalid {
+    border-color: #e2401c;
+}
+
+.woo-limit-available-info {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #666;
+    line-height: 1.4;
+}
+
+.woo-limit-available-info.woo-limit-error {
+    color: #e2401c;
+    font-weight: 500;
+}
+
+.woo-limit-range-info.woo-limit-error {
+    color: #e2401c;
+}
+
+.woo-limit-message {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    color: #856404;
+    font-size: 13px;
+    line-height: 1.4;
+    display: none;
+}
+
+.woo-limit-message.woo-limit-error {
+    background: #f8d7da;
+    border-color: #e2401c;
+    color: #721c24;
+}
+
+.woo-limit-message.woo-limit-info {
+    background: #d1ecf1;
+    border-color: #0073aa;
+    color: #0c5460;
+}
+
+.woo-limit-message.loading {
+    background: #e7f3ff;
+    border-color: #0073aa;
+    color: #004085;
+    position: relative;
+    padding-left: 35px;
+}
+
+.woo-limit-message.loading:before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    border: 2px solid #0073aa;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: woo-limit-spin 0.6s linear infinite;
+}
+
+@keyframes woo-limit-spin {
+    to {
+        transform: translateY(-50%) rotate(360deg);
+    }
+}
+
+/* Loading state for input fields */
+.woo-limit.woo-limit-loading {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="%230073aa" stroke-width="2" fill="none" stroke-dasharray="31.416" stroke-dashoffset="31.416"><animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416;0 31.416" repeatCount="indefinite"/><animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416;-31.416" repeatCount="indefinite"/></circle></svg>');
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 40px;
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.woo-limit.woo-limit-error {
+    border-color: #e2401c;
+    background-color: #fff5f5;
+}
+
+/* Loading state for buttons */
+button.woo-limit-loading,
+button.single_add_to_cart_button.woo-limit-loading,
+button[name="add-to-cart"].woo-limit-loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+button.woo-limit-loading:after,
+button.single_add_to_cart_button.woo-limit-loading:after,
+button[name="add-to-cart"].woo-limit-loading:after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: woo-limit-spin-button 0.6s linear infinite;
+}
+
+@keyframes woo-limit-spin-button {
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+}
+
+/* Hide quantity field for all products */
+.woocommerce div.product form.cart .quantity,
+.woocommerce div.product form.cart .quantity input {
+    display: none !important;
+}
+
+/* Disabled add to cart button */
+button.single_add_to_cart_button.disabled,
+button[name="add-to-cart"].disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Cart page specific styles - uses same classes as product page but with wrapper specificity */
+.woo-limit-cart-item-wrapper {
+    margin: 10px 0;
+}
+
+.woo-limit-cart-item-wrapper .woo-limit-field-wrapper {
+    margin: 10px 0;
+    padding: 10px;
+}
+
+.woo-limit-cart-item-wrapper .woo-limit-field-label {
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.woo-limit-cart-item-wrapper .woo-limit {
+    max-width: 250px;
+    padding: 8px 10px;
+    font-size: 14px;
+}
+
+.woo-limit-cart-item-wrapper .woo-limit-message {
+    margin-top: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.woo-limit-cart-item-wrapper .woo-limit-message.loading {
+    padding-left: 30px;
+}
+
+.woo-limit-cart-item-wrapper .woo-limit-message.loading:before {
+    left: 10px;
+    width: 12px;
+    height: 12px;
+}
+
+/* Cart item wrapper for individual inputs */
+.woo-limit-cart-item {
+    margin-bottom: 8px;
+}
+
+.woo-limit-cart-item:last-child {
+    margin-bottom: 0;
+}
+
+.woocommerce-cart .qty {
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.woocommerce-cart .button[name="update_cart"] {
+    display: none !important;
+}
+
+/* Container that holds the suggestions */
+.woo-limit-autocomplete-box {
+    position: absolute;
+    left: 0;
+    right: 0;
+    margin-top: 2px;
+    z-index: 10000;
+}
+
+/* Devbridge suggestion container */
+.woo-limit-autocomplete {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    border: 1px solid #ddd;
+    background: #fff;
+    padding: 4px;
+    gap: 6px;
+}
+
+/* Each suggestion item */
+.woo-limit-autocomplete .autocomplete-suggestion {
+    display: inline-block;
+    white-space: nowrap;
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Hover styling */
+.woo-limit-autocomplete .autocomplete-suggestion:hover {
+    background: #f0f0f0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .woo-limit {
+        max-width: 100%;
+    }
+}

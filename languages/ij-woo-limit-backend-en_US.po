@@ -1,0 +1,136 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=utf-8\n"
+"X-Generator: babel-plugin-makepot\n"
+
+#: backend.js
+msgid "Woo Limited Product"
+msgstr ""
+
+#: backend.js
+msgid "No orders found."
+msgstr ""
+
+#: backend.js
+msgid "Orders"
+msgstr ""
+
+#: backend.js
+msgid "Filter Options"
+msgstr ""
+
+#: backend.js
+msgid "Select Product"
+msgstr ""
+
+#: backend.js
+msgid "Select User"
+msgstr ""
+
+#: backend.js
+msgid "Go"
+msgstr ""
+
+#: backend.js
+msgid "ID"
+msgstr ""
+
+#: backend.js
+msgid "PRODUCT"
+msgstr ""
+
+#: backend.js
+msgid "USER ID"
+msgstr ""
+
+#: backend.js
+msgid "LIMIT NO"
+msgstr ""
+
+#: backend.js
+msgid "STATUS"
+msgstr ""
+
+#: backend.js
+msgid "DATE"
+msgstr ""
+
+#: backend.js
+msgid "ORDER STATUS"
+msgstr ""
+
+#: backend.js
+msgid "ORDER DETAILS"
+msgstr ""
+
+#: backend.js
+msgid "In product summary"
+msgstr ""
+
+#: backend.js
+msgid "Before add to cart form"
+msgstr ""
+
+#: backend.js
+msgid "Before variations from"
+msgstr ""
+
+#: backend.js
+msgid "Before add to cart button"
+msgstr ""
+
+#: backend.js
+msgid "After add to cart button"
+msgstr ""
+
+#: backend.js
+msgid "After variations from"
+msgstr ""
+
+#: backend.js
+msgid "After add to cart form"
+msgstr ""
+
+#: backend.js
+msgid "Product meta start"
+msgstr ""
+
+#: backend.js
+msgid "Product meta end"
+msgstr ""
+
+#: backend.js
+msgid "After product summary"
+msgstr ""
+
+#: backend.js
+msgid "Settings"
+msgstr ""
+
+#: backend.js
+msgid "Global Settings"
+msgstr ""
+
+#: backend.js
+msgid "Enable Timer (Disable / Enable Timer)"
+msgstr ""
+
+#: backend.js
+msgid "Listing Page Text"
+msgstr ""
+
+#: backend.js
+msgid "Cart Page Text"
+msgstr ""
+
+#: backend.js
+msgid "Timer Limit (Default 15 mins)"
+msgstr ""
+
+#: backend.js
+msgid "Time in Minutes"
+msgstr ""
+
+#: backend.js
+msgid "Save Changes"
+msgstr ""

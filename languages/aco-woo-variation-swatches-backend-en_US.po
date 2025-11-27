@@ -1,0 +1,288 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=utf-8\n"
+"X-Generator: babel-plugin-makepot\n"
+
+#: backend.js
+msgid "Vertical"
+msgstr ""
+
+#: backend.js
+msgid "Horizontal"
+msgstr ""
+
+#: backend.js
+msgid "Label"
+msgstr ""
+
+#: backend.js
+msgid "Radio"
+msgstr ""
+
+#: backend.js
+msgid "Color"
+msgstr ""
+
+#: backend.js
+msgid "Image"
+msgstr ""
+
+#: backend.js
+msgid "Default"
+msgstr ""
+
+#: backend.js
+msgid "Upload Attribute Image"
+msgstr ""
+
+#: backend.js
+msgid "No attributes found."
+msgstr ""
+
+#: backend.js
+msgid "We are build something awesome..!"
+msgstr ""
+
+#: backend.js
+msgid "Our premium version plugin coming soon."
+msgstr ""
+
+#: backend.js
+msgid "Attribute Name"
+msgstr ""
+
+#: backend.js
+msgid "Attribute Slug"
+msgstr ""
+
+#: backend.js
+msgid "Attribute Type"
+msgstr ""
+
+#: backend.js
+msgid "Style"
+msgstr ""
+
+#: backend.js
+msgid "Select Style"
+msgstr ""
+
+#: backend.js
+msgid "Type"
+msgstr ""
+
+#: backend.js
+msgid "Select Type"
+msgstr ""
+
+#: backend.js
+msgid "Set Attribute Images"
+msgstr ""
+
+#: backend.js
+msgid "No Image"
+msgstr ""
+
+#: backend.js
+msgid "Change Image"
+msgstr ""
+
+#: backend.js
+msgid "Upload Image"
+msgstr ""
+
+#: backend.js
+msgid "No variations found."
+msgstr ""
+
+#: backend.js
+msgid "Set Attribute Colors"
+msgstr ""
+
+#: backend.js
+msgid "Icon Height"
+msgstr ""
+
+#: backend.js
+msgid "in PX"
+msgstr ""
+
+#: backend.js
+msgid "Icon Width"
+msgstr ""
+
+#: backend.js
+msgid "Save Changes"
+msgstr ""
+
+#: backend.js
+msgid "Global Settings"
+msgstr ""
+
+#: backend.js
+msgid "Check premium options"
+msgstr ""
+
+#: backend.js
+msgid "Hey there,"
+msgstr ""
+
+#: backend.js
+msgid "Welcome to swatches attribute settings"
+msgstr ""
+
+#: backend.js
+msgid "Square"
+msgstr ""
+
+#: backend.js
+msgid "Rounded"
+msgstr ""
+
+#: backend.js
+msgid "Edge Rounded Square"
+msgstr ""
+
+#: backend.js
+msgid "Cross"
+msgstr ""
+
+#: backend.js
+msgid "Blur"
+msgstr ""
+
+#: backend.js
+msgid "Hide"
+msgstr ""
+
+#: backend.js
+msgid "Top"
+msgstr ""
+
+#: backend.js
+msgid "Bottom"
+msgstr ""
+
+#: backend.js
+msgid "Right"
+msgstr ""
+
+#: backend.js
+msgid "Left"
+msgstr ""
+
+#: backend.js
+msgid "Additional Settings"
+msgstr ""
+
+#: backend.js
+msgid "General Settings"
+msgstr ""
+
+#: backend.js
+msgid "Attribute Font Size"
+msgstr ""
+
+#: backend.js
+msgid "Label Settings"
+msgstr ""
+
+#: backend.js
+msgid "Height"
+msgstr ""
+
+#: backend.js
+msgid "Line Height"
+msgstr ""
+
+#: backend.js
+msgid "Select Swatches Type"
+msgstr ""
+
+#: backend.js
+msgid "Border Radius"
+msgstr ""
+
+#: backend.js
+msgid "Font Size"
+msgstr ""
+
+#: backend.js
+msgid "Text Color"
+msgstr ""
+
+#: backend.js
+msgid "Button Background"
+msgstr ""
+
+#: backend.js
+msgid "Border Color"
+msgstr ""
+
+#: backend.js
+msgid "Hover Settings"
+msgstr ""
+
+#: backend.js
+msgid "Active Settings"
+msgstr ""
+
+#: backend.js
+msgid "Radio Settings"
+msgstr ""
+
+#: backend.js
+msgid "Background Color"
+msgstr ""
+
+#: backend.js
+msgid "Opacity (in %)"
+msgstr ""
+
+#: backend.js
+msgid "Color Settings"
+msgstr ""
+
+#: backend.js
+msgid "Width"
+msgstr ""
+
+#: backend.js
+msgid "Image Settings"
+msgstr ""
+
+#: backend.js
+msgid "Tooltip Settings"
+msgstr ""
+
+#: backend.js
+msgid "Enable Tooltip"
+msgstr ""
+
+#: backend.js
+msgid "Position"
+msgstr ""
+
+#: backend.js
+msgid "Tooltip Position"
+msgstr ""
+
+#: backend.js
+msgid "Tooltip Text Color"
+msgstr ""
+
+#: backend.js
+msgid "Tooltip Border Color"
+msgstr ""
+
+#: backend.js
+msgid "Tooltip Background Color"
+msgstr ""
+
+#: backend.js
+msgid "Out Of Stock Variation Style"
+msgstr ""
+
+#: backend.js
+msgid "Out Of Stock"
+msgstr ""

@@ -1,0 +1,8 @@
+#woo_limit_product .form-field input[type="number"]{
+    width: 40%;
+    display: inline-block;
+}
+.woocommerce_options_panel#woo_limit_product .form-field .description{
+    display: inline-block;
+    width: auto;
+}
