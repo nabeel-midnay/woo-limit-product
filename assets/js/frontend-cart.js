@@ -50,7 +50,13 @@
 
             // attach autocomplete to this input
             try {
-                attachAutocomplete && attachAutocomplete($input);
+                if (
+                    window.IJWLP_Frontend_Common &&
+                    typeof window.IJWLP_Frontend_Common.attachAutocomplete ===
+                        "function"
+                ) {
+                    window.IJWLP_Frontend_Common.attachAutocomplete($input);
+                }
             } catch (e) {
                 // fail silently if autocomplete not available
             }
