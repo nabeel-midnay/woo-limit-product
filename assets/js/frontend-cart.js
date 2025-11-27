@@ -609,9 +609,11 @@
                 var max =
                     parseInt($wrapper.data("max-quantity") || "", 10) || null;
                 if (max !== null && !isNaN(max) && current >= max) {
-                    showClientNotice(
+                    var $errorDiv = $wrapper.find(".woo-limit-message");
+                    window.IJWLP_Frontend_Common.showError(
                         ijwlp_frontend.max_message ||
-                            "Maximum quantity reached for a limited product."
+                            "Maximum quantity reached for a limited product.",
+                        $errorDiv
                     );
                     return;
                 }
