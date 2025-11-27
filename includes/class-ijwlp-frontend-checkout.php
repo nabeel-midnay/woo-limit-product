@@ -25,31 +25,22 @@ class IJWLP_Frontend_Checkout
         // Update status from 'block' to 'ordered' when order is created
         add_action('woocommerce_checkout_order_created', array($this, 'update_limited_edition_status'), 10, 1);
 
-        // Show limited edition number on thank you page
-        add_action('woocommerce_thankyou', array($this, 'show_limited_edition_on_thankyou'), 20, 1);
+
+        // Show Limited Edition Number with order item meta
+        add_action('woocommerce_order_item_meta_start', array($this, 'show_limited_edition_in_item_meta'), 10, 3);
     }
     /**
-     * Display Limited Edition Number on the Thank You page
+     * Display Limited Edition Number in order item meta
      */
-    public function show_limited_edition_on_thankyou($order_id)
+    public function show_limited_edition_in_item_meta($item_id, $item, $order)
     {
-        if (!$order_id) {
-            return;
-        }
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            return;
-        }
-        echo '<h3>' . esc_html__('Limited Edition Numbers', 'woo-limit-product') . '</h3>';
-        echo '<ul class="ijwlp-limited-edition-list">';
-        foreach ($order->get_items() as $item) {
-            $limited_number = $item->get_meta('Limited Edition Number');
-            if (!empty($limited_number)) {
-                $product_name = $item->get_name();
-                echo '<li>' . esc_html($product_name) . ': ' . esc_html($limited_number) . '</li>';
+        $limited_number = $item->get_meta('Limited Edition Number');
+        if (!empty($limited_number)) {
+            if (is_array($limited_number)) {
+                $limited_number = implode(', ', $limited_number);
             }
+            echo '<div class="ijwlp-limited-number-meta"><strong>' . esc_html__('Limited Edition Number', 'woo-limit-product') . ':</strong> ' . esc_html($limited_number) . '</div>';
         }
-        echo '</ul>';
     }
 
     /**
