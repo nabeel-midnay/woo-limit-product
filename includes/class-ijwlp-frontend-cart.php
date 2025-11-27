@@ -21,30 +21,29 @@ class IJWLP_Frontend_Cart
     {
         // Display limited edition number input field in cart - use cart item name action
         add_action('woocommerce_after_cart_item_name', array($this, 'append_limited_edition_input_to_name'), 99, 2);
-        
+
         // Update limited edition number when changed in cart
         // Validate quantities on cart update (run before number updates)
         add_filter('woocommerce_update_cart_action_cart_updated', array($this, 'validate_cart_quantities_on_update'), 9, 1);
         add_filter('woocommerce_update_cart_action_cart_updated', array($this, 'update_cart_item_limited_number'), 10, 1);
-        
+
         // Merge limited edition numbers when adding to existing cart item (run first)
         add_action('woocommerce_add_to_cart', array($this, 'merge_limited_edition_on_add'), 5, 6);
 
         // Group identical cart items (same product/variation) on cart display
         add_action('woocommerce_before_cart', array($this, 'group_similar_cart_items'), 10);
-        
+
         // Block limited edition number when item is added to cart (run after merge)
         add_action('woocommerce_add_to_cart', array($this, 'block_limited_edition_number'), 15, 6);
-        
+
         // Remove limited edition numbers from database when item is removed from cart
         add_action('woocommerce_remove_cart_item', array($this, 'remove_limited_edition_from_database'), 10, 2);
         add_action('woocommerce_cart_item_removed', array($this, 'remove_limited_edition_from_database'), 10, 2);
-    
+
         // Clear cart on logout if there are limited edition products in the cart
         add_action('wp_logout', array($this, 'maybe_clear_cart_on_logout'), 10);
 
         add_action('wp_footer', array($this, 'remove_modal'), 10);
-    
     }
 
     /**
@@ -236,7 +235,7 @@ class IJWLP_Frontend_Cart
      */
     public function append_limited_edition_input_to_name($cart_item, $cart_item_key)
     {
-   
+
         // Only append if this cart item has limited edition number(s)
         if (!isset($cart_item['woo_limit']) || empty($cart_item['woo_limit'])) {
             return;
@@ -249,11 +248,11 @@ class IJWLP_Frontend_Cart
         $product_id = $cart_item['product_id'];
         $variation_id = $cart_item['variation_id'];
         $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : ($variation_id > 0 ? $variation_id : $product_id);
-        
+
         // Get parent product ID for variable products
         $product = wc_get_product($actual_pro_id);
         $parent_product_id = $actual_pro_id;
-        
+
         if ($product && $product->is_type('variation')) {
             $parent_product_id = $product->get_parent_id();
         }
@@ -276,17 +275,19 @@ class IJWLP_Frontend_Cart
         $limit_label_cart = IJWLP_Options::get_setting('limitlabelcart', __('Limited Edition Number(s)', 'woolimited'));
 
         // Output input fields after product name - one for each limited edition number
-        ?>
+?>
         <?php $max_qty = get_post_meta($parent_product_id, '_woo_limit_max_quantity', true); ?>
-        <div class="woo-limit-field-wrapper woo-limit-cart-item-wrapper" data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>" data-product-id="<?php echo esc_attr($parent_product_id); ?>" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>"<?php if (!empty($max_qty)) { echo ' data-max-quantity="' . esc_attr($max_qty) . '"'; } ?>>
+        <div class="woo-limit-field-wrapper woo-limit-cart-item-wrapper" data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>" data-product-id="<?php echo esc_attr($parent_product_id); ?>" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" <?php if (!empty($max_qty)) {
+                                                                                                                                                                                                                                                                                                echo ' data-max-quantity="' . esc_attr($max_qty) . '"';
+                                                                                                                                                                                                                                                                                            } ?>>
             <p class="woo-limit-field-label">
                 <?php echo esc_html($limit_label_cart); ?>
             </p>
             <?php if ($start && $end): ?>
-            <p class="woo-limit-range-info">
-                <?php esc_html_e('Enter a number between: ', 'woolimited'); ?>
-                <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
-            </p>
+                <p class="woo-limit-range-info">
+                    <?php esc_html_e('Enter a number between: ', 'woolimited'); ?>
+                    <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
+                </p>
             <?php endif; ?>
             <?php foreach ($limited_numbers as $index => $limited_number): ?>
                 <div class="woo-limit-cart-item">
@@ -299,9 +300,9 @@ class IJWLP_Frontend_Cart
                         data-cart-key="<?php echo esc_attr($cart_item_key); ?>"
                         data-index="<?php echo esc_attr($index); ?>"
                         data-old-value="<?php echo esc_attr($limited_number); ?>"
-                        placeholder="<?php esc_attr_e('Enter edition number', 'woolimited'); ?>" 
+                        placeholder="<?php esc_attr_e('Enter edition number', 'woolimited'); ?>"
                         min="<?php echo esc_attr($start); ?>"
-                        max="<?php echo esc_attr($end); ?>"/>
+                        max="<?php echo esc_attr($end); ?>" />
                 </div>
             <?php endforeach; ?>
             <input
@@ -311,7 +312,7 @@ class IJWLP_Frontend_Cart
                 value="<?php echo esc_attr($available_numbers); ?>" />
             <div class="woo-limit-message" style="display: none;"></div>
         </div>
-        <?php
+    <?php
     }
 
     /**
@@ -338,19 +339,19 @@ class IJWLP_Frontend_Cart
             if (!is_array($new_numbers)) {
                 $new_numbers = array($new_numbers);
             }
-            
+
             $new_numbers = array_map('sanitize_text_field', $new_numbers);
             $cart_item = $cart->get_cart_item($cart_item_key);
-            
+
             if (!$cart_item) {
                 continue;
             }
 
             // Get existing numbers
-            $old_numbers = isset($cart_item['woo_limit']) ? 
-                (is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit'])) : 
+            $old_numbers = isset($cart_item['woo_limit']) ?
+                (is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit'])) :
                 array();
-            
+
             // Check if numbers actually changed
             if ($new_numbers === $old_numbers) {
                 continue;
@@ -358,10 +359,10 @@ class IJWLP_Frontend_Cart
 
             // Validate new number
             $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : ($cart_item['variation_id'] > 0 ? $cart_item['variation_id'] : $cart_item['product_id']);
-            
+
             $product = wc_get_product($actual_pro_id);
             $parent_product_id = $actual_pro_id;
-            
+
             if ($product && $product->is_type('variation')) {
                 $parent_product_id = $product->get_parent_id();
             }
@@ -426,7 +427,7 @@ class IJWLP_Frontend_Cart
             }
 
             $user_numbers = array_filter(array_unique($user_numbers), 'strlen');
-            
+
             $item_has_error = false;
             foreach ($new_numbers as $new_number) {
                 // Validate number is within range
@@ -439,7 +440,7 @@ class IJWLP_Frontend_Cart
                             $start,
                             $end
                         );
-                        
+
                         if ($is_ajax) {
                             $errors[$cart_item_key] = $error_message;
                         } else {
@@ -466,7 +467,7 @@ class IJWLP_Frontend_Cart
 
                     if (!in_array($clean_number, $available_array)) {
                         $error_message = sprintf(__('Limited Edition Number %s is not available.', 'woolimited'), $new_number);
-                        
+
                         if ($is_ajax) {
                             $errors[$cart_item_key] = $error_message;
                         } else {
@@ -483,10 +484,10 @@ class IJWLP_Frontend_Cart
                 // Update cart item data
                 $cart_item['woo_limit'] = $new_numbers;
                 $cart->cart_contents[$cart_item_key] = $cart_item;
-                
+
                 // Update database - unblock old numbers, block new numbers
                 $this->update_limited_edition_in_database($cart_item_key, $old_numbers, $new_numbers, $parent_product_id, $actual_pro_id);
-                
+
                 $cart_updated = true;
             }
         }
@@ -548,7 +549,7 @@ class IJWLP_Frontend_Cart
             // Check if any of the new numbers are already blocked or ordered
             $numbers_to_check = $new_numbers;
             $blocked_numbers = array();
-            
+
             foreach ($numbers_to_check as $number) {
                 $existing = $wpdb->get_row($wpdb->prepare(
                     "SELECT id, status, limit_no FROM $table 
@@ -610,10 +611,10 @@ class IJWLP_Frontend_Cart
 
         // Convert to array if needed
         $existing_numbers = is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit']);
-        
+
         // Get the new number from cart_item_data
-        $new_number = isset($cart_item_data['woo_limit']) ? 
-            (is_array($cart_item_data['woo_limit']) ? $cart_item_data['woo_limit'][0] : $cart_item_data['woo_limit']) : 
+        $new_number = isset($cart_item_data['woo_limit']) ?
+            (is_array($cart_item_data['woo_limit']) ? $cart_item_data['woo_limit'][0] : $cart_item_data['woo_limit']) :
             null;
 
         if ($new_number && !in_array($new_number, $existing_numbers)) {
@@ -652,7 +653,7 @@ class IJWLP_Frontend_Cart
         // Get parent product ID for variable products
         $product = wc_get_product($actual_pro_id);
         $parent_product_id = $actual_pro_id;
-        
+
         if ($product && $product->is_type('variation')) {
             $parent_product_id = $product->get_parent_id();
         }
@@ -706,7 +707,7 @@ class IJWLP_Frontend_Cart
             // Check if any of these numbers are already blocked or ordered by another cart
             $numbers_to_check = $limited_numbers;
             $blocked_numbers = array();
-            
+
             foreach ($numbers_to_check as $number) {
                 $existing = $wpdb->get_row($wpdb->prepare(
                     "SELECT id, status, limit_no FROM $table 
@@ -749,30 +750,17 @@ class IJWLP_Frontend_Cart
     /**
      * Remove limited edition numbers from database when item is removed from cart
      * Handles both woocommerce_remove_cart_item and woocommerce_cart_item_removed hooks
+     * 
+     * Note: Always attempts deletion by cart_item_key, regardless of whether cart item data is available.
+     * This ensures DB cleanup even when mini cart removal doesn't pass full cart item details.
      */
     public function remove_limited_edition_from_database($cart_item_key, $cart_or_item)
     {
         global $wpdb, $table_prefix;
         $table = $table_prefix . 'woo_limit';
 
-        // Get cart item - $cart_or_item could be cart object or cart item array depending on hook
-        $cart_item = null;
-        if (is_array($cart_or_item)) {
-            // woocommerce_cart_item_removed passes cart item directly
-            $cart_item = $cart_or_item;
-        } else {
-            // woocommerce_remove_cart_item passes cart object
-            $cart = $cart_or_item;
-            if ($cart && method_exists($cart, 'get_cart_item')) {
-                $cart_item = $cart->get_cart_item($cart_item_key);
-            }
-        }
-        
-        if (!$cart_item || !isset($cart_item['woo_limit']) || empty($cart_item['woo_limit'])) {
-            return;
-        }
-
-        // Remove the entire record for this cart_key (since all numbers are stored in one record)
+        // Always attempt to delete by cart_item_key from the database
+        // This ensures cleanup even when cart item data is not available (e.g., mini cart removals)
         $wpdb->delete(
             $table,
             array(
@@ -830,8 +818,9 @@ class IJWLP_Frontend_Cart
         }
     }
 
-    public function remove_modal() {
-        ?>
+    public function remove_modal()
+    {
+    ?>
         <div id="woo-limit-remove-modal" class="woo-limit-modal" style="display: none;">
             <div class="woo-limit-modal-content">
                 <span class="woo-limit-close">&times;</span>
@@ -847,7 +836,6 @@ class IJWLP_Frontend_Cart
                 </div>
             </div>
         </div>
-        <?php
+<?php
     }
-
 }
