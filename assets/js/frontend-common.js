@@ -223,47 +223,134 @@
                             data.available = true;
                         } else {
                             // Treat any non-'available' or unavailable as an error
-                            var msg =
-                                data && data.message
-                                    ? data.message
-                                    : "This number is not available.";
-                            self.showError(msg, $errorDiv);
-                            $input
-                                .addClass("woo-limit-error")
-                                .removeClass("woo-limit-available");
+                            // Special-case server-reported 'max_quantity' status so we can show
+                            // a nicer message that includes the product name and the max value.
+                            if (data && data.status === "max_quantity") {
+                                var maxVal =
+                                    data.max_quantity || data.max || "";
 
-                            if ($button && $button.length) {
-                                $button
-                                    .prop("disabled", true)
-                                    .addClass("disabled");
-                            }
-
-                            // Disable all other limited inputs in the same wrapper on cart page
-                            var $wrapper = $input.closest(
-                                ".woo-limit-field-wrapper"
-                            );
-                            if ($wrapper && $wrapper.length) {
-                                $wrapper
-                                    .find(".woo-limit")
-                                    .not($input)
-                                    .prop("disabled", true);
-                            }
-
-                            // Disable all cart action buttons when error occurs
-                            $(".woo-coupon-btn").prop("disabled", true);
-                            $(".wc-forward")
-                                .addClass("disabled")
-                                .prop("disabled", true);
-                            $(".wc-forward").on(
-                                "click.woo-limit",
-                                function (e) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    return false;
+                                // Try to determine product name from DOM in a few ways
+                                var prodName = "";
+                                try {
+                                    var $wrapper = $input.closest(
+                                        ".woo-limit-field-wrapper"
+                                    );
+                                    var $row = $wrapper.closest(".cart_item");
+                                    if ($row && $row.length) {
+                                        prodName = $row
+                                            .find(
+                                                ".product-name a, .product-name"
+                                            )
+                                            .first()
+                                            .text()
+                                            .trim();
+                                    }
+                                } catch (e) {
+                                    prodName = "";
                                 }
-                            );
 
-                            data.available = false;
+                                if (!prodName) {
+                                    prodName =
+                                        $(".product_title")
+                                            .first()
+                                            .text()
+                                            .trim() ||
+                                        $("h1.product_title")
+                                            .first()
+                                            .text()
+                                            .trim() ||
+                                        (document && document.title) ||
+                                        "";
+                                }
+
+                                var friendly =
+                                    "Max quantity for " +
+                                    prodName +
+                                    " reached (" +
+                                    maxVal +
+                                    ")";
+
+                                self.showError(friendly, $errorDiv);
+
+                                $input
+                                    .addClass("woo-limit-error")
+                                    .removeClass("woo-limit-available");
+
+                                if ($button && $button.length) {
+                                    $button
+                                        .prop("disabled", true)
+                                        .addClass("disabled");
+                                }
+
+                                // Disable all other limited inputs in the same wrapper on cart page
+                                var $wrapper2 = $input.closest(
+                                    ".woo-limit-field-wrapper"
+                                );
+                                if ($wrapper2 && $wrapper2.length) {
+                                    $wrapper2
+                                        .find(".woo-limit")
+                                        .not($input)
+                                        .prop("disabled", true);
+                                }
+
+                                // Disable all cart action buttons when error occurs
+                                $(".woo-coupon-btn").prop("disabled", true);
+                                $(".wc-forward")
+                                    .addClass("disabled")
+                                    .prop("disabled", true);
+                                $(".wc-forward").on(
+                                    "click.woo-limit",
+                                    function (e) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        return false;
+                                    }
+                                );
+
+                                data.available = false;
+                            } else {
+                                var msg =
+                                    data && data.message
+                                        ? data.message
+                                        : "This number is not available.";
+                                self.showError(msg, $errorDiv);
+                                $input
+                                    .addClass("woo-limit-error")
+                                    .removeClass("woo-limit-available");
+
+                                if ($button && $button.length) {
+                                    $button
+                                        .prop("disabled", true)
+                                        .addClass("disabled");
+                                }
+
+                                // Disable all other limited inputs in the same wrapper on cart page
+                                var $wrapper = $input.closest(
+                                    ".woo-limit-field-wrapper"
+                                );
+                                if ($wrapper && $wrapper.length) {
+                                    $wrapper
+                                        .find(".woo-limit")
+                                        .not($input)
+                                        .prop("disabled", true);
+                                }
+
+                                // Disable all cart action buttons when error occurs
+                                $(".woo-coupon-btn").prop("disabled", true);
+                                $(".wc-forward")
+                                    .addClass("disabled")
+                                    .prop("disabled", true);
+                                $(".wc-forward").on(
+                                    "click.woo-limit",
+                                    function (e) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        return false;
+                                    }
+                                );
+
+                                data.available = false;
+                            }
                         }
 
                         // Call completion callback (with coerced available flag)

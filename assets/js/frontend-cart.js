@@ -192,10 +192,39 @@
                 });
 
                 if (showMessage) {
-                    showClientNotice(
-                        ijwlp_frontend.max_message ||
-                            "Maximum quantity reached for a limited product. Quantities adjusted to respect the limit."
-                    );
+                    // Build friendly message including product name and max value
+                    var prodName = "";
+                    try {
+                        var first =
+                            info.items && info.items.length
+                                ? info.items[0]
+                                : null;
+                        if (first && first.$wrapper && first.$wrapper.length) {
+                            prodName = first.$wrapper
+                                .closest(".cart_item")
+                                .find(".product-name a, .product-name")
+                                .first()
+                                .text()
+                                .trim();
+                        }
+                    } catch (e) {
+                        prodName = "";
+                    }
+                    if (!prodName) {
+                        prodName =
+                            $(".product_title").first().text().trim() ||
+                            document.title ||
+                            "";
+                    }
+                    var maxVal = info.max;
+                    var msg =
+                        "Max quantity for " +
+                        prodName +
+                        " reached (" +
+                        maxVal +
+                        ")";
+
+                    showClientNotice(msg);
                 }
             });
         }
@@ -616,11 +645,24 @@
                     parseInt($wrapper.data("max-quantity") || "", 10) || null;
                 if (max !== null && !isNaN(max) && current >= max) {
                     var $errorDiv = $wrapper.find(".woo-limit-message");
-                    window.IJWLP_Frontend_Common.showError(
-                        ijwlp_frontend.max_message ||
-                            "Maximum quantity reached for a limited product.",
-                        $errorDiv
-                    );
+                    var prodName =
+                        $row
+                            .find(".product-name a, .product-name")
+                            .first()
+                            .text()
+                            .trim() ||
+                        $(".product_title").first().text().trim() ||
+                        document.title ||
+                        "";
+                    var msg =
+                        "Max quantity for “" +
+                        prodName +
+                        "” reached (" +
+                        max +
+                        "). " +
+                        max +
+                        " is the max quantity";
+                    window.IJWLP_Frontend_Common.showError(msg, $errorDiv);
                     return;
                 }
 
