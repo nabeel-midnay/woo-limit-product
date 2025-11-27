@@ -21,7 +21,7 @@ class IJWLP_Frontend_Checkout
     {
         // Add limited edition number to order item meta
         add_action('woocommerce_checkout_create_order_line_item', array($this, 'add_limited_edition_to_order_item'), 10, 4);
-        
+
         // Update status from 'block' to 'ordered' when order is created
         add_action('woocommerce_checkout_order_created', array($this, 'update_limited_edition_status'), 10, 1);
     }
@@ -68,7 +68,7 @@ class IJWLP_Frontend_Checkout
             // Get parent product ID
             $product = wc_get_product($actual_product_id);
             $parent_product_id = $actual_product_id;
-            
+
             if ($product && $product->is_type('variation')) {
                 $parent_product_id = $product->get_parent_id();
             }
@@ -87,7 +87,7 @@ class IJWLP_Frontend_Checkout
                     'limit_no' => $limited_number,
                     'status' => 'block'
                 ),
-                array('%d', '%d', '%s', '%s'),
+                array('%s', '%s', '%s', '%s'),
                 array('%s', '%s', '%s')
             );
 
@@ -106,11 +106,10 @@ class IJWLP_Frontend_Checkout
                         'limit_no' => $limited_number,
                         'status' => 'block'
                     ),
-                    array('%d', '%d', '%s', '%s'),
-                    array('%d', '%s', '%s')
+                    array('%s', '%s', '%s', '%s'),
+                    array('%s', '%s', '%s')
                 );
             }
         }
     }
-
 }

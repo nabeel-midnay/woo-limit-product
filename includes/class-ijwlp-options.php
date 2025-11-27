@@ -116,7 +116,7 @@ class IJWLP_Options
 		if ($order_status === 'cancelled') {
 			// Delete records matching order_id (handle both integer and string formats)
 			$deleted = $wpdb->query($wpdb->prepare(
-				"DELETE FROM $table WHERE order_id = %d OR order_id = %s",
+				"DELETE FROM $table WHERE order_id = %s OR order_id = %s",
 				$order_id,
 				(string) $order_id
 			));
@@ -162,7 +162,7 @@ class IJWLP_Options
 						'cart_key' => $cart_item_key,
 						'limit_no' => $limited_number
 					),
-					array('%d', '%d', '%s', '%s'),
+					array('%s', '%s', '%s', '%s'),
 					array('%s', '%s')
 				);
 			}
@@ -170,10 +170,10 @@ class IJWLP_Options
 			// Also update records that might not have cart_key - only update 'block' status records or records already linked to this order
 			$wpdb->query($wpdb->prepare(
 				"UPDATE $table 
-				SET order_id = %d, order_item_id = %d, status = 'ordered', order_status = %s 
-				WHERE parent_product_id = %d 
+				SET order_id = %s, order_item_id = %s, status = 'ordered', order_status = %s 
+				WHERE parent_product_id = %s 
 				AND limit_no = %s 
-				AND (status = 'block' OR order_id = %d)",
+				AND (status = 'block' OR order_id = %s)",
 				$order_id,
 				$item_id,
 				$order_status,
@@ -189,7 +189,7 @@ class IJWLP_Options
 			array('order_status' => $order_status),
 			array('order_id' => $order_id),
 			array('%s'),
-			array('%d')
+			array('%s')
 		);
 	}
 
@@ -514,7 +514,7 @@ class IJWLP_Options
 		$existing_record = $wpdb->get_row($wpdb->prepare(
 			"SELECT id FROM $table 
 			WHERE cart_key = %s 
-			AND parent_product_id = %d 
+			AND parent_product_id = %s 
 			AND status = 'block'",
 			$cart_item_key,
 			$parent_product_id
@@ -542,9 +542,9 @@ class IJWLP_Options
 			foreach ($numbers_to_check as $number) {
 				$existing = $wpdb->get_row($wpdb->prepare(
 					"SELECT id, status, limit_no FROM $table 
-					WHERE parent_product_id = %d 
-					AND (status = 'block' OR status = 'ordered')
-					AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
+				WHERE parent_product_id = %s 
+				AND (status = 'block' OR status = 'ordered')
+				AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
 					$parent_product_id,
 					$number,
 					$number . ',%',
@@ -594,7 +594,7 @@ class IJWLP_Options
 		$product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
 
 		if ($product_id > 0) {
-			$where = $wpdb->prepare("WHERE status = 'block' AND parent_product_id = %d", $product_id);
+			$where = $wpdb->prepare("WHERE status = 'block' AND parent_product_id = %s", $product_id);
 		} else {
 			$where = "WHERE status = 'block'";
 		}
@@ -659,7 +659,7 @@ class IJWLP_Options
 		// Check if number is ordered (sold)
 		$ordered = $wpdb->get_row($wpdb->prepare(
 			"SELECT id, status, order_id, user_id, cart_key FROM $table 
-			WHERE parent_product_id = %d 
+			WHERE parent_product_id = %s 
 			AND status = 'ordered'
 			AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
 			$parent_product_id,
@@ -680,7 +680,7 @@ class IJWLP_Options
 		// Check if number is blocked (in someone's cart)
 		$blocked = $wpdb->get_row($wpdb->prepare(
 			"SELECT id, status, user_id, cart_key FROM $table 
-			WHERE parent_product_id = %d 
+			WHERE parent_product_id = %s 
 			AND status = 'block'
 			AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
 			$parent_product_id,
@@ -733,7 +733,7 @@ class IJWLP_Options
 		if (!empty($max_quantity)) {
 			// Gather all existing numbers (blocked) and count them
 			$rows = $wpdb->get_col($wpdb->prepare(
-				"SELECT limit_no FROM $table WHERE parent_product_id = %d AND status = 'block' AND user_id = %d",
+				"SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
 				$parent_product_id,
 				$user_id
 			));
@@ -758,7 +758,7 @@ class IJWLP_Options
 			// Numbers blocked for this user_id
 			if ($user_id > 0) {
 				$user_rows = $wpdb->get_col($wpdb->prepare(
-					"SELECT limit_no FROM $table WHERE parent_product_id = %d AND status = 'block' AND user_id = %d",
+					"SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
 					$parent_product_id,
 					$user_id
 				));
@@ -782,7 +782,7 @@ class IJWLP_Options
 					$cart_keys = array_keys($cart_items);
 					$placeholders = implode(',', array_fill(0, count($cart_keys), '%s'));
 					$sql = $wpdb->prepare(
-						"SELECT limit_no FROM $table WHERE parent_product_id = %d AND status = 'block' AND cart_key IN ($placeholders)",
+						"SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND cart_key IN ($placeholders)",
 						array_merge(array($parent_product_id), $cart_keys)
 					);
 					$guest_rows = $wpdb->get_col($sql);
@@ -879,7 +879,7 @@ class IJWLP_Options
 		$existing_record = $wpdb->get_row($wpdb->prepare(
 			"SELECT id, limit_no, status FROM $table 
 			WHERE cart_key = %s 
-			AND parent_product_id = %d 
+			AND parent_product_id = %s 
 			AND status = 'block'",
 			$cart_item_key,
 			$parent_product_id
@@ -917,9 +917,9 @@ class IJWLP_Options
 			foreach ($numbers_to_check as $number) {
 				$existing = $wpdb->get_row($wpdb->prepare(
 					"SELECT id, status, limit_no FROM $table 
-					WHERE parent_product_id = %d 
-					AND (status = 'block' OR status = 'ordered')
-					AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
+				WHERE parent_product_id = %s 
+				AND (status = 'block' OR status = 'ordered')
+				AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
 					$parent_product_id,
 					$number,
 					$number . ',%',
@@ -930,9 +930,7 @@ class IJWLP_Options
 				if ($existing) {
 					$blocked_numbers[] = $number;
 				}
-			}
-
-			// Only insert if none of the numbers are already blocked/ordered
+			}			// Only insert if none of the numbers are already blocked/ordered
 			if (empty($blocked_numbers)) {
 				// Insert new record with all numbers comma-separated
 				$wpdb->insert(

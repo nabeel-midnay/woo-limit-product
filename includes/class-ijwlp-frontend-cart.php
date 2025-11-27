@@ -389,7 +389,7 @@ class IJWLP_Frontend_Cart
             // Numbers blocked for this user_id
             if ($user_id > 0) {
                 $user_rows = $wpdb->get_col($wpdb->prepare(
-                    "SELECT limit_no FROM $table WHERE parent_product_id = %d AND status = 'block' AND user_id = %d",
+                    "SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
                     $parent_product_id,
                     $user_id
                 ));
@@ -523,9 +523,9 @@ class IJWLP_Frontend_Cart
 
         // Check if record exists for this cart_key
         $existing_record = $wpdb->get_row($wpdb->prepare(
-            "SELECT id FROM $table 
+            "SELECT * FROM $table 
             WHERE cart_key = %s 
-            AND parent_product_id = %d 
+            AND parent_product_id = %s
             AND status = 'block'",
             $cart_item_key,
             $parent_product_id
@@ -582,7 +582,7 @@ class IJWLP_Frontend_Cart
                         'status' => 'block',
                         'time' => current_time('mysql'),
                     ),
-                    array('%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s')
+                    array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
                 );
             }
         }
@@ -683,7 +683,7 @@ class IJWLP_Frontend_Cart
         $existing_record = $wpdb->get_row($wpdb->prepare(
             "SELECT id, limit_no, status FROM $table 
             WHERE cart_key = %s 
-            AND parent_product_id = %d 
+            AND parent_product_id = %s 
             AND status = 'block'",
             $cart_item_key,
             $parent_product_id
@@ -741,7 +741,7 @@ class IJWLP_Frontend_Cart
                         'status' => 'block',
                         'time' => current_time('mysql'),
                     ),
-                    array('%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s')
+                    array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
                 );
             }
         }
