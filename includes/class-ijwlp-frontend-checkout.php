@@ -25,23 +25,30 @@ class IJWLP_Frontend_Checkout
         // Update status from 'block' to 'ordered' when order is created
         add_action('woocommerce_checkout_order_created', array($this, 'update_limited_edition_status'), 10, 1);
 
-
-        // Show Limited Edition Number with order item meta
-        add_action('woocommerce_order_item_meta_start', array($this, 'show_limited_edition_in_item_meta'), 10, 3);
+        add_action('woocommerce_checkout_after_customer_details', array($this, 'custom_checkout_order_summary'), 5);
     }
 
     /**
-     * Display Limited Edition Number in order item meta
+     * Add limited edition number to cart/checkout item display
+     * This filter is used by WooCommerce to show item meta on cart and checkout pages.
+     *
+     * @param array $item_data Formatted item data array
+     * @param array $cart_item The cart item array
+     * @return array
      */
-    public function show_limited_edition_in_item_meta($item_id, $item, $order)
+    public function add_limited_edition_to_item_display($item_data, $cart_item)
     {
-        $limited_number = $item->get_meta('Limited Edition Number');
-        $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($limited_number);
-
-        if (!empty($numbers)) {
-            $display = implode(', ', $numbers);
-            echo '<div class="ijwlp-limited-number-meta"><strong>' . esc_html__('Limited Edition Number', 'woo-limit-product') . ':</strong> ' . esc_html($display) . '</div>';
+        if (isset($cart_item['woo_limit']) && $cart_item['woo_limit'] !== '') {
+            $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($cart_item['woo_limit']);
+            if (!empty($numbers)) {
+                $display = esc_html(implode(', ', $numbers));
+                $item_data[] = array(
+                    'key'   => esc_html__('Limited Edition Number', 'woo-limit-product'),
+                    'value' => $display,
+                );
+            }
         }
+        return $item_data;
     }
 
     /**
@@ -135,5 +142,104 @@ class IJWLP_Frontend_Checkout
                 );
             }
         }
+    }
+
+    /**
+     * Custom Order Summary for Checkout Page
+     * Displays product details with limited edition numbers
+     */
+    public function custom_checkout_order_summary()
+    {
+        // Minimal checkout order summary: only HTML structure and limited edition numbers
+        if (! is_checkout()) {
+            return;
+        }
+
+        $cart = WC()->cart;
+        if (! $cart || $cart->is_empty()) {
+            return;
+        }
+
+        $cart_items = $cart->get_cart();
+?>
+        <div class="checkout-order-summary-container">
+            <div id="custom-order-summary" class="custom-order-summary-wrapper">
+                <div class="order-summary-container">
+                    <a href="<?php echo esc_url(wc_get_cart_url()); ?>" class="view-cart-btn"><?php echo esc_html__('View cart', 'woo-limit-product'); ?></a>
+                    <div class="order-summary-wrap">
+                        <div class="order-summary-header">
+                            <h3><?php echo esc_html__('ORDER SUMMARY', 'woo-limit-product'); ?></h3>
+                        </div>
+                    </div>
+                    <div class="order-summary-content">
+                        <?php foreach ($cart_items as $ci_key => $ci_item) :
+                            $product = isset($ci_item['data']) ? $ci_item['data'] : null;
+                            if (! is_object($product)) {
+                                continue;
+                            }
+
+                            $product_name = $product->get_name();
+                            $image = wp_kses_post($product->get_image('thumbnail'));
+                            $quantity = isset($ci_item['quantity']) ? (int) $ci_item['quantity'] : 1;
+
+                            // Resolve product id (use cart item parent product id when available)
+                            $product_id = isset($ci_item['product_id']) ? $ci_item['product_id'] : $product->get_id();
+
+                            // Get limited edition numbers (preferred keys only)
+                            $numbers = array();
+                            if (! empty($ci_item['woo_limit'])) {
+                                $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit']);
+                            } elseif (! empty($ci_item['woo_limit_display'])) {
+                                $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit_display']);
+                            }
+
+                            // Get limited edition range
+                            $limited_range = '';
+                            $start_range = get_post_meta($product_id, '_woo_limit_start_value', true);
+                            $end_range = get_post_meta($product_id, '_woo_limit_end_value', true);
+                            if ($start_range !== '' && $end_range !== '') {
+                                $limited_range = $start_range . ' - ' . $end_range;
+                            }
+
+                        ?>
+                            <div class="order-summary-item">
+                                <div class="item-image"><?php echo $image; ?></div>
+                                <div class="item-details">
+                                    <div class="item-name"><?php echo esc_html($product_name); ?></div>
+                                    <div class="item-quantity"><?php echo '&#215;' . esc_html($quantity); ?></div>
+
+                                    <?php if ($limited_range) : ?>
+                                        <div class="limited-edition-range"><?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?>: <?php echo esc_html($limited_range); ?></div>
+                                    <?php endif; ?>
+
+                                    <?php if (! empty($numbers)) : ?>
+                                        <div class="limited-edition-display">
+                                            <span class="limited-edition-label"><?php echo esc_html__('Limited Edition Numbers', 'woo-limit-product'); ?></span>
+                                            <div class="limited-number-list">
+                                                <?php foreach ($numbers as $num) : ?>
+                                                    <span class="limited-number"><?php echo esc_html((string) $num); ?></span>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php
+                                    // Backorder notification (keep as-is)
+                                    $backorder_status = $product->get_stock_status();
+                                    if ($backorder_status === 'onbackorder') :
+                                    ?>
+                                        <div class="backorder_notification">
+                                            <?php echo esc_html__('Available on backorder', 'woo-limit-product'); ?>
+                                            <span class="backorder-help-icon help-icon" data-tooltip="<?php echo esc_attr__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woo-limit-product'); ?>">?</span>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+<?php
     }
 }
