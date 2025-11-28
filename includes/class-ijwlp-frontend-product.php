@@ -65,6 +65,7 @@ class IJWLP_Frontend_Product
         $limit_label = IJWLP_Options::get_setting('limitlabel', __('Limited Edition Number', 'woolimited'));
 
 ?>
+        <div class="woo-limit-attribute-error" style="display:none"></div>
         <div class="woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
             <p class="woo-limit-field-label">
                 <?php echo esc_html($limit_label); ?>
