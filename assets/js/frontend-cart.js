@@ -655,11 +655,11 @@
                         document.title ||
                         "";
                     var msg =
-                        "Max quantity for “" +
+                        "Max quantity for " +
                         prodName +
-                        "” reached (" +
+                        " reached (" +
                         max +
-                        "). " +
+                        ")" +
                         max +
                         " is the max quantity";
                     window.IJWLP_Frontend_Common.showError(msg, $errorDiv);
