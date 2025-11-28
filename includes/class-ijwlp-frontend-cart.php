@@ -246,6 +246,10 @@ class IJWLP_Frontend_Cart
         // Convert to array if it's a single value (backward compatibility)
         $limited_numbers = is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit']);
 
+        if (count($limited_numbers) === 1 && strpos($limited_numbers[0], ',') !== false) {
+            $limited_numbers = array_map('trim', explode(',', $limited_numbers[0]));
+        }
+
         // Get product ID
         $product_id = $cart_item['product_id'];
         $variation_id = $cart_item['variation_id'];
