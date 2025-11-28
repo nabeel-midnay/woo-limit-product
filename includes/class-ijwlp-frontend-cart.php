@@ -30,8 +30,10 @@ class IJWLP_Frontend_Cart
         // Merge limited edition numbers when adding to existing cart item (run first)
         add_action('woocommerce_add_to_cart', array($this, 'merge_limited_edition_on_add'), 5, 6);
 
-        // Group identical cart items (same product/variation) on cart display
+        // Group identical cart items (same product/variation) on cart display AND checkout
+        // This ensures grouping happens whether user visits cart or goes directly to checkout
         add_action('woocommerce_before_cart', array($this, 'group_similar_cart_items'), 10);
+        add_action('woocommerce_before_checkout_form', array($this, 'group_similar_cart_items'), 10);
 
         // Block limited edition number when item is added to cart (run after merge)
         add_action('woocommerce_add_to_cart', array($this, 'block_limited_edition_number'), 15, 6);
