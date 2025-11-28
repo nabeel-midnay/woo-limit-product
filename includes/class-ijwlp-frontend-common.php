@@ -56,6 +56,8 @@ class IJWLP_Frontend_Common
 
         // Restore cart item data from session
         add_filter('woocommerce_get_cart_item_from_session', array($this, 'get_cart_item_from_session'), 10, 2);
+        add_action('woocommerce_after_shop_loop_stock_labels', array($this, 'limit_display_shop_loop'), 15, 0);
+        add_action('woocommerce_after_shop_loop_stock_labels', array($this, 'out_of_stock_display_shop_loop'), 20, 0);
     }
 
     /**
@@ -212,5 +214,32 @@ class IJWLP_Frontend_Common
             $cart_item['woo_limit_pro_id'] = $values['woo_limit_pro_id'];
         }
         return $cart_item;
+    }
+
+    public function limit_display_shop_loop()
+    {
+        global $product;
+        $product_id = get_the_ID();
+
+        // Check if this product has limited edition feature enabled
+        $status = get_post_meta($product_id, '_woo_limit_status', true);
+
+        // Only check for limited edition availability if the product has limited edition enabled
+        if ($status == 'yes') {
+            $limitedNosAvailableCount = limitedNosAvailableCount($product_id);
+            if ($limitedNosAvailableCount == 0) {
+                echo '<div class="soldout_wrapper shop-loop-soldout"><span class="soldout-label">' . esc_html__('Sold Out', 'woolimit') . '</span></div>';
+            }
+        }
+    }
+
+    public function out_of_stock_display_shop_loop()
+    {
+        global $product;
+
+        // Check if product is out of stock
+        if (!$product->is_in_stock()) {
+            echo '<div class="outofstock_wrapper shop-loop-outofstock"><span class="outofstock-label">' . esc_html__('Out of Stock', 'woolimit') . '</span></div>';
+        }
     }
 }
