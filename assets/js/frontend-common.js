@@ -194,7 +194,10 @@
                         // Consider the number available only when the server reports status === 'available'
                         if (data.available && data.status === "available") {
                             // Number is available
-                            self.showInfo("You are lucky!", $errorDiv);
+                            self.showInfo(
+                                "You are lucky! Click on Add to cart",
+                                $errorDiv
+                            );
                             $input
                                 .removeClass("woo-limit-error")
                                 .addClass("woo-limit-available");

@@ -677,7 +677,7 @@ class IJWLP_Options
 		if ($ordered) {
 			wp_send_json_success(array(
 				'available' => false,
-				'message' => __('This Limited Edition Number is sold out.', 'woolimited'),
+				'message' => __('Sold, try another one', 'woolimited'),
 				'status' => 'sold'
 			));
 		}
@@ -702,7 +702,7 @@ class IJWLP_Options
 				if (!empty($cart_item_key) && $blocked->cart_key === $cart_item_key) {
 					wp_send_json_success(array(
 						'available' => true,
-						'message' => __('This number is already in your cart.', 'woolimited'),
+						'message' => __('Already in your cart', 'woolimited'),
 						'status' => 'in_your_cart'
 					));
 				} else {
@@ -713,7 +713,7 @@ class IJWLP_Options
 						if ($cart_item) {
 							wp_send_json_success(array(
 								'available' => true,
-								'message' => __('This number is already in your cart.', 'woolimited'),
+								'message' => __('Already in your cart', 'woolimited'),
 								'status' => 'in_your_cart'
 							));
 						}
@@ -724,7 +724,7 @@ class IJWLP_Options
 			// It's in someone else's cart
 			wp_send_json_success(array(
 				'available' => false,
-				'message' => __('This Limited Edition Number is already in someone\'s cart.', 'woolimited'),
+				'message' => __('Number currently in someone else\’s cart', 'woolimited'),
 				'status' => 'in_other_cart'
 			));
 		}
