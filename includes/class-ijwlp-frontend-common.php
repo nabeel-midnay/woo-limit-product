@@ -12,6 +12,7 @@
 if (!defined('ABSPATH'))
     exit;
 
+
 class IJWLP_Frontend_Common
 {
     /**
@@ -58,21 +59,73 @@ class IJWLP_Frontend_Common
     }
 
     /**
+     * Normalize limited number for storage
+     * - If array, join into comma-separated string
+     * - If scalar, cast to string
+     * - If empty, return empty string
+     *
+     * @param mixed $value
+     * @return string
+     */
+    public static function normalize_limited_number_for_storage($value)
+    {
+        if (is_array($value)) {
+            $parts = array_filter(array_map('strval', $value), function ($v) {
+                return $v !== '' && $v !== null;
+            });
+            return implode(',', $parts);
+        }
+
+        if ($value === null) {
+            return '';
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * Normalize limited number for processing/display
+     * - If string, split on commas and trim
+     * - If array, return cleaned array
+     * - If empty, return empty array
+     *
+     * @param mixed $value
+     * @return array
+     */
+    public static function normalize_limited_number_for_processing($value)
+    {
+        if (is_array($value)) {
+            return array_values(array_filter(array_map('trim', $value), function ($v) {
+                return $v !== '' && $v !== null;
+            }));
+        }
+
+        if ($value === null || $value === '') {
+            return array();
+        }
+
+        $parts = array_map('trim', explode(',', (string) $value));
+        return array_values(array_filter($parts, function ($v) {
+            return $v !== '' && $v !== null;
+        }));
+    }
+
+    /**
      * Enqueue frontend scripts
      */
     public function enqueue_scripts()
     {
         // Common script - loaded on all relevant pages
         if (is_product() || is_cart() || is_checkout()) {
-			wp_enqueue_script(
-				'jQuery-autocomplete',
-				$this->assets_url . 'js/autocomplete.js',
-				array(),
-				$this->_version,
-				true
-			);
+            wp_enqueue_script(
+                'jQuery-autocomplete',
+                $this->assets_url . 'js/autocomplete.js',
+                array(),
+                $this->_version,
+                true
+            );
 
-			
+
             // Enqueue common script first
             wp_enqueue_script(
                 'ijwlp-frontend-common',
@@ -81,12 +134,12 @@ class IJWLP_Frontend_Common
                 $this->_version,
                 true
             );
-			
-			// Prepare AJAX data for all scripts
-			$ajax_data = array(
-				'ajax_url' => admin_url('admin-ajax.php'),
-				'nonce' => wp_create_nonce('ijwlp_frontend_nonce')
-			);
+
+            // Prepare AJAX data for all scripts
+            $ajax_data = array(
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('ijwlp_frontend_nonce')
+            );
 
             // Localize script data to common script
             wp_localize_script('ijwlp-frontend-common', 'ijwlp_frontend', $ajax_data);
@@ -147,7 +200,8 @@ class IJWLP_Frontend_Common
     public function get_cart_item_from_session($cart_item, $values)
     {
         if (isset($values['woo_limit'])) {
-            $cart_item['woo_limit'] = $values['woo_limit'];
+            // Ensure we restore a normalized string for storage/processing
+            $cart_item['woo_limit'] = self::normalize_limited_number_for_storage($values['woo_limit']);
         }
         if (isset($values['limited_edition_pro_id'])) {
             $cart_item['limited_edition_pro_id'] = $values['limited_edition_pro_id'];

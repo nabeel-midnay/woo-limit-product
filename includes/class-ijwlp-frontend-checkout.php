@@ -29,67 +29,14 @@ class IJWLP_Frontend_Checkout
         // Show Limited Edition Number with order item meta
         add_action('woocommerce_order_item_meta_start', array($this, 'show_limited_edition_in_item_meta'), 10, 3);
     }
-    /**
-     * Normalize limited number for storage
-     * - If array, join into comma-separated string
-     * - If scalar, cast to string
-     * - If empty, return empty string
-     *
-     * @param mixed $value
-     * @return string
-     */
-    protected function normalize_limited_number_for_storage($value)
-    {
-        if (is_array($value)) {
-            // cast each to string and remove empty entries
-            $parts = array_filter(array_map('strval', $value), function ($v) {
-                return $v !== '' && $v !== null;
-            });
-            return implode(',', $parts);
-        }
 
-        if ($value === null) {
-            return '';
-        }
-
-        return (string) $value;
-    }
-
-    /**
-     * Normalize limited number for processing/display
-     * - If string, split on commas and trim
-     * - If array, return cleaned array
-     * - If empty, return empty array
-     *
-     * @param mixed $value
-     * @return array
-     */
-    protected function normalize_limited_number_for_processing($value)
-    {
-        if (is_array($value)) {
-            // trim each and remove empties
-            return array_values(array_filter(array_map('trim', $value), function ($v) {
-                return $v !== '' && $v !== null;
-            }));
-        }
-
-        if ($value === null || $value === '') {
-            return array();
-        }
-
-        // string -> explode and clean
-        $parts = array_map('trim', explode(',', (string) $value));
-        return array_values(array_filter($parts, function ($v) {
-            return $v !== '' && $v !== null;
-        }));
-    }
     /**
      * Display Limited Edition Number in order item meta
      */
     public function show_limited_edition_in_item_meta($item_id, $item, $order)
     {
         $limited_number = $item->get_meta('Limited Edition Number');
-        $numbers = $this->normalize_limited_number_for_processing($limited_number);
+        $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($limited_number);
 
         if (!empty($numbers)) {
             $display = implode(', ', $numbers);
@@ -103,7 +50,7 @@ class IJWLP_Frontend_Checkout
     public function add_limited_edition_to_order_item($item, $cart_item_key, $values, $order)
     {
         if (isset($values['woo_limit']) && $values['woo_limit'] !== '') {
-            $limited_number = $this->normalize_limited_number_for_storage($values['woo_limit']);
+            $limited_number = IJWLP_Frontend_Common::normalize_limited_number_for_storage($values['woo_limit']);
             if ($limited_number !== '') {
                 $item->add_meta_data('Limited Edition Number', $limited_number);
                 $item->add_meta_data('_cart_item_key', $cart_item_key);
@@ -134,7 +81,7 @@ class IJWLP_Frontend_Checkout
             }
 
             // Normalize limited_number to string for DB comparisons
-            $limited_number = $this->normalize_limited_number_for_storage($limited_number);
+            $limited_number = IJWLP_Frontend_Common::normalize_limited_number_for_storage($limited_number);
 
 
             // Get product ID

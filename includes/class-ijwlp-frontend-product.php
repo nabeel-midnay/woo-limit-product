@@ -66,7 +66,7 @@ class IJWLP_Frontend_Product
 
 ?>
         <div class="woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
-            <p  class="woo-limit-field-label">
+            <p class="woo-limit-field-label">
                 <?php echo esc_html($limit_label); ?>
             </p>
             <p class="woo-limit-range-info">
@@ -174,15 +174,19 @@ class IJWLP_Frontend_Product
 
     /**
      * Add limited edition number to cart item data
-     * Store as array to support multiple limited edition numbers per cart item
+     * Store as a normalized string for consistent storage (comma-separated if multiple)
      */
     public function add_limited_edition_to_cart_item($cart_item_data, $pro_id, $variation_id)
     {
-        if (isset($_POST['woo-limit']) && !empty($_POST['woo-limit'])) {
+        if (isset($_POST['woo-limit']) && $_POST['woo-limit'] !== '') {
             $limited_number = sanitize_text_field($_POST['woo-limit']);
-            
-            // Store as array to support multiple numbers
-            $cart_item_data['woo_limit'] = array($limited_number);
+
+            // Normalize to string for storage (keeps consistency across cart/session/meta)
+            if (class_exists('IJWLP_Frontend_Common') && method_exists('IJWLP_Frontend_Common', 'normalize_limited_number_for_storage')) {
+                $cart_item_data['woo_limit'] = IJWLP_Frontend_Common::normalize_limited_number_for_storage($limited_number);
+            } else {
+                $cart_item_data['woo_limit'] = (string) $limited_number;
+            }
 
             // Store the actual product ID used (for variable products, use variation ID)
             $actual_pro_id = $variation_id > 0 ? $variation_id : $pro_id;
@@ -211,8 +215,7 @@ class IJWLP_Frontend_Product
         }
 
         // Note: We don't include limited edition numbers in the key so items with same variation/product group together
-        // Limited edition numbers will be stored as an array in cart item data
+        // Limited edition numbers will be stored as a normalized string in cart item data
         return md5($group_key);
     }
-
 }
