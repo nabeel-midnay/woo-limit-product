@@ -144,6 +144,8 @@
             var productId = options.productId;
             var variationId = options.variationId || 0;
             var cartItemKey = options.cartItemKey || "";
+            // If silent is true, suppress user-facing messages (useful when submitting the form)
+            var silent = options.silent || false;
 
             // Clear any existing timer for this input
             var inputId =
@@ -153,12 +155,14 @@
                 delete self.checkTimers[inputId];
             }
 
-            // Show loading state
+            // Show loading state (suppress visible messages when silent)
             $input.addClass("woo-limit-loading").prop("disabled", true);
             if ($button && $button.length) {
                 $button.addClass("woo-limit-loading").prop("disabled", true);
             }
-            $errorDiv.addClass("loading").text("Checking...").show();
+            if (!silent) {
+                $errorDiv.addClass("loading").text("Checking...").show();
+            }
 
             // Make AJAX request
             $.ajax({
@@ -194,10 +198,12 @@
                         // Consider the number available only when the server reports status === 'available'
                         if (data.available && data.status === "available") {
                             // Number is available
-                            self.showInfo(
-                                "You are lucky! Click on Add to cart",
-                                $errorDiv
-                            );
+                            if (!silent) {
+                                self.showInfo(
+                                    "You are lucky! Click on Add to cart",
+                                    $errorDiv
+                                );
+                            }
                             $input
                                 .removeClass("woo-limit-error")
                                 .addClass("woo-limit-available");
@@ -241,9 +247,7 @@
                                     var $row = $wrapper.closest(".cart_item");
                                     if ($row && $row.length) {
                                         prodName = $row
-                                            .find(
-                                                ".product-name a, .product-name"
-                                            )
+                                            .find(".product-name a")
                                             .first()
                                             .text()
                                             .trim();
@@ -316,7 +320,9 @@
                                     data && data.message
                                         ? data.message
                                         : "This number is not available.";
-                                self.showError(msg, $errorDiv);
+                                if (!silent) {
+                                    self.showError(msg, $errorDiv);
+                                }
                                 $input
                                     .addClass("woo-limit-error")
                                     .removeClass("woo-limit-available");
