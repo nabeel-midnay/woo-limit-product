@@ -271,7 +271,6 @@ class IJWLP_Frontend_Cart
 
         // Get available numbers
         $available_numbers = limitedNosAvailable($parent_product_id);
-        $available_count = limitedNosAvailableCount($parent_product_id);
 
         // Get start and end values for range display
         $start = get_post_meta($parent_product_id, '_woo_limit_start_value', true);

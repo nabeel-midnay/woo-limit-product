@@ -59,7 +59,6 @@ class IJWLP_Frontend_Product
 
         // Get available numbers
         $available_numbers = limitedNosAvailable($pro_id);
-        $available_count = limitedNosAvailableCount($pro_id);
 
         // Get admin settings for label
         $limit_label = IJWLP_Options::get_setting('limitlabel', __('Limited Edition Number', 'woolimited'));
