@@ -237,7 +237,6 @@ class IJWLP_Frontend_Cart
      */
     public function append_limited_edition_input_to_name($cart_item, $cart_item_key)
     {
-
         // Only append if this cart item has limited edition number(s)
         if (!isset($cart_item['woo_limit']) || empty($cart_item['woo_limit'])) {
             return;
@@ -250,7 +249,7 @@ class IJWLP_Frontend_Cart
             $limited_numbers = array_map('trim', explode(',', $limited_numbers[0]));
         }
 
-        // Get product ID
+        // Get product ID and variation ID
         $product_id = $cart_item['product_id'];
         $variation_id = $cart_item['variation_id'];
         $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : ($variation_id > 0 ? $variation_id : $product_id);
@@ -260,6 +259,7 @@ class IJWLP_Frontend_Cart
         $parent_product_id = $actual_pro_id;
 
         if ($product && $product->is_type('variation')) {
+            // If it's a variation, get the parent product's ID
             $parent_product_id = $product->get_parent_id();
         }
 
@@ -279,7 +279,22 @@ class IJWLP_Frontend_Cart
         // Get admin settings for label
         $limit_label_cart = IJWLP_Options::get_setting('limitlabelcart', __('Limited Edition Number(s)', 'woolimited'));
 
-        // Output input fields after product name - one for each limited edition number
+        // Get stock quantities
+        if ($product && $product->is_type('variation')) {
+            // If it's a variation, get the parent product's stock quantity
+            $parent_product = wc_get_product($parent_product_id);
+            $parent_stock_quantity = $parent_product->get_stock_quantity(); // Parent product's stock quantity
+
+            // Get the stock quantity for the current variation
+            $variation = wc_get_product($variation_id);
+            $variation_stock_quantity = $variation->get_stock_quantity(); // Stock quantity for this variation
+        } else {
+            // If it's a simple product, just get its own stock quantity
+            $product = wc_get_product($product_id);
+            $parent_stock_quantity = $product->get_stock_quantity(); // Stock of the simple product
+            $variation_stock_quantity = 0; // No variation, so variation stock is 0
+        }
+
 ?>
         <?php $max_qty = get_post_meta($parent_product_id, '_woo_limit_max_quantity', true); ?>
         <div class="woo-limit-field-wrapper woo-limit-cart-item-wrapper" data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>" data-product-id="<?php echo esc_attr($parent_product_id); ?>" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" <?php if (!empty($max_qty)) {
@@ -294,6 +309,7 @@ class IJWLP_Frontend_Cart
                     <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
                 </p>
             <?php endif; ?>
+
             <?php foreach ($limited_numbers as $index => $limited_number): ?>
                 <div class="woo-limit-cart-item">
                     <input
@@ -310,15 +326,17 @@ class IJWLP_Frontend_Cart
                         max="<?php echo esc_attr($end); ?>" />
                 </div>
             <?php endforeach; ?>
-            <input
-                type="hidden"
-                name="woo-limit-available[<?php echo esc_attr($cart_item_key); ?>]"
-                class="woo-limit-available-numbers"
-                value="<?php echo esc_attr($available_numbers); ?>" />
+
+            <!-- Hidden fields for stock information -->
+            <input type="hidden" name="woo-limit-parent-stock-quantity[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-parent-stock-quantity" value="<?php echo esc_attr($parent_stock_quantity); ?>" />
+            <input type="hidden" name="woo-limit-variation-stock-quantity[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-variation-stock-quantity" value="<?php echo esc_attr($variation_stock_quantity); ?>" />
+            <input type="hidden" name="woo-limit-available[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-available-numbers" value="<?php echo esc_attr($available_numbers); ?>" />
+
             <div class="woo-limit-message" style="display: none;"></div>
         </div>
     <?php
     }
+
 
     /**
      * Update limited edition number when changed in cart

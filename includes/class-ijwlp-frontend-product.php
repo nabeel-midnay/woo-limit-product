@@ -63,6 +63,21 @@ class IJWLP_Frontend_Product
         // Get admin settings for label
         $limit_label = IJWLP_Options::get_setting('limitlabel', __('Limited Edition Number', 'woolimited'));
 
+        // Get stock quantity for the main product
+        $stock_quantity = $product->get_stock_quantity();
+
+        // Get stock quantities for variations (if product is variable)
+        $variation_quantities = [];
+        if ($product->is_type('variable')) {
+            foreach ($product->get_children() as $variation_id) {
+                $variation = wc_get_product($variation_id);
+                $variation_quantities[$variation_id] = $variation->get_stock_quantity();
+            }
+        }
+
+        // Prepare variation quantities in a JSON format for hidden field
+        $variation_quantities_json = !empty($variation_quantities) ? json_encode($variation_quantities) : '[]';
+
 ?>
         <div class="woo-limit-selection-error" style="display:none"></div>
         <div class="woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
@@ -73,6 +88,11 @@ class IJWLP_Frontend_Product
                 <?php esc_html_e('Enter a number between: ', 'woolimited'); ?>
                 <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
             </p>
+
+            <!-- Hidden fields for stock information -->
+            <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity" value="<?php echo esc_attr($stock_quantity); ?>" />
+            <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities" value="<?php echo esc_attr($variation_quantities_json); ?>" />
+
             <input
                 type="number"
                 id="woo-limit"
