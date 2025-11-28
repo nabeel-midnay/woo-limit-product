@@ -203,8 +203,13 @@ class IJWLP_Frontend_Common
             // Ensure we restore a normalized string for storage/processing
             $cart_item['woo_limit'] = self::normalize_limited_number_for_storage($values['woo_limit']);
         }
-        if (isset($values['limited_edition_pro_id'])) {
-            $cart_item['limited_edition_pro_id'] = $values['limited_edition_pro_id'];
+        // Restore display variant if available (keeps UI consistent)
+        if (isset($values['woo_limit_display'])) {
+            $cart_item['woo_limit_display'] = self::normalize_limited_number_for_storage($values['woo_limit_display']);
+        }
+        // Restore stored product id key used by add-to-cart
+        if (isset($values['woo_limit_pro_id'])) {
+            $cart_item['woo_limit_pro_id'] = $values['woo_limit_pro_id'];
         }
         return $cart_item;
     }
