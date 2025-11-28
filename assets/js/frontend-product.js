@@ -20,10 +20,12 @@
             $(".variations select").length > 0;
         var variationSelected = false;
 
-        // Check if limited edition field exists on this page
-        if (!$limitedNumberInput.length) {
-            return; // Exit if not a limited edition product page
-        }
+        // Enable AJAX for normal products too
+        var isLimitedProduct = $limitedNumberInput.length > 0;
+
+        // Get error div
+        var $errorDiv = $(".woo-limit-message");
+        var $selectionErrorDiv = $(".woo-limit-selection-message");
 
         // Check if variation is already selected on page load
         function checkVariationSelected() {
@@ -48,6 +50,8 @@
                 $variationId.val() &&
                 $variationId.val() !== ""
             ) {
+                $selectionErrorDiv.find(".woo-limit-variation-error").slideUp();
+                $selectionErrorDiv.hide();
                 hasVariation = true;
             }
 
@@ -55,9 +59,15 @@
             updateFieldStates();
         }
 
-        // Disable add to cart button initially if limited edition field exists
-        $addToCartButton.prop("disabled", true).addClass("disabled");
-        $addToCartButton.addClass("disabled");
+        // Force enable add to cart button and remove WooCommerce disabling classes/attrs on load
+        // Ensure we clear both the disabled prop/attribute and any aria-disabled
+        setTimeout(function () {
+            $addToCartButton
+                .prop("disabled", false)
+                .removeAttr("disabled")
+                .removeAttr("aria-disabled")
+                .removeClass("disabled wc-variation-selection-needed");
+        }, 500);
 
         // If it's a variable product, disable the number field initially
         if (isVariableProduct) {
@@ -66,17 +76,78 @@
                 "placeholder",
                 "Please select a variation first"
             );
+            // Some themes/plugins add disabled attributes or aria-disabled; clear them here as well
+            $addToCartButton
+                .prop("disabled", false)
+                .removeAttr("disabled")
+                .removeAttr("aria-disabled")
+                .removeClass("disabled wc-variation-selection-needed");
         }
 
         // Check initial variation state
         checkVariationSelected();
 
+        // MutationObserver to block YITH Wishlist and other plugins from re-adding disabled classes
+        // This watches the button and strips 'disabled' and 'wc-variation-selection-needed' classes
+        // plus disabled/aria-disabled attributes whenever they're added by external plugins
+        var buttonObserver = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
+                if (
+                    mutation.type === "attributes" ||
+                    (mutation.type === "childList" &&
+                        mutation.target === $addToCartButton[0])
+                ) {
+                    // Check if the problematic classes or attributes were added
+                    var hasDisabledClass =
+                        $addToCartButton.hasClass("disabled");
+                    var hasVariationClass = $addToCartButton.hasClass(
+                        "wc-variation-selection-needed"
+                    );
+                    var isDisabledAttr = $addToCartButton.prop("disabled");
+                    var hasAriaDisabled =
+                        $addToCartButton.attr("aria-disabled");
+
+                    // If any of the problematic attributes/classes are present, remove them
+                    // (unless we're in a loading/submitting state where button should legitimately be disabled)
+                    if (
+                        !$addToCartButton.hasClass("woo-limit-loading") &&
+                        (hasDisabledClass ||
+                            hasVariationClass ||
+                            isDisabledAttr ||
+                            hasAriaDisabled)
+                    ) {
+                        $addToCartButton
+                            .prop("disabled", false)
+                            .removeAttr("disabled")
+                            .removeAttr("aria-disabled")
+                            .removeClass(
+                                "disabled wc-variation-selection-needed"
+                            );
+                    }
+                }
+            });
+        });
+
+        // Start observing the button for attribute and class changes
+        var observerConfig = {
+            attributes: true,
+            attributeFilter: ["disabled", "aria-disabled", "class"],
+            subtree: false,
+        };
+        buttonObserver.observe($addToCartButton[0], observerConfig);
+
         // Handle variation selection for variable products
         if (isVariableProduct) {
             // Listen for WooCommerce variation events
+
             $form.on("found_variation", function (event, variation) {
                 variationSelected = true;
                 updateFieldStates();
+                $addToCartButton
+                    .prop("disabled", false)
+                    .removeAttr("disabled")
+                    .removeAttr("aria-disabled")
+                    .removeClass("disabled wc-variation-selection-needed");
             });
 
             $form.on("reset_data", function () {
@@ -89,7 +160,11 @@
                     "placeholder",
                     "Please select a variation first"
                 );
-                $addToCartButton.prop("disabled", true).addClass("disabled");
+                $addToCartButton
+                    .prop("disabled", false)
+                    .removeAttr("disabled")
+                    .removeAttr("aria-disabled")
+                    .removeClass("disabled wc-variation-selection-needed");
                 window.IJWLP_Frontend_Common.hideError();
             });
 
@@ -110,8 +185,7 @@
                     .prop("disabled", false)
                     .removeClass("disabled");
                 $limitedNumberInput.attr("placeholder", "Enter edition number");
-
-                // Availability check controls the add to cart button; update visuals
+                // Only update visuals, do not disable button
                 checkAddToCartState();
             } else {
                 // Disable number field if variation not selected
@@ -120,39 +194,25 @@
                     "placeholder",
                     "Please select a variation first"
                 );
-                $addToCartButton.prop("disabled", true).addClass("disabled");
+                // Do not disable add to cart button
             }
         }
 
         // Check if add to cart button should be enabled
         // Only enable when the number has been positively verified as available
         function checkAddToCartState() {
+            // Only update visuals, do not disable button
             if (!$limitedNumberInput.length) {
                 return;
             }
-
             var hasAvailableClass = $limitedNumberInput.hasClass(
                 "woo-limit-available"
             );
-
-            // For variable products, require variation selected as well
-            if (isVariableProduct && !variationSelected) {
-                $addToCartButton.prop("disabled", true).addClass("disabled");
-                return;
-            }
-
+            // No button disabling here
             if (hasAvailableClass) {
-                $addToCartButton
-                    .prop("disabled", false)
-                    .removeClass("disabled");
                 window.IJWLP_Frontend_Common.hideError();
-            } else {
-                $addToCartButton.prop("disabled", true).addClass("disabled");
             }
         }
-
-        // Get error div
-        var $errorDiv = $(".woo-limit-message");
 
         // Setup number validation with debounce
         if ($limitedNumberInput.length && $errorDiv.length) {
@@ -173,23 +233,72 @@
             });
         }
 
+        // Mirror availability class from input to add-to-cart button so we can
+        // gate adding to cart by presence of a class instead of using disabled props.
+        if ($limitedNumberInput.length) {
+            try {
+                var inputObserver = new MutationObserver(function (mutations) {
+                    mutations.forEach(function (mutation) {
+                        if (
+                            mutation.type === "attributes" &&
+                            mutation.attributeName === "class"
+                        ) {
+                            var hasAvailable = $limitedNumberInput.hasClass(
+                                "woo-limit-available"
+                            );
+                            if (hasAvailable) {
+                                $addToCartButton.addClass(
+                                    "woo-limit-available"
+                                );
+                            } else {
+                                $addToCartButton.removeClass(
+                                    "woo-limit-available"
+                                );
+                            }
+                        }
+                    });
+                });
+
+                inputObserver.observe($limitedNumberInput[0], {
+                    attributes: true,
+                    attributeFilter: ["class"],
+                    subtree: false,
+                });
+
+                // Initialize state
+                if ($limitedNumberInput.hasClass("woo-limit-available")) {
+                    $addToCartButton.addClass("woo-limit-available");
+                } else {
+                    $addToCartButton.removeClass("woo-limit-available");
+                }
+            } catch (e) {
+                // If observation fails for some reason, fail silently and rely on
+                // existing behavior — this is a non-fatal enhancement.
+            }
+        }
+
         // Enable/disable add to cart button based on input (basic validation)
         $limitedNumberInput.on("input change blur", function () {
             var value = $(this).val().trim();
-            if (value === "") {
-                $addToCartButton.prop("disabled", true).addClass("disabled");
-            } else if (
-                window.IJWLP_Frontend_Common.validateNumberFormat(value)
-            ) {
-                // Basic format validation passed, but availability check will enable/disable button
-                // The availability check will handle button state
-            } else {
-                $addToCartButton.prop("disabled", true).addClass("disabled");
-            }
+            // Do not disable add to cart button, just show error if needed
         });
 
         // Function to submit add to cart form
         function submitAddToCartForm() {
+            // Prevent submission if this is a limited product and availability
+            // has not been confirmed via the 'woo-limit-available' class.
+            // We intentionally avoid toggling disabled props — we rely on class
+            // gating as requested.
+            if (
+                isLimitedProduct &&
+                !$addToCartButton.hasClass("woo-limit-available")
+            ) {
+                window.IJWLP_Frontend_Common.showError(
+                    "Please verify the limited edition number availability before adding to cart.",
+                    $errorDiv
+                );
+                return false;
+            }
             // Get form data
             var formData = $form.serializeArray();
             var productId =
@@ -238,8 +347,10 @@
                             $addToCartButton,
                         ]);
 
-                        // Hide availability message only after successful add to cart
+                        // Hide ALL messages immediately (checking, lucky, etc)
                         window.IJWLP_Frontend_Common.hideError($errorDiv);
+                        $errorDiv.hide();
+                        $(".woo-limit-message").hide();
 
                         // Reset form
                         $limitedNumberInput
@@ -248,7 +359,7 @@
                             .removeClass("woo-limit-available");
                         $addToCartButton
                             .prop("disabled", true)
-                            .addClass("disabled wc-variation-selection-needed");
+                            .addClass("disabled woo-limit-loading");
 
                         $(".rtwpvs-wc-select").val("").trigger("change");
 
@@ -273,80 +384,221 @@
                 complete: function () {
                     $addToCartButton
                         .prop("disabled", false)
-                        .removeClass("woo-limit-loading")
+                        .removeAttr("disabled")
+                        .removeAttr("aria-disabled")
+                        .removeClass(
+                            "woo-limit-loading disabled wc-variation-selection-needed"
+                        )
                         .text(originalText);
                     checkAddToCartState();
                 },
             });
         }
 
-        // Handle form submit with AJAX
+        // Handle form submit with AJAX for both limited and normal products
         $form.on("submit", function (e) {
             e.preventDefault();
 
             // Check variation selection for variable products
+
             if (isVariableProduct && !variationSelected) {
-                window.IJWLP_Frontend_Common.showError(
-                    "Please select a variation first.",
-                    $errorDiv
-                );
-                return false;
+                // Find the first unselected variation
+                var $unselected = null;
+                var labelText = "";
+                $(".variations select").each(function () {
+                    if (!$(this).val() || $(this).val() === "") {
+                        $unselected = $(this);
+                        // Find label from parent tr > th > label
+                        var $tr = $(this).closest("tr");
+                        var $label = $tr.find("th label");
+                        labelText = $label.length ? $label.text().trim() : "";
+                        return false;
+                    }
+                });
+                if ($unselected) {
+                    // Remove any previous error
+                    $selectionErrorDiv
+                        .find(".woo-limit-variation-error")
+                        .remove();
+                    // Insert error into message div and ensure it's visible
+                    var errorMsg =
+                        "Please select " +
+                        (labelText ? labelText : "a variation") +
+                        ".";
+                    // Show error message instead of disabling button
+                    $selectionErrorDiv
+                        .append(
+                            '<div class="woo-limit-variation-error">' +
+                                errorMsg +
+                                "</div>"
+                        )
+                        .slideDown();
+                    return false;
+                }
             }
 
-            var value = $limitedNumberInput.val().trim();
-
-            if ($limitedNumberInput.length && value === "") {
-                window.IJWLP_Frontend_Common.showError(
-                    "Please enter a Limited Edition Number.",
-                    $errorDiv
-                );
-                $limitedNumberInput.focus();
-                return false;
-            }
-
-            // Basic format validation
-            if (!window.IJWLP_Frontend_Common.validateNumberFormat(value)) {
-                window.IJWLP_Frontend_Common.showError(
-                    "Please enter a valid number.",
-                    $errorDiv
-                );
-                return false;
-            }
-
-            // Check availability before submitting
             var productId =
                 $form.find('input[name="add-to-cart"]').val() ||
                 $form.find('input[name="product_id"]').val();
             var variationId =
                 $form.find('input[name="variation_id"]').val() || 0;
+            var quantity = $form.find('input[name="quantity"]').val() || 1;
 
-            // Clear any pending timer
-            var inputId = $limitedNumberInput.attr("id") || "default";
-            if (window.IJWLP_Frontend_Common.checkTimers[inputId]) {
-                clearTimeout(window.IJWLP_Frontend_Common.checkTimers[inputId]);
-                delete window.IJWLP_Frontend_Common.checkTimers[inputId];
+            // Quantity validation (must be positive integer)
+            if (!/^[1-9]\d*$/.test(quantity)) {
+                window.IJWLP_Frontend_Common.showError(
+                    "Please enter a valid quantity.",
+                    $errorDiv
+                );
+                $form.find('input[name="quantity"]').focus();
+                return false;
             }
 
-            // Check availability immediately before submitting
-            window.IJWLP_Frontend_Common.checkNumberAvailability({
-                number: value,
-                productId: productId,
-                variationId: variationId,
-                cartItemKey: "",
-                $input: $limitedNumberInput,
-                $button: $addToCartButton,
-                $errorDiv: $errorDiv,
-                onComplete: function (data) {
-                    if (data.available) {
-                        // Submit the form
-                        submitAddToCartForm();
-                    } else {
-                        // Error already shown by checkNumberAvailability
-                        $addToCartButton.prop("disabled", false);
+            // Limited product logic
+            if (isLimitedProduct) {
+                var value = $limitedNumberInput.val().trim();
+                if (value === "") {
+                    // Highlight error after variation is selected
+                    $limitedNumberInput.addClass("woo-limit-error-highlight");
+                    // Remove any previous error
+                    $errorDiv.find(".woo-limit-number-error").remove();
+                    // Insert error into message div and ensure it's visible
+                    var errorMsg =
+                        '<div class="woo-limit-number-error">Please enter a Limited Edition Number.</div>';
+                    $errorDiv.append(errorMsg);
+                    $errorDiv.css("display", "block");
+                    $limitedNumberInput.focus();
+                    return false;
+                } else {
+                    $limitedNumberInput.removeClass(
+                        "woo-limit-error-highlight"
+                    );
+                    $errorDiv.find(".woo-limit-number-error").remove();
+                    // Hide message div if no errors
+                    if ($errorDiv.children().length === 0) {
+                        $errorDiv.css("display", "none");
                     }
-                },
-            });
+                }
+                // Basic format validation
+                if (!window.IJWLP_Frontend_Common.validateNumberFormat(value)) {
+                    window.IJWLP_Frontend_Common.showError(
+                        "Please enter a valid number.",
+                        $errorDiv
+                    );
+                    return false;
+                }
+                // Clear any pending timer
+                var inputId = $limitedNumberInput.attr("id") || "default";
+                if (window.IJWLP_Frontend_Common.checkTimers[inputId]) {
+                    clearTimeout(
+                        window.IJWLP_Frontend_Common.checkTimers[inputId]
+                    );
+                    delete window.IJWLP_Frontend_Common.checkTimers[inputId];
+                }
+                // Check availability immediately before submitting
+                window.IJWLP_Frontend_Common.checkNumberAvailability({
+                    number: value,
+                    productId: productId,
+                    variationId: variationId,
+                    silent: true,
+                    cartItemKey: "",
+                    $input: $limitedNumberInput,
+                    $button: $addToCartButton,
+                    $errorDiv: $errorDiv,
+                    // Before starting the async check, mark the button as checking
+                    // and remove any previous available marker so that any premature
+                    // calls to submission will be blocked by submitAddToCartForm().
+                    onStart: function () {
+                        $addToCartButton
+                            .addClass("woo-limit-checking")
+                            .removeClass("woo-limit-available");
+                    },
+                    onComplete: function (data) {
+                        if (data.available) {
+                            // Mark button as available (used as our gating mechanism)
+                            $addToCartButton
+                                .addClass("woo-limit-available")
+                                .removeClass("woo-limit-checking");
+                            // Hide the "You are lucky" message immediately and submit
+                            window.IJWLP_Frontend_Common.hideError($errorDiv);
+                            // Submit the form
+                            submitAddToCartForm();
+                        } else {
+                            // Error already shown by checkNumberAvailability. Ensure button
+                            // is not marked available and remove checking state.
+                            $addToCartButton
+                                .removeClass("woo-limit-available")
+                                .removeClass("woo-limit-checking");
+                            $addToCartButton.prop("disabled", false);
+                        }
+                    },
+                });
+            } else {
+                // Normal product: submit via AJAX
+                // Disable button and show loading state
+                $addToCartButton
+                    .prop("disabled", true)
+                    .addClass("woo-limit-loading");
+                var originalText = $addToCartButton.text();
+                $addToCartButton.text("Adding...");
 
+                $.ajax({
+                    url: ijwlp_frontend.ajax_url,
+                    type: "POST",
+                    data: {
+                        action: "ijwlp_add_to_cart",
+                        nonce: ijwlp_frontend.nonce,
+                        product_id: productId,
+                        variation_id: variationId,
+                        quantity: quantity,
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            if (response.data.fragments) {
+                                $.each(
+                                    response.data.fragments,
+                                    function (key, value) {
+                                        $(key).replaceWith(value);
+                                    }
+                                );
+                            }
+                            $(document.body).trigger("added_to_cart", [
+                                response.data.fragments,
+                                response.data.cart_hash,
+                                $addToCartButton,
+                            ]);
+                            window.IJWLP_Frontend_Common.hideError($errorDiv);
+                            $addToCartButton
+                                .prop("disabled", true)
+                                .addClass("disabled woo-limit-loading");
+                            if (typeof wc_add_to_cart_params !== "undefined") {
+                                $(document.body).trigger("wc_fragment_refresh");
+                            }
+                        } else {
+                            window.IJWLP_Frontend_Common.showError(
+                                response.data.message ||
+                                    "Failed to add product to cart.",
+                                $errorDiv
+                            );
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        window.IJWLP_Frontend_Common.showError(
+                            "An error occurred. Please try again.",
+                            $errorDiv
+                        );
+                    },
+                    complete: function () {
+                        $addToCartButton
+                            .prop("disabled", false)
+                            .removeAttr("disabled")
+                            .removeAttr("aria-disabled")
+                            .removeClass("woo-limit-loading")
+                            .text(originalText);
+                        checkAddToCartState();
+                    },
+                });
+            }
             return false;
         });
     });
