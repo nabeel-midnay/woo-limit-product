@@ -161,6 +161,13 @@ class IJWLP_Frontend_Checkout
         }
 
         $cart_items = $cart->get_cart();
+        $shipping_total = $cart->get_shipping_total();
+        $total = $cart->get_total('raw');
+        $coupons = $cart->get_coupons();
+
+        if (!empty($coupons)) {
+            $coupon_discount = $cart_items->get_discount_total();
+        }
 ?>
         <div class="checkout-order-summary-container">
             <div id="custom-order-summary" class="custom-order-summary-wrapper">
@@ -170,7 +177,26 @@ class IJWLP_Frontend_Checkout
                         <div class="order-summary-header">
                             <h3><?php echo esc_html__('ORDER SUMMARY', 'woo-limit-product'); ?></h3>
                         </div>
+
+                        <div class="order-summary-totals">
+                            <div class="summary-line">
+                                <span class="label">Delivery:</span>
+                                <span class="value"><?php echo $shipping_total > 0 ? wc_price($shipping_total) : 'FREE'; ?></span>
+                            </div>
+                            <?php if ($coupon_discount > 0): ?>
+                                <div class="summary-line">
+                                    <span class="label">Discount:</span>
+                                    <span class="value"><?php echo wc_price($coupon_discount); ?></span>
+                                </div>
+                            <?php endif; ?>
+                            <div class="summary-line total-line">
+                                <span class="label">Total:</span>
+                                <span class="value"><?php echo wc_price($total); ?></span>
+                            </div>
+
+                        </div>
                     </div>
+
                     <div class="order-summary-content">
                         <?php foreach ($cart_items as $ci_key => $ci_item) :
                             $product = isset($ci_item['data']) ? $ci_item['data'] : null;
