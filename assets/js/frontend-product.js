@@ -27,6 +27,34 @@
         var $errorDiv = $(".woo-limit-message");
         var $selectionErrorDiv = $(".woo-limit-selection-message");
 
+        // Stock quantities parsed from data attributes
+        var stockQuantityRemaining =
+            parseInt($(".woo-limit-stock-quantity").val()) || 99;
+        var variationStockQuantities = {};
+
+        // Parse variation stock quantities from JSON
+        var variationStockJson = $(".woo-limit-variation-quantities").val();
+        if (variationStockJson) {
+            try {
+                variationStockQuantities = JSON.parse(variationStockJson);
+            } catch (e) {
+                variationStockQuantities = {};
+            }
+        }
+
+        // Function to get current variation stock
+        function getCurrentVariationStock() {
+            var variationId =
+                $form.find('input[name="variation_id"]').val() || 0;
+            if (
+                variationId &&
+                variationStockQuantities[variationId] !== undefined
+            ) {
+                return variationStockQuantities[variationId];
+            }
+            return stockQuantityRemaining;
+        }
+
         // Check if variation is already selected on page load
         function checkVariationSelected() {
             if (!isVariableProduct) {
@@ -53,6 +81,20 @@
                 $selectionErrorDiv.find(".woo-limit-variation-error").slideUp();
                 $selectionErrorDiv.hide();
                 hasVariation = true;
+
+                // Check stock availability for the selected variation on load
+                if (isLimitedProduct) {
+                    var currentStock = getCurrentVariationStock();
+                    if (currentStock <= 0) {
+                        // Handle out-of-stock state centrally
+                        window.IJWLP_Frontend_Common.handleOutOfStock(
+                            isVariableProduct,
+                            $addToCartButton,
+                            $limitedNumberInput,
+                            $errorDiv
+                        );
+                    }
+                }
             }
 
             variationSelected = hasVariation;
@@ -62,26 +104,39 @@
         // Force enable add to cart button and remove WooCommerce disabling classes/attrs on load
         // Ensure we clear both the disabled prop/attribute and any aria-disabled
         setTimeout(function () {
-            $addToCartButton
-                .prop("disabled", false)
-                .removeAttr("disabled")
-                .removeAttr("aria-disabled")
-                .removeClass("disabled wc-variation-selection-needed");
+            // Only force-enable the button if it's NOT intentionally marked as
+            // out of stock or currently in our loading/checking state. Some
+            // other plugins add disabling attributes which we want to strip,
+            // but we must not override a deliberate out-of-stock state set by
+            // `handleOutOfStock`.
+            if (
+                !$addToCartButton.hasClass("woo-limit-loading") &&
+                !$addToCartButton.hasClass("woo-outofstock")
+            ) {
+                $addToCartButton
+                    .prop("disabled", false)
+                    .removeAttr("disabled")
+                    .removeAttr("aria-disabled")
+                    .removeClass("disabled wc-variation-selection-needed");
+            }
         }, 500);
 
         // If it's a variable product, disable the number field initially
         if (isVariableProduct) {
             $limitedNumberInput.prop("disabled", true).addClass("disabled");
-            $limitedNumberInput.attr(
-                "placeholder",
-                "Please select a variation first"
-            );
             // Some themes/plugins add disabled attributes or aria-disabled; clear them here as well
-            $addToCartButton
-                .prop("disabled", false)
-                .removeAttr("disabled")
-                .removeAttr("aria-disabled")
-                .removeClass("disabled wc-variation-selection-needed");
+            // Respect intentional out-of-stock or loading states when clearing
+            // third-party disabling markers.
+            if (
+                !$addToCartButton.hasClass("woo-limit-loading") &&
+                !$addToCartButton.hasClass("woo-outofstock")
+            ) {
+                $addToCartButton
+                    .prop("disabled", false)
+                    .removeAttr("disabled")
+                    .removeAttr("aria-disabled")
+                    .removeClass("disabled wc-variation-selection-needed");
+            }
         }
 
         // Check initial variation state
@@ -107,10 +162,19 @@
                     var hasAriaDisabled =
                         $addToCartButton.attr("aria-disabled");
 
+                    // New persistent out-of-stock marker — if present we must NOT
+                    // remove the disabled state or classes. Also respect loading state.
+                    var hasOutOfStock =
+                        $addToCartButton.hasClass("woo-outofstock");
+
                     // If any of the problematic attributes/classes are present, remove them
                     // (unless we're in a loading/submitting state where button should legitimately be disabled)
+                    // Only strip third-party disabling if we're NOT in a
+                    // plugin-induced loading state and the button is not
+                    // intentionally out of stock for this site.
                     if (
                         !$addToCartButton.hasClass("woo-limit-loading") &&
+                        !hasOutOfStock &&
                         (hasDisabledClass ||
                             hasVariationClass ||
                             isDisabledAttr ||
@@ -142,12 +206,18 @@
 
             $form.on("found_variation", function (event, variation) {
                 variationSelected = true;
+                checkVariationSelected();
                 updateFieldStates();
                 $addToCartButton
                     .prop("disabled", false)
                     .removeAttr("disabled")
                     .removeAttr("aria-disabled")
-                    .removeClass("disabled wc-variation-selection-needed");
+                    .removeClass("disabled wc-variation-selection-needed")
+                    .removeClass("woo-outofstock");
+                $limitedNumberInput
+                    .prop("disabled", false)
+                    .removeClass("disabled")
+                    .removeClass("woo-outofstock");
             });
 
             $form.on("reset_data", function () {
@@ -155,16 +225,14 @@
                 $limitedNumberInput
                     .val("")
                     .prop("disabled", true)
-                    .addClass("disabled");
-                $limitedNumberInput.attr(
-                    "placeholder",
-                    "Please select a variation first"
-                );
+                    .addClass("disabled")
+                    .removeClass("woo-outofstock");
                 $addToCartButton
                     .prop("disabled", false)
                     .removeAttr("disabled")
                     .removeAttr("aria-disabled")
-                    .removeClass("disabled wc-variation-selection-needed");
+                    .removeClass("disabled wc-variation-selection-needed")
+                    .removeClass("woo-outofstock");
                 window.IJWLP_Frontend_Common.hideError();
             });
 
@@ -173,6 +241,17 @@
                 // Small delay to let WooCommerce process the variation
                 setTimeout(function () {
                     checkVariationSelected();
+                    // Check stock for selected variation
+                    var currentStock = getCurrentVariationStock();
+                    if (currentStock <= 0) {
+                        // Handle out-of-stock state centrally
+                        window.IJWLP_Frontend_Common.handleOutOfStock(
+                            isVariableProduct,
+                            $addToCartButton,
+                            $limitedNumberInput,
+                            $errorDiv
+                        );
+                    }
                 }, 100);
             });
         }
@@ -183,17 +262,13 @@
                 // Enable number field if not variable product or variation is selected
                 $limitedNumberInput
                     .prop("disabled", false)
-                    .removeClass("disabled");
-                $limitedNumberInput.attr("placeholder", "Enter edition number");
+                    .removeClass("disabled")
+                    .removeClass("woo-outofstock");
                 // Only update visuals, do not disable button
                 checkAddToCartState();
             } else {
                 // Disable number field if variation not selected
                 $limitedNumberInput.prop("disabled", true).addClass("disabled");
-                $limitedNumberInput.attr(
-                    "placeholder",
-                    "Please select a variation first"
-                );
                 // Do not disable add to cart button
             }
         }
@@ -229,6 +304,9 @@
                 },
                 getVariationId: function () {
                     return $form.find('input[name="variation_id"]').val() || 0;
+                },
+                getCurrentStock: function () {
+                    return getCurrentVariationStock();
                 },
             });
         }
@@ -330,6 +408,64 @@
                 },
                 success: function (response) {
                     if (response.success) {
+                        // Update stock quantities
+                        if (
+                            variationId &&
+                            variationStockQuantities[variationId] !== undefined
+                        ) {
+                            // Reduce variation-specific stock
+                            variationStockQuantities[variationId] = Math.max(
+                                0,
+                                variationStockQuantities[variationId] - 1
+                            );
+                            // If this variation is now out of stock, mark persistent state
+                            if (variationStockQuantities[variationId] <= 0) {
+                                $addToCartButton
+                                    .prop("disabled", true)
+                                    .addClass("disabled")
+                                    .addClass("woo-outofstock");
+                                $limitedNumberInput
+                                    .prop("disabled", true)
+                                    .addClass("disabled")
+                                    .addClass("woo-outofstock");
+                            } else {
+                                // Clear out-of-stock marker if stock remains
+                                $addToCartButton.removeClass("woo-outofstock");
+                                $limitedNumberInput.removeClass(
+                                    "woo-outofstock"
+                                );
+                            }
+                        } else {
+                            // Reduce main product stock
+                            stockQuantityRemaining = Math.max(
+                                0,
+                                stockQuantityRemaining - 1
+                            );
+                            if (stockQuantityRemaining <= 0) {
+                                $addToCartButton
+                                    .prop("disabled", true)
+                                    .addClass("disabled")
+                                    .addClass("woo-outofstock");
+                                $limitedNumberInput
+                                    .prop("disabled", true)
+                                    .addClass("disabled")
+                                    .addClass("woo-outofstock");
+                            } else {
+                                $addToCartButton.removeClass("woo-outofstock");
+                                $limitedNumberInput.removeClass(
+                                    "woo-outofstock"
+                                );
+                            }
+                        }
+
+                        // Update the hidden fields with new stock values
+                        $(".woo-limit-stock-quantity").val(
+                            stockQuantityRemaining
+                        );
+                        $(".woo-limit-variation-quantities").val(
+                            JSON.stringify(variationStockQuantities)
+                        );
+
                         // Update cart fragments
                         if (response.data.fragments) {
                             $.each(
@@ -505,6 +641,7 @@
                     $input: $limitedNumberInput,
                     $button: $addToCartButton,
                     $errorDiv: $errorDiv,
+                    currentStock: getCurrentVariationStock(),
                     // Before starting the async check, mark the button as checking
                     // and remove any previous available marker so that any premature
                     // calls to submission will be blocked by submitAddToCartForm().

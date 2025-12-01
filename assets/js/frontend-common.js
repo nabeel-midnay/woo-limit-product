@@ -13,6 +13,46 @@
     window.IJWLP_Frontend_Common = {
         // Debounce timers
         checkTimers: {},
+        OUT_OF_STOCK_MESSAGES: {
+            product: "This product is out of stock",
+            variation: "This variation is out of stock",
+        },
+        /**
+         * Get dynamic out-of-stock message
+         * @param {boolean} isVariation - true if variation, false if product
+         * @returns {string}
+         */
+        getOutOfStockMessage: function (isVariation) {
+            return isVariation
+                ? this.OUT_OF_STOCK_MESSAGES.variation
+                : this.OUT_OF_STOCK_MESSAGES.product;
+        },
+
+        /**
+         * Handle out-of-stock state: show message, disable button, add class
+         * @param {boolean} isVariation - true if variation, false if product
+         * @param {jQuery} $button - Button to disable
+         * @param {jQuery} $input - Input to disable
+         * @param {jQuery} $errorDiv - Error div to show message in
+         */
+        handleOutOfStock: function (isVariation, $button, $input, $errorDiv) {
+            // Disable input
+            if ($input && $input.length) {
+                $input
+                    .prop("disabled", true)
+                    .addClass("disabled")
+                    .addClass("woo-outofstock");
+            }
+            // Disable and mark button
+            if ($button && $button.length) {
+                $button
+                    .prop("disabled", true)
+                    .addClass("disabled")
+                    .addClass("woo-outofstock");
+            }
+            // Show error message
+            this.showError(this.getOutOfStockMessage(isVariation), $errorDiv);
+        },
 
         /**
          * Show error message
@@ -104,7 +144,7 @@
             }
 
             // Check if any range info has error
-            if ($(".woo-limit-range-info.woo-limit-error").length > 0) {
+            if ($(".woo-number-range.woo-limit-error").length > 0) {
                 hasErrors = true;
             }
 
@@ -144,8 +184,37 @@
             var productId = options.productId;
             var variationId = options.variationId || 0;
             var cartItemKey = options.cartItemKey || "";
+            var currentStock = options.currentStock || 0;
             // If silent is true, suppress user-facing messages (useful when submitting the form)
             var silent = options.silent || false;
+
+            // Check if stock is available before making AJAX request
+            if (currentStock <= 0) {
+                $input
+                    .addClass("woo-limit-error")
+                    .removeClass("woo-limit-available");
+                if (!silent) {
+                    self.showError(
+                        "This product is currently out of stock.",
+                        $errorDiv
+                    );
+                }
+                if ($button && $button.length) {
+                    $button.prop("disabled", true).addClass("disabled");
+                }
+
+                // Call onComplete callback if provided
+                if (options.onComplete) {
+                    options.onComplete({ available: false });
+                }
+
+                // Call onStart callback if provided
+                if (options.onStart) {
+                    options.onStart();
+                }
+
+                return;
+            }
 
             // Clear any existing timer for this input
             var inputId =
@@ -153,6 +222,11 @@
             if (self.checkTimers[inputId]) {
                 clearTimeout(self.checkTimers[inputId]);
                 delete self.checkTimers[inputId];
+            }
+
+            // Call onStart callback if provided
+            if (options.onStart) {
+                options.onStart();
             }
 
             // Show loading state (suppress visible messages when silent)
@@ -433,7 +507,7 @@
 
             // Range info element and start/end values (added to wrapper by PHP)
             var $wrapper = $input.closest(".woo-limit-field-wrapper");
-            var $rangeInfo = $wrapper.find(".woo-limit-range-info");
+            var $rangeInfo = $wrapper.find(".woo-number-range");
             var start = parseInt($wrapper.data("start"), 10);
             var end = parseInt($wrapper.data("end"), 10);
             if (isNaN(start)) {
@@ -562,6 +636,9 @@
                         cartItemKey: options.getCartItemKey
                             ? options.getCartItemKey()
                             : "",
+                        currentStock: options.getCurrentStock
+                            ? options.getCurrentStock()
+                            : 0,
                         $input: $input,
                         $button: $button,
                         $errorDiv: $errorDiv,
@@ -634,6 +711,9 @@
                         cartItemKey: options.getCartItemKey
                             ? options.getCartItemKey()
                             : "",
+                        currentStock: options.getCurrentStock
+                            ? options.getCurrentStock()
+                            : 0,
                         $input: $input,
                         $button: $button,
                         $errorDiv: $errorDiv,
@@ -748,7 +828,8 @@
                     minChars: 1,
                     triggerSelectOnValidInput: false,
                     appendTo: $customBox,
-                    containerClass: "woo-limit-autocomplete",
+                    containerClass:
+                        "woo-limit-autocomplete autocomplete-suggestions",
                     onSelect: function (s) {
                         $input.val(s.value).trigger("input").trigger("change");
                         setTimeout(function () {
