@@ -3,14 +3,6 @@
  */
 
 /* Limited Edition Number Field Wrapper */
-.woo-limit-field-wrapper {
-    margin: 20px 0;
-    padding: 15px;
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    position: relative;
-}
 
 .woo-limit-field-label {
     display: block;
@@ -59,7 +51,7 @@
     font-weight: 500;
 }
 
-.woo-limit-range-info.woo-limit-error {
+.woo-number-range.woo-limit-error {
     color: #e2401c;
 }
 
@@ -179,11 +171,6 @@ button[name="add-to-cart"].disabled {
 /* Cart page specific styles - uses same classes as product page but with wrapper specificity */
 .woo-limit-cart-item-wrapper {
     margin: 10px 0;
-}
-
-.woo-limit-cart-item-wrapper .woo-limit-field-wrapper {
-    margin: 10px 0;
-    padding: 10px;
 }
 
 .woo-limit-cart-item-wrapper .woo-limit-field-label {
