@@ -433,7 +433,9 @@
                 for (var i = 0; i < toAdd; i++) {
                     // create new input block
                     var index = currentCount + i;
-                    var $div = $('<div class="woo-limit-cart-item"></div>');
+                    var $div = $(
+                        '<div class="woo-limit-cart-item woo-input-single gt-2"></div>'
+                    );
                     var $inp = $(
                         '<input type="number" class="woo-limit" name="woo_limit[' +
                             cartKey +
@@ -567,7 +569,7 @@
             if (!$wrapper || !$wrapper.length) return false;
             var $err = $wrapper.find(".woo-limit-message.woo-limit-error");
             if ($err.length && $err.is(":visible")) return true;
-            var $range = $wrapper.find(".woo-limit-range-info.woo-limit-error");
+            var $range = $wrapper.find(".woo-number-range.woo-limit-error");
             if ($range.length) return true;
             // any inputs with validation class indicating error?
             var $invalidInputs = $wrapper.find(".woo-limit.woo-limit-error");
