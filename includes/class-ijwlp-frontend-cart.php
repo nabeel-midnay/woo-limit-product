@@ -297,21 +297,21 @@ class IJWLP_Frontend_Cart
 
 ?>
         <?php $max_qty = get_post_meta($parent_product_id, '_woo_limit_max_quantity', true); ?>
-        <div class="woo-limit-field-wrapper woo-limit-cart-item-wrapper" data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>" data-product-id="<?php echo esc_attr($parent_product_id); ?>" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" <?php if (!empty($max_qty)) {
-                                                                                                                                                                                                                                                                                                echo ' data-max-quantity="' . esc_attr($max_qty) . '"';
-                                                                                                                                                                                                                                                                                            } ?>>
+        <div class="woo-limit-product woo-limit-cart woo-limit-field-wrapper woo-limit-cart-item-wrapper" data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>" data-product-id="<?php echo esc_attr($parent_product_id); ?>" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" <?php if (!empty($max_qty)) {
+                                                                                                                                                                                                                                                                                                                                echo ' data-max-quantity="' . esc_attr($max_qty) . '"';
+                                                                                                                                                                                                                                                                                                                            } ?>>
             <p class="woo-limit-field-label">
                 <?php echo esc_html($limit_label_cart); ?>
             </p>
             <?php if ($start && $end): ?>
-                <p class="woo-limit-range-info">
+                <span class="woo-number-range">
                     <?php esc_html_e('Enter a number between: ', 'woolimited'); ?>
                     <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
-                </p>
+                </span>
             <?php endif; ?>
 
             <?php foreach ($limited_numbers as $index => $limited_number): ?>
-                <div class="woo-limit-cart-item">
+                <div class="woo-limit-cart-item woo-input-single gt-2">
                     <input
                         type="number"
                         id="woo-limit-cart-<?php echo esc_attr($cart_item_key); ?>-<?php echo esc_attr($index); ?>"
