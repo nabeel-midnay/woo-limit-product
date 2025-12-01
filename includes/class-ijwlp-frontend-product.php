@@ -71,38 +71,71 @@ class IJWLP_Frontend_Product
         if ($product->is_type('variable')) {
             foreach ($product->get_children() as $variation_id) {
                 $variation = wc_get_product($variation_id);
-                $variation_quantities[$variation_id] = $variation->get_stock_quantity();
+                $variation_quantities[$variation_id] = $variation ? intval($variation->get_stock_quantity()) : 0;
+            }
+        }
+
+        // Reduce quantities by anything already in the user's cart
+        if (function_exists('WC') && WC()->cart) {
+            foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+                $cart_product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
+                $cart_variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
+                $cart_qty = isset($cart_item['quantity']) ? intval($cart_item['quantity']) : 0;
+
+                if ($product->is_type('variable')) {
+                    // If this cart item is a variation of the current parent product, reduce that variation's stock
+                    if ($cart_variation_id > 0) {
+                        $cart_variation_product = wc_get_product($cart_variation_id);
+                        $parent_id = $cart_variation_product ? intval($cart_variation_product->get_parent_id()) : 0;
+                        if ($parent_id === $pro_id) {
+                            if (isset($variation_quantities[$cart_variation_id])) {
+                                $variation_quantities[$cart_variation_id] = max(0, $variation_quantities[$cart_variation_id] - $cart_qty);
+                            }
+                        }
+                    } else {
+                        // In rare cases a parent product might be added directly; reduce parent stock
+                        if ($cart_product_id === $pro_id) {
+                            $stock_quantity = max(0, intval($stock_quantity) - $cart_qty);
+                        }
+                    }
+                } else {
+                    // Simple (non-variable) product: reduce stock when product matches
+                    if ($cart_product_id === $pro_id) {
+                        $stock_quantity = max(0, intval($stock_quantity) - $cart_qty);
+                    }
+                }
             }
         }
 
         // Prepare variation quantities in a JSON format for hidden field
-        $variation_quantities_json = !empty($variation_quantities) ? json_encode($variation_quantities) : '[]';
+        $variation_quantities_json = !empty($variation_quantities) ? wp_json_encode($variation_quantities) : '[]';
 
 ?>
         <div class="woo-limit-selection-error" style="display:none"></div>
-        <div class="woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
+        <div class="woo-limit-product woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
             <p class="woo-limit-field-label">
                 <?php echo esc_html($limit_label); ?>
             </p>
-            <p class="woo-limit-range-info">
+            <span class="woo-number-range">
                 <?php esc_html_e('Enter a number between: ', 'woolimited'); ?>
                 <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
-            </p>
+            </span>
 
-            <!-- Hidden fields for stock information -->
             <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity" value="<?php echo esc_attr($stock_quantity); ?>" />
             <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities" value="<?php echo esc_attr($variation_quantities_json); ?>" />
 
-            <input
-                type="number"
-                id="woo-limit"
-                name="woo-limit"
-                class="woo-limit"
-                placeholder="<?php esc_attr_e('Enter a number', 'woolimited'); ?>"
-                value=""
-                min="<?php echo esc_attr($start); ?>"
-                max="<?php echo esc_attr($end); ?>"
-                required />
+            <div class="woo-limit-input-group">
+                <input
+                    type="number"
+                    id="woo-limit"
+                    name="woo-limit"
+                    class="woo-limit"
+                    value=""
+                    min="<?php echo esc_attr($start); ?>"
+                    max="<?php echo esc_attr($end); ?>"
+                    required />
+            </div>
+
             <input
                 type="hidden"
                 name="woo-limit-available"
