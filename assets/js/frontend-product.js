@@ -641,7 +641,6 @@
                     $input: $limitedNumberInput,
                     $button: $addToCartButton,
                     $errorDiv: $errorDiv,
-                    currentStock: getCurrentVariationStock(),
                     // Before starting the async check, mark the button as checking
                     // and remove any previous available marker so that any premature
                     // calls to submission will be blocked by submitAddToCartForm().

@@ -184,37 +184,8 @@
             var productId = options.productId;
             var variationId = options.variationId || 0;
             var cartItemKey = options.cartItemKey || "";
-            var currentStock = options.currentStock || 0;
             // If silent is true, suppress user-facing messages (useful when submitting the form)
             var silent = options.silent || false;
-
-            // Check if stock is available before making AJAX request
-            if (currentStock <= 0) {
-                $input
-                    .addClass("woo-limit-error")
-                    .removeClass("woo-limit-available");
-                if (!silent) {
-                    self.showError(
-                        "This product is currently out of stock.",
-                        $errorDiv
-                    );
-                }
-                if ($button && $button.length) {
-                    $button.prop("disabled", true).addClass("disabled");
-                }
-
-                // Call onComplete callback if provided
-                if (options.onComplete) {
-                    options.onComplete({ available: false });
-                }
-
-                // Call onStart callback if provided
-                if (options.onStart) {
-                    options.onStart();
-                }
-
-                return;
-            }
 
             // Clear any existing timer for this input
             var inputId =
@@ -636,9 +607,6 @@
                         cartItemKey: options.getCartItemKey
                             ? options.getCartItemKey()
                             : "",
-                        currentStock: options.getCurrentStock
-                            ? options.getCurrentStock()
-                            : 0,
                         $input: $input,
                         $button: $button,
                         $errorDiv: $errorDiv,
@@ -711,9 +679,6 @@
                         cartItemKey: options.getCartItemKey
                             ? options.getCartItemKey()
                             : "",
-                        currentStock: options.getCurrentStock
-                            ? options.getCurrentStock()
-                            : 0,
                         $input: $input,
                         $button: $button,
                         $errorDiv: $errorDiv,
