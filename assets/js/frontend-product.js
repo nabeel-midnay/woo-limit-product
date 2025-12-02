@@ -483,6 +483,23 @@
                             $addToCartButton,
                         ]);
 
+                        // TIMER: Restart countdown when limited product is added from product page
+                        var limitTime =
+                            window.ijwlp_limit_time ||
+                            parseInt(
+                                $("[data-limit-time]").attr("data-limit-time")
+                            ) ||
+                            15;
+                        if (
+                            window.ijwlpTimer &&
+                            typeof window.ijwlpTimer.restartTimer === "function"
+                        ) {
+                            window.ijwlpTimer.restartTimer(limitTime);
+                            console.log(
+                                "Timer restarted for limited product addition"
+                            );
+                        }
+
                         // Hide ALL messages immediately (checking, lucky, etc)
                         window.IJWLP_Frontend_Common.hideError($errorDiv);
                         $errorDiv.hide();

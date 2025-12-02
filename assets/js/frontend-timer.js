@@ -1,0 +1,428 @@
+/**
+ * WooCommerce Limited Product - Timer Manager JavaScript
+ *
+ * Manages countdown timer for limited-edition products using localStorage
+ * - Persists timer state across page refreshes
+ * - Handles timer start, resume, and expiry
+ * - Removes expired products from cart
+ * - Integrates with shortcode display
+ *
+ * @package WooCommerce Limited Product
+ */
+
+(function ($) {
+    "use strict";
+
+    /**
+     * Timer Manager Object
+     * Encapsulates all timer functionality
+     */
+    window.ijwlpTimer = {
+        // Configuration constants
+        CHECK_INTERVAL: 1000, // Check every 1 second (milliseconds)
+        DANGER_THRESHOLD: 180, // 3 minutes in seconds
+        STORAGE_KEYS: {
+            EXPIRY: "ijwlp_timer_expiry",
+            ACTIVE: "ijwlp_timer_active",
+        },
+
+        // State variables
+        intervalId: null,
+        timerData: {
+            expiry: null,
+            isActive: false,
+        },
+
+        /**
+         * Initialize timer on page load
+         * Check if timer exists and resume if active
+         */
+        init: function () {
+            console.log("ijwlpTimer: Initializing...");
+
+            // Check if timer already exists in localStorage
+            if (this.hasActiveTimer()) {
+                console.log("ijwlpTimer: Active timer found, resuming...");
+                this.resumeTimer();
+            } else {
+                console.log("ijwlpTimer: No active timer");
+            }
+
+            // Attach cart change listeners
+            this.attachCartListeners();
+        },
+
+        /**
+         * Check if valid timer exists in localStorage
+         *
+         * @returns {boolean}
+         */
+        hasActiveTimer: function () {
+            const expiry = localStorage.getItem(this.STORAGE_KEYS.EXPIRY);
+            const isActive = localStorage.getItem(this.STORAGE_KEYS.ACTIVE);
+
+            if (!expiry || isActive !== "true") {
+                return false;
+            }
+
+            const expiryTime = parseInt(expiry);
+            const currentTime = Math.floor(Date.now() / 1000);
+
+            // Timer is still valid if expiry is in the future
+            return expiryTime > currentTime;
+        },
+
+        /**
+         * Resume an existing timer from localStorage
+         */
+        resumeTimer: function () {
+            const expiry = localStorage.getItem(this.STORAGE_KEYS.EXPIRY);
+
+            if (!expiry) {
+                this.clearTimer();
+                return;
+            }
+
+            this.timerData.expiry = parseInt(expiry);
+            this.timerData.isActive = true;
+
+            console.log(
+                "ijwlpTimer: Resumed with expiry:",
+                this.timerData.expiry
+            );
+
+            // Start the countdown interval
+            this.startTimer();
+        },
+
+        /**
+         * Start or restart the timer
+         * Called when limited product is added from product page
+         *
+         * @param {number} limitTimeMinutes - Time limit in minutes from settings
+         */
+        restartTimer: function (limitTimeMinutes) {
+            console.log(
+                "ijwlpTimer: Restarting with",
+                limitTimeMinutes,
+                "minutes"
+            );
+
+            // Calculate expiry timestamp (Unix timestamp in seconds)
+            const currentTime = Math.floor(Date.now() / 1000);
+            const limitTimeSeconds = limitTimeMinutes * 60;
+            const expiry = currentTime + limitTimeSeconds;
+
+            // Store in localStorage
+            localStorage.setItem(this.STORAGE_KEYS.EXPIRY, expiry.toString());
+            localStorage.setItem(this.STORAGE_KEYS.ACTIVE, "true");
+
+            this.timerData.expiry = expiry;
+            this.timerData.isActive = true;
+
+            console.log("ijwlpTimer: Timer started, expiry:", expiry);
+
+            // Start countdown
+            this.startTimer();
+        },
+
+        /**
+         * Begin countdown interval (1 second checks)
+         */
+        startTimer: function () {
+            // Clear any existing interval
+            if (this.intervalId !== null) {
+                clearInterval(this.intervalId);
+            }
+
+            const self = this;
+
+            // Update display immediately
+            this.updateDisplay();
+
+            // Set interval to check timer every second
+            this.intervalId = setInterval(function () {
+                const remaining = self.getTimeRemaining();
+
+                if (remaining <= 0) {
+                    // Timer expired
+                    console.log("ijwlpTimer: Timer expired!");
+                    self.onTimerExpiry();
+                } else {
+                    // Update display
+                    self.updateDisplay();
+                }
+            }, this.CHECK_INTERVAL);
+        },
+
+        /**
+         * Stop timer and clear interval
+         */
+        stopTimer: function () {
+            if (this.intervalId !== null) {
+                clearInterval(this.intervalId);
+                this.intervalId = null;
+                console.log("ijwlpTimer: Timer stopped");
+            }
+        },
+
+        /**
+         * Clear timer from storage and UI
+         */
+        clearTimer: function () {
+            this.stopTimer();
+
+            localStorage.removeItem(this.STORAGE_KEYS.EXPIRY);
+            localStorage.removeItem(this.STORAGE_KEYS.ACTIVE);
+
+            this.timerData.expiry = null;
+            this.timerData.isActive = false;
+
+            // Hide timer display
+            const $timerDisplay = $("#woo-limit-timer");
+            if ($timerDisplay.length) {
+                $timerDisplay.hide();
+            }
+
+            console.log("ijwlpTimer: Timer cleared");
+        },
+
+        /**
+         * Get remaining time in seconds
+         *
+         * @returns {number}
+         */
+        getTimeRemaining: function () {
+            if (!this.timerData.expiry) {
+                return 0;
+            }
+
+            const currentTime = Math.floor(Date.now() / 1000);
+            const remaining = this.timerData.expiry - currentTime;
+
+            return remaining > 0 ? remaining : 0;
+        },
+
+        /**
+         * Format seconds to mm:ss format
+         *
+         * @param {number} seconds
+         * @returns {string}
+         */
+        formatTime: function (seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+
+            // Pad with leading zeros
+            const paddedMinutes = String(minutes).padStart(2, "0");
+            const paddedSecs = String(secs).padStart(2, "0");
+
+            return paddedMinutes + ":" + paddedSecs;
+        },
+
+        /**
+         * Update timer display in UI
+         * Updates separate minutes and seconds boxes
+         */
+        updateDisplay: function () {
+            const $timerDisplay = $("#woo-limit-timer");
+
+            if (!$timerDisplay.length) {
+                return;
+            }
+
+            const remaining = this.getTimeRemaining();
+            const minutes = Math.floor(remaining / 60);
+            const seconds = remaining % 60;
+
+            if (remaining <= 0) {
+                // Display expired
+                $("#timer-minutes", $timerDisplay).text("00");
+                $("#timer-seconds", $timerDisplay).text("00");
+                $timerDisplay.addClass("expired");
+                return;
+            }
+
+            // Pad with leading zeros
+            const paddedMinutes = String(minutes).padStart(2, "0");
+            const paddedSeconds = String(seconds).padStart(2, "0");
+
+            // Update minutes and seconds boxes separately
+            $("#timer-minutes", $timerDisplay).text(paddedMinutes);
+            $("#timer-seconds", $timerDisplay).text(paddedSeconds);
+
+            // Add/remove danger class if less than 3 minutes
+            if (remaining < this.DANGER_THRESHOLD) {
+                $timerDisplay.addClass("danger");
+            } else {
+                $timerDisplay.removeClass("danger");
+            }
+
+            // Show timer if hidden
+            if ($timerDisplay.is(":hidden")) {
+                $timerDisplay.show();
+            }
+        },
+
+        /**
+         * Handle timer expiry - remove products and reload
+         */
+        onTimerExpiry: function () {
+            console.log("ijwlpTimer: Handling timer expiry");
+
+            this.stopTimer();
+
+            // Check if nonce is available
+            const nonce = window.ijwlpTimerNonce || "";
+
+            if (!nonce) {
+                console.error("ijwlpTimer: Nonce not available for AJAX");
+                // Fallback: just clear and reload
+                this.clearTimer();
+                location.reload();
+                return;
+            }
+
+            // AJAX: Remove expired limited products
+            $.ajax({
+                url: ajaxurl || "/wp-admin/admin-ajax.php",
+                type: "POST",
+                data: {
+                    action: "ijwlp_remove_expired_limited_products",
+                    nonce: nonce,
+                },
+                success: function (response) {
+                    console.log("ijwlpTimer: AJAX removal response", response);
+
+                    // Clear timer from localStorage
+                    window.ijwlpTimer.clearTimer();
+
+                    // Reload page to show updated cart
+                    location.reload();
+                },
+                error: function (error) {
+                    console.error("ijwlpTimer: AJAX error", error);
+
+                    // Even on error, clear timer and reload
+                    window.ijwlpTimer.clearTimer();
+                    location.reload();
+                },
+            });
+        },
+
+        /**
+         * Attach listeners for cart changes
+         * If user removes all limited items, clear timer
+         */
+        attachCartListeners: function () {
+            const self = this;
+
+            // Listen for cart updated event (WooCommerce standard)
+            $(document).on("wc_cart_emptied updated_cart_totals", function () {
+                console.log("ijwlpTimer: Cart updated event");
+
+                // Check if limited products still exist in cart
+                $.ajax({
+                    url: ajaxurl || "/wp-admin/admin-ajax.php",
+                    type: "POST",
+                    data: {
+                        action: "ijwlp_cart_has_limited_products",
+                    },
+                    success: function (response) {
+                        if (!response.success || !response.data.has_limited) {
+                            console.log(
+                                "ijwlpTimer: No limited products in cart, clearing timer"
+                            );
+                            self.clearTimer();
+                        }
+                    },
+                });
+            });
+
+            // Listen for mini cart fragment updates (WooCommerce mini cart)
+            $(document.body).on(
+                "wc_fragments_loaded wc_fragments_refreshed",
+                function () {
+                    console.log(
+                        "ijwlpTimer: Cart fragments loaded/refreshed - checking for limited products"
+                    );
+
+                    // Check if limited products still exist in cart
+                    $.ajax({
+                        url: ajaxurl || "/wp-admin/admin-ajax.php",
+                        type: "POST",
+                        data: {
+                            action: "ijwlp_cart_has_limited_products",
+                        },
+                        success: function (response) {
+                            if (
+                                !response.success ||
+                                !response.data.has_limited
+                            ) {
+                                console.log(
+                                    "ijwlpTimer: No limited products in cart (mini cart), clearing timer"
+                                );
+                                self.clearTimer();
+                            }
+                        },
+                    });
+                }
+            );
+
+            // Listen for product removed from cart event
+            $(document).on("woocommerce_cart_item_removed", function () {
+                console.log("ijwlpTimer: Cart item removed event");
+
+                // Check if limited products still exist in cart
+                $.ajax({
+                    url: ajaxurl || "/wp-admin/admin-ajax.php",
+                    type: "POST",
+                    data: {
+                        action: "ijwlp_cart_has_limited_products",
+                    },
+                    success: function (response) {
+                        if (!response.success || !response.data.has_limited) {
+                            console.log(
+                                "ijwlpTimer: No limited products in cart after removal, clearing timer"
+                            );
+                            self.clearTimer();
+                        }
+                    },
+                });
+            });
+        },
+
+        /**
+         * Check if cart contains limited products
+         * Utility method for other parts of the system
+         *
+         * @param {function} callback - Callback function (result: boolean)
+         */
+        checkCartHasLimitedProducts: function (callback) {
+            $.ajax({
+                url: ajaxurl || "/wp-admin/admin-ajax.php",
+                type: "POST",
+                data: {
+                    action: "ijwlp_cart_has_limited_products",
+                },
+                success: function (response) {
+                    if (typeof callback === "function") {
+                        callback(response.success && response.data.has_limited);
+                    }
+                },
+                error: function () {
+                    if (typeof callback === "function") {
+                        callback(false);
+                    }
+                },
+            });
+        },
+    };
+
+    /**
+     * Initialize timer when DOM is ready
+     */
+    $(document).ready(function () {
+        window.ijwlpTimer.init();
+    });
+})(jQuery);

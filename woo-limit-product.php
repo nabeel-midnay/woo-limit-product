@@ -88,6 +88,9 @@ new IJWLP_Options();
 
 new IJWLP_Api();
 
+// Load Timer Manager (common) in both admin and frontend
+new IJWLP_Timer_Manager();
+
 //register activation hook
 register_activation_hook(IJWLP_FILE, 'woo_limit_activate_plugin');
 

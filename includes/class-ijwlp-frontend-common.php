@@ -146,6 +146,15 @@ class IJWLP_Frontend_Common
             // Localize script data to common script
             wp_localize_script('ijwlp-frontend-common', 'ijwlp_frontend', $ajax_data);
 
+            // Enqueue timer script
+            wp_enqueue_script(
+                'ijwlp-frontend-timer',
+                $this->assets_url . 'js/frontend-timer.js',
+                array('jquery'),
+                $this->_version,
+                true
+            );
+
             // Product page specific script
             if (is_product()) {
                 wp_enqueue_script(
@@ -155,6 +164,10 @@ class IJWLP_Frontend_Common
                     $this->_version,
                     true
                 );
+
+                // Localize limit time setting for product page
+                $limit_time = IJWLP_Options::get_setting('limittime', 15);
+                wp_localize_script('ijwlp-frontend-product', 'ijwlp_limit_time', intval($limit_time));
             }
 
             // Cart page specific script
@@ -190,6 +203,14 @@ class IJWLP_Frontend_Common
             wp_enqueue_style(
                 'ijwlp-frontend-style',
                 $this->assets_url . 'css/frontend.css',
+                array(),
+                $this->_version
+            );
+
+            // Enqueue timer styles
+            wp_enqueue_style(
+                'ijwlp-timer-style',
+                $this->assets_url . 'css/timer.css',
                 array(),
                 $this->_version
             );
