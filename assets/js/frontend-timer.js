@@ -285,7 +285,7 @@
 
             // AJAX: Remove expired limited products
             $.ajax({
-                url: ajaxurl || "/wp-admin/admin-ajax.php",
+                url: ijwlp_frontend.ajax_url,
                 type: "POST",
                 data: {
                     action: "ijwlp_remove_expired_limited_products",
@@ -323,7 +323,7 @@
 
                 // Check if limited products still exist in cart
                 $.ajax({
-                    url: ajaxurl || "/wp-admin/admin-ajax.php",
+                    url: ijwlp_frontend.ajax_url,
                     type: "POST",
                     data: {
                         action: "ijwlp_cart_has_limited_products",
@@ -349,7 +349,7 @@
 
                     // Check if limited products still exist in cart
                     $.ajax({
-                        url: ajaxurl || "/wp-admin/admin-ajax.php",
+                        url: ijwlp_frontend.ajax_url,
                         type: "POST",
                         data: {
                             action: "ijwlp_cart_has_limited_products",
@@ -375,7 +375,7 @@
 
                 // Check if limited products still exist in cart
                 $.ajax({
-                    url: ajaxurl || "/wp-admin/admin-ajax.php",
+                    url: ijwlp_frontend.ajax_url,
                     type: "POST",
                     data: {
                         action: "ijwlp_cart_has_limited_products",
@@ -400,7 +400,7 @@
          */
         checkCartHasLimitedProducts: function (callback) {
             $.ajax({
-                url: ajaxurl || "/wp-admin/admin-ajax.php",
+                url: ijwlp_frontend.ajax_url,
                 type: "POST",
                 data: {
                     action: "ijwlp_cart_has_limited_products",
