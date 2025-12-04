@@ -824,6 +824,16 @@ body [name="update_cart"] {
     visibility: hidden;
 }
 
+.woo-limit-variation-error {
+    color: #ff0000;
+}
+
+.woo-limit-message.loading,
+.woo-limit-info,
+.woo-limit-available {
+    color: #28a745;
+}
+
 /* Responsive adjustments */
 @media only screen and (max-width: 768px) {
     .help-icon[data-tooltip]:hover::after {
