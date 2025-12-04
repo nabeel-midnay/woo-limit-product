@@ -630,15 +630,16 @@
                 }
 
                 // If we just cleared an error while the user started editing,
-                // don't schedule an availability AJAX right away — let the user
-                // continue editing. Enter key will still trigger an immediate check.
+                // clear the flag and any pending timers, but allow scheduling
+                // a new check below (don't return early).
                 if ($input.data("cleared-error")) {
                     $input.removeData("cleared-error");
+                    // Clear any existing timer so we start fresh
                     if (self.checkTimers[inputId]) {
                         clearTimeout(self.checkTimers[inputId]);
                         delete self.checkTimers[inputId];
                     }
-                    return;
+                    // Don't return - let the code below schedule the timeout check
                 }
 
                 // If the value equals the stored old value, do not schedule an availability check
