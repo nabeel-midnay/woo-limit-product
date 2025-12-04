@@ -50,6 +50,8 @@
 
             // Attach cart change listeners
             this.attachCartListeners();
+            // Watch for visibility and perform an initial cart check
+            this.setupVisibilityWatcher();
         },
 
         /**
@@ -164,6 +166,8 @@
                 this.intervalId = null;
                 console.log("ijwlpTimer: Timer stopped");
             }
+
+            // (visibilitychange handler moved to setupVisibilityWatcher)
         },
 
         /**
@@ -297,14 +301,20 @@
                     // Clear timer from localStorage
                     window.ijwlpTimer.clearTimer();
 
-                    // Reload page to show updated cart
+                    // Trigger WooCommerce cart update event to refresh cart table
+                    if (typeof $(document.body).trigger === "function") {
+                        $(document.body).trigger("updated_cart_totals");
+                    }
                     location.reload();
                 },
                 error: function (error) {
                     console.error("ijwlpTimer: AJAX error", error);
 
-                    // Even on error, clear timer and reload
+                    // Even on error, clear timer and refresh cart
                     window.ijwlpTimer.clearTimer();
+                    if (typeof $(document.body).trigger === "function") {
+                        $(document.body).trigger("updated_cart_totals");
+                    }
                     location.reload();
                 },
             });
@@ -392,6 +402,107 @@
             });
         },
 
+        /**
+         * Watch for timer element visibility and check cart for limited products
+         * - On page load perform a cart check
+         * - When the timer element becomes visible, re-check the cart
+         */
+        setupVisibilityWatcher: function () {
+            const self = this;
+            const $timer = $("#woo-limit-timer");
+
+            if (!$timer.length) {
+                return;
+            }
+
+            // Initial check on load: if no limited products, clear timer
+            this.checkCartHasLimitedProducts(function (hasLimited) {
+                if (!hasLimited) {
+                    console.log(
+                        "ijwlpTimer: No limited products in cart on load, clearing timer"
+                    );
+                    self.clearTimer();
+                }
+            });
+
+            // If IntersectionObserver is available, use it to detect visibility
+            if ("IntersectionObserver" in window) {
+                const observer = new IntersectionObserver(
+                    function (entries) {
+                        entries.forEach(function (entry) {
+                            if (entry.isIntersecting) {
+                                console.log(
+                                    "ijwlpTimer: Timer became visible, checking cart for limited products"
+                                );
+                                self.checkCartHasLimitedProducts(function (
+                                    hasLimited
+                                ) {
+                                    if (!hasLimited) {
+                                        self.clearTimer();
+                                    }
+                                });
+                            }
+                        });
+                    },
+                    { threshold: 0.1 }
+                );
+
+                observer.observe($timer[0]);
+            } else {
+                // Fallback: check on scroll/resize when the element is visible
+                const isElementInViewport = function (el) {
+                    const rect = el.getBoundingClientRect();
+                    return (
+                        rect.bottom > 0 &&
+                        rect.right > 0 &&
+                        rect.left <
+                            (window.innerWidth ||
+                                document.documentElement.clientWidth) &&
+                        rect.top <
+                            (window.innerHeight ||
+                                document.documentElement.clientHeight)
+                    );
+                };
+
+                $(window).on("scroll.ijwlp resize.ijwlp", function () {
+                    if (
+                        $timer.is(":visible") &&
+                        isElementInViewport($timer[0])
+                    ) {
+                        console.log(
+                            "ijwlpTimer: Timer visible via fallback, checking cart for limited products"
+                        );
+                        self.checkCartHasLimitedProducts(function (hasLimited) {
+                            if (!hasLimited) {
+                                self.clearTimer();
+                            }
+                        });
+                    }
+                });
+            }
+
+            // Also listen for tab visibility changes (user switches back to tab)
+            // Ensure we only add the handler once
+            if (!this._visibilityHandlerAdded) {
+                const _self = this;
+                document.addEventListener("visibilitychange", function () {
+                    if (document.visibilityState === "visible") {
+                        console.log(
+                            "ijwlpTimer: Tab became visible, checking cart for limited products"
+                        );
+                        _self.checkCartHasLimitedProducts(function (
+                            hasLimited
+                        ) {
+                            if (!hasLimited) {
+                                _self.clearTimer();
+                            }
+                        });
+                    }
+                });
+
+                this._visibilityHandlerAdded = true;
+            }
+        },
         /**
          * Check if cart contains limited products
          * Utility method for other parts of the system
