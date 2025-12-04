@@ -536,11 +536,41 @@
                         $errorDiv.hide();
                         $(".woo-limit-message").hide();
 
-                        // Reset form
+                        // Show "Added!" success message for 2 seconds
+                        window.IJWLP_Frontend_Common.showInfo(
+                            "Added",
+                            $errorDiv
+                        );
+                        setTimeout(function () {
+                            window.IJWLP_Frontend_Common.hideError($errorDiv);
+                        }, 2000);
+
+                        // Reset form and clear input
                         $limitedNumberInput
                             .val("")
                             .removeClass("woo-limit-error")
                             .removeClass("woo-limit-available");
+
+                        // Hide and dispose current autocomplete instance
+                        var ac = $limitedNumberInput.data("autocomplete");
+                        if (ac) {
+                            ac.hide();
+                            ac.dispose();
+                        }
+                        // Clear autocomplete data and flags so it can be reinitialized
+                        $limitedNumberInput.removeData("autocomplete");
+                        $limitedNumberInput.removeData("ac-initialized");
+                        // Remove the autocomplete box from DOM
+                        var $wrapper = $limitedNumberInput.closest(".woo-limit-field-wrapper");
+                        $wrapper.find(".woo-limit-autocomplete-box").remove();
+
+                        // Re-attach autocomplete so it will work when user starts typing again
+                        if (window.IJWLP_Frontend_Common && typeof window.IJWLP_Frontend_Common.attachAutocomplete === "function") {
+                            setTimeout(function () {
+                                window.IJWLP_Frontend_Common.attachAutocomplete($limitedNumberInput);
+                            }, 100);
+                        }
+
                         $addToCartButton
                             .prop("disabled", true)
                             .addClass("disabled woo-limit-loading");
