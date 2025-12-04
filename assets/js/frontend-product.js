@@ -674,11 +674,6 @@
                 }
             }
 
-
-            if ($addToCartButton.hasClass("woo-limit-loading") || !$addToCartButton.hasClass("woo-limit-available")) {
-                return false;
-            }
-
             var productId =
                 $form.find('input[name="add-to-cart"]').val() ||
                 $form.find('input[name="product_id"]').val();
@@ -698,6 +693,11 @@
 
             // Limited product logic
             if (isLimitedProduct) {
+
+                if ($addToCartButton.hasClass("woo-limit-loading") || !$addToCartButton.hasClass("woo-limit-available")) {
+                    return false;
+                }
+
                 var value = $limitedNumberInput.val().trim();
                 if (value === "") {
                     // Highlight error after variation is selected
