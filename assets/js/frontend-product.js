@@ -609,6 +609,15 @@
             });
         }
 
+        // Prevent clicks on add to cart button while loading
+        $addToCartButton.on("click", function (e) {
+            if ($(this).hasClass("woo-limit-loading")) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        });
+
         // Handle form submit with AJAX for both limited and normal products
         $form.on("submit", function (e) {
             e.preventDefault();
