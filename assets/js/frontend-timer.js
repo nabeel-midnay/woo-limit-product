@@ -38,14 +38,10 @@
          * Check if timer exists and resume if active
          */
         init: function () {
-            console.log("ijwlpTimer: Initializing...");
-
             // Check if timer already exists in localStorage
             if (this.hasActiveTimer()) {
-                console.log("ijwlpTimer: Active timer found, resuming...");
                 this.resumeTimer();
             } else {
-                console.log("ijwlpTimer: No active timer");
                 // If no timer exists, check if cart has limited products and remove them
                 this.removeProductsIfNoTimer();
             }
@@ -66,46 +62,7 @@
             // Check if cart has limited products
             this.checkCartHasLimitedProducts(function (hasLimited) {
                 if (hasLimited) {
-                    console.log(
-                        "ijwlpTimer: Limited products found but no timer - removing products"
-                    );
-
-                    // Check if nonce is available
-                    const nonce = ijwlp_frontend.nonce || "";
-
-                    if (!nonce) {
-                        console.error(
-                            "ijwlpTimer: Nonce not available for removing products"
-                        );
-                        return;
-                    }
-
-                    // AJAX: Remove expired limited products
-                    $.ajax({
-                        url: ijwlp_frontend.ajax_url,
-                        type: "POST",
-                        data: {
-                            action: "ijwlp_remove_expired_limited_products",
-                            nonce: nonce,
-                        },
-                        success: function (response) {
-                            console.log(
-                                "ijwlpTimer: Products removed successfully",
-                                response
-                            );
-
-                            // Trigger WooCommerce cart update event to refresh cart table
-                            if (typeof $(document.body).trigger === "function") {
-                                $(document.body).trigger("updated_cart_totals");
-                            }
-                        },
-                        error: function (error) {
-                            console.error(
-                                "ijwlpTimer: Error removing products",
-                                error
-                            );
-                        },
-                    });
+                    self.removeExpiredProducts();
                 }
             });
         },
@@ -144,11 +101,6 @@
             this.timerData.expiry = parseInt(expiry);
             this.timerData.isActive = true;
 
-            console.log(
-                "ijwlpTimer: Resumed with expiry:",
-                this.timerData.expiry
-            );
-
             // Start the countdown interval
             this.startTimer();
         },
@@ -160,11 +112,6 @@
          * @param {number} limitTimeMinutes - Time limit in minutes from settings
          */
         restartTimer: function (limitTimeMinutes) {
-            console.log(
-                "ijwlpTimer: Restarting with",
-                limitTimeMinutes,
-                "minutes"
-            );
 
             // Calculate expiry timestamp (Unix timestamp in seconds)
             const currentTime = Math.floor(Date.now() / 1000);
@@ -177,8 +124,6 @@
 
             this.timerData.expiry = expiry;
             this.timerData.isActive = true;
-
-            console.log("ijwlpTimer: Timer started, expiry:", expiry);
 
             // Start countdown
             this.startTimer();
@@ -204,7 +149,6 @@
 
                 if (remaining <= 0) {
                     // Timer expired
-                    console.log("ijwlpTimer: Timer expired!");
                     self.onTimerExpiry();
                 } else {
                     // Update display
@@ -220,7 +164,6 @@
             if (this.intervalId !== null) {
                 clearInterval(this.intervalId);
                 this.intervalId = null;
-                console.log("ijwlpTimer: Timer stopped");
             }
 
             // (visibilitychange handler moved to setupVisibilityWatcher)
@@ -243,8 +186,6 @@
             if ($timerDisplay.length) {
                 $timerDisplay.hide();
             }
-
-            console.log("ijwlpTimer: Timer cleared");
         },
 
         /**
@@ -329,51 +270,13 @@
          * Handle timer expiry - remove products and reload
          */
         onTimerExpiry: function () {
-            console.log("ijwlpTimer: Handling timer expiry");
-
             this.stopTimer();
-
-            // Check if nonce is available
-            const nonce = ijwlp_frontend.nonce || "";
-
-            if (!nonce) {
-                console.error("ijwlpTimer: Nonce not available for AJAX");
-                // Fallback: just clear and reload
-                this.clearTimer();
+            
+            // Use the helper method to remove products and reload
+            this.removeExpiredProducts(function() {
+                // Clear timer from localStorage
+                window.ijwlpTimer.clearTimer();
                 location.reload();
-                return;
-            }
-
-            // AJAX: Remove expired limited products
-            $.ajax({
-                url: ijwlp_frontend.ajax_url,
-                type: "POST",
-                data: {
-                    action: "ijwlp_remove_expired_limited_products",
-                    nonce: nonce,
-                },
-                success: function (response) {
-                    console.log("ijwlpTimer: AJAX removal response", response);
-
-                    // Clear timer from localStorage
-                    window.ijwlpTimer.clearTimer();
-
-                    // Trigger WooCommerce cart update event to refresh cart table
-                    if (typeof $(document.body).trigger === "function") {
-                        $(document.body).trigger("updated_cart_totals");
-                    }
-                    location.reload();
-                },
-                error: function (error) {
-                    console.error("ijwlpTimer: AJAX error", error);
-
-                    // Even on error, clear timer and refresh cart
-                    window.ijwlpTimer.clearTimer();
-                    if (typeof $(document.body).trigger === "function") {
-                        $(document.body).trigger("updated_cart_totals");
-                    }
-                    location.reload();
-                },
             });
         },
 
@@ -384,79 +287,26 @@
         attachCartListeners: function () {
             const self = this;
 
-            // Listen for cart updated event (WooCommerce standard)
-            $(document).on("wc_cart_emptied updated_cart_totals", function () {
-                console.log("ijwlpTimer: Cart updated event");
-
-                // Check if limited products still exist in cart
-                $.ajax({
-                    url: ijwlp_frontend.ajax_url,
-                    type: "POST",
-                    data: {
-                        action: "ijwlp_cart_has_limited_products",
-                    },
-                    success: function (response) {
-                        if (!response.success || !response.data.has_limited) {
-                            console.log(
-                                "ijwlpTimer: No limited products in cart, clearing timer"
-                            );
-                            self.clearTimer();
-                        }
-                    },
+            // Handler function to check cart and clear timer if needed
+            const handleCartCheck = function() {
+                self.checkCartHasLimitedProducts(function(hasLimited) {
+                    if (!hasLimited) {
+                        self.clearTimer();
+                    }
                 });
-            });
+            };
+
+            // Listen for cart updated event (WooCommerce standard)
+            $(document).on("wc_cart_emptied updated_cart_totals", handleCartCheck);
 
             // Listen for mini cart fragment updates (WooCommerce mini cart)
             $(document.body).on(
                 "wc_fragments_loaded wc_fragments_refreshed",
-                function () {
-                    console.log(
-                        "ijwlpTimer: Cart fragments loaded/refreshed - checking for limited products"
-                    );
-
-                    // Check if limited products still exist in cart
-                    $.ajax({
-                        url: ijwlp_frontend.ajax_url,
-                        type: "POST",
-                        data: {
-                            action: "ijwlp_cart_has_limited_products",
-                        },
-                        success: function (response) {
-                            if (
-                                !response.success ||
-                                !response.data.has_limited
-                            ) {
-                                console.log(
-                                    "ijwlpTimer: No limited products in cart (mini cart), clearing timer"
-                                );
-                                self.clearTimer();
-                            }
-                        },
-                    });
-                }
+                handleCartCheck
             );
 
             // Listen for product removed from cart event
-            $(document).on("woocommerce_cart_item_removed", function () {
-                console.log("ijwlpTimer: Cart item removed event");
-
-                // Check if limited products still exist in cart
-                $.ajax({
-                    url: ijwlp_frontend.ajax_url,
-                    type: "POST",
-                    data: {
-                        action: "ijwlp_cart_has_limited_products",
-                    },
-                    success: function (response) {
-                        if (!response.success || !response.data.has_limited) {
-                            console.log(
-                                "ijwlpTimer: No limited products in cart after removal, clearing timer"
-                            );
-                            self.clearTimer();
-                        }
-                    },
-                });
-            });
+            $(document).on("woocommerce_cart_item_removed", handleCartCheck);
         },
 
         /**
@@ -470,9 +320,6 @@
             // Initial check on load: if no limited products, clear timer
             this.checkCartHasLimitedProducts(function (hasLimited) {
                 if (!hasLimited) {
-                    console.log(
-                        "ijwlpTimer: No limited products in cart on load, clearing timer"
-                    );
                     self.clearTimer();
                 }
             });
@@ -482,15 +329,8 @@
             if (!this._visibilityHandlerAdded) {
                 document.addEventListener("visibilitychange", function () {
                     if (document.visibilityState === "visible") {
-                        console.log(
-                            "ijwlpTimer: Tab became visible, checking for timer and limited products"
-                        );
-
                         // If no active timer exists, remove limited products from cart
                         if (!self.hasActiveTimer()) {
-                            console.log(
-                                "ijwlpTimer: No active timer on visibility change"
-                            );
                             self.removeProductsIfNoTimer();
                         } else {
                             // If timer exists, just check if cart still has limited products
@@ -529,6 +369,53 @@
                 error: function () {
                     if (typeof callback === "function") {
                         callback(false);
+                    }
+                },
+            });
+        },
+
+        /**
+         * Remove expired limited products from cart via AJAX
+         * 
+         * @param {function} callback - Optional callback on completion
+         */
+        removeExpiredProducts: function(callback) {
+            // Check if nonce is available
+            const nonce = ijwlp_frontend.nonce || "";
+
+            if (!nonce) {
+                if (typeof callback === "function") {
+                    callback();
+                }
+                return;
+            }
+
+            // AJAX: Remove expired limited products
+            $.ajax({
+                url: ijwlp_frontend.ajax_url,
+                type: "POST",
+                data: {
+                    action: "ijwlp_remove_expired_limited_products",
+                    nonce: nonce,
+                },
+                success: function (response) {
+                    // Trigger WooCommerce cart update event to refresh cart table
+                    if (typeof $(document.body).trigger === "function") {
+                        $(document.body).trigger("updated_cart_totals");
+                    }
+                    
+                    if (typeof callback === "function") {
+                        callback();
+                    }
+                },
+                error: function (error) {
+                    // Even on error, we should probably proceed with callback (e.g. reload)
+                    if (typeof $(document.body).trigger === "function") {
+                        $(document.body).trigger("updated_cart_totals");
+                    }
+                    
+                    if (typeof callback === "function") {
+                        callback();
                     }
                 },
             });

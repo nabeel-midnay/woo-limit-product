@@ -979,13 +979,12 @@ class IJWLP_Options
 			return '';
 		}
 
-		// On non-product pages: check if cart has limited products
-		if (!$this->cart_has_limited_products()) {
-			return '';
-		}
-
 		// Cart has limited products - show timer
 		$limitTime = self::get_setting('limittime', 15);
+
+		if ($limitTime < 1) {
+			return '';
+		}
 
 		return $this->get_timer_html($limitTime);
 	}
