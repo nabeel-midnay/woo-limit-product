@@ -184,7 +184,6 @@
 
             // Hide timer display
             const $timerDisplay = $("#woo-limit-timer");
-            const $timerContainer = $(".timer-container");
             if ($timerDisplay.length) {
                 $timerDisplay.hide();
             }
@@ -231,6 +230,7 @@
          */
         updateDisplay: function () {
             const $timerDisplay = $("#woo-limit-timer");
+            const $timerContainer = $(".timer-container");
 
             if (!$timerDisplay.length) {
                 return;
