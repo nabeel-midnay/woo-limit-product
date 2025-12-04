@@ -200,6 +200,12 @@
                 options.onStart();
             }
 
+            // Hide autocomplete immediately
+            var ac = $input.data("autocomplete");
+            if (ac) {
+                ac.hide();
+            }
+
             // Show loading state (suppress visible messages when silent)
             $input.addClass("woo-limit-loading").prop("disabled", true);
             if ($button && $button.length) {
@@ -724,6 +730,62 @@
         },
 
         /**
+         * Build suggestions list for a given input value
+         * @param {string} val - Current input value
+         * @param {jQuery} $input - Input element
+         * @returns {Array} - List of suggestions
+         */
+        buildSuggestions: function (val, $input) {
+            var $wrapper = $input.closest(".woo-limit-field-wrapper");
+            var avail = this.getAvailableNumbers($wrapper);
+            if (!avail || !avail.length) return [];
+
+            var used = $wrapper
+                .find("input.woo-limit")
+                .not($input)
+                .map(function () {
+                    return String($(this).val() || "").trim();
+                })
+                .get();
+
+            return avail
+                .filter(function (v) {
+                    v = String(v);
+                    if (used.indexOf(v) !== -1) return false;
+                    if (!v.includes(val)) return false;
+                    return true;
+                })
+                .slice(0, 10)
+                .map(function (v) {
+                    return { value: String(v) };
+                });
+        },
+
+        /**
+         * Refresh autocomplete suggestions for an input
+         * @param {jQuery} $input
+         */
+        refreshAutocomplete: function ($input) {
+            if (!$input || !$input.length) return;
+            // Prevent refresh if input is disabled or loading
+            if ($input.prop("disabled") || $input.hasClass("woo-limit-loading")) return;
+
+            var inst = $input.data("autocomplete");
+            if (!inst) return;
+
+            var val = $input.val().trim();
+            if (val === "") {
+                inst.setOptions({ lookup: [] });
+                inst.hide();
+                return;
+            }
+
+            var suggestions = this.buildSuggestions(val, $input);
+            inst.setOptions({ lookup: suggestions });
+            inst.onValueChange();
+        },
+
+        /**
          * Attach Devbridge Autocomplete to a .woo-limit input.
          * Suggestion list limited to 10 and excludes used values.
          * Suggestions update dynamically on input and focus.
@@ -743,80 +805,30 @@
             );
             $wrapper.append($customBox);
 
-            function buildSuggestions(val) {
-                var avail = self.getAvailableNumbers($wrapper);
-                if (!avail || !avail.length) return [];
-
-                var used = $wrapper
-                    .find("input.woo-limit")
-                    .not($input)
-                    .map(function () {
-                        return String($(this).val() || "").trim();
-                    })
-                    .get();
-
-                return avail
-                    .filter(function (v) {
-                        v = String(v);
-                        if (used.indexOf(v) !== -1) return false;
-                        if (!v.includes(val)) return false;
-                        return true;
-                    })
-                    .slice(0, 10)
-                    .map(function (v) {
-                        return { value: String(v) };
-                    });
+            function refresh() {
+                self.refreshAutocomplete($input);
             }
 
-            function refresh() {
-                var inst = $input.data("autocomplete");
-                var val = $input.val().trim();
+            // First-time initialization
+            var val = $input.val().trim();
+            var suggestions = val ? self.buildSuggestions(val, $input) : [];
 
-                if (val === "") {
-                    if (inst) {
-                        inst.setOptions({ lookup: [] });
-                        inst.hide();
-                    }
-                    return;
-                }
-
-                var suggestions = buildSuggestions(val);
-
-                if (inst) {
-                    inst.setOptions({ lookup: suggestions });
-                    return;
-                }
-
-                // First-time initialization
-                $input.autocomplete({
-                    lookup: suggestions,
-                    minChars: 1,
-                    triggerSelectOnValidInput: false,
-                    appendTo: $customBox,
-                    containerClass:
-                        "woo-limit-autocomplete autocomplete-suggestions",
-                    onSelect: function (s) {
-                        $input.val(s.value).trigger("input").trigger("change");
-                        setTimeout(function () {
-                            var inst2 = $input.data("autocomplete");
-                            if (inst2) inst2.hide();
-                        }, 100);
-                    },
-                });
-
-                if (!$("body").hasClass("woocommerce-cart")) {
-                    // Force suggestions to display immediately on first typing
+            $input.autocomplete({
+                lookup: suggestions,
+                minChars: 1,
+                triggerSelectOnValidInput: false,
+                appendTo: $customBox,
+                containerClass:
+                    "woo-limit-autocomplete autocomplete-suggestions",
+                onSelect: function (s) {
+                    $input.val(s.value).trigger("input").trigger("change");
                     setTimeout(function () {
                         var inst2 = $input.data("autocomplete");
-                        if (inst2) {
-                            inst2.setOptions({ lookup: suggestions });
-                            inst2.onValueChange();
-                        }
-                    }, 0);
-                }
-            }
+                        if (inst2) inst2.hide();
+                    }, 100);
+                },
+            });
 
-            refresh();
             $input.on("input", refresh);
             $input.on("focus", refresh);
         },
@@ -829,7 +841,7 @@
         if (
             window.IJWLP_Frontend_Common &&
             typeof window.IJWLP_Frontend_Common.attachAutocomplete ===
-                "function"
+            "function"
         ) {
             $(".woo-limit").each(function () {
                 try {
@@ -846,7 +858,7 @@
         if (
             window.IJWLP_Frontend_Common &&
             typeof window.IJWLP_Frontend_Common.attachAutocomplete ===
-                "function"
+            "function"
         ) {
             $(".woo-limit").each(function () {
                 // Remove previous ac-initialized flag to allow re-init
@@ -857,7 +869,8 @@
     }
 
     // WooCommerce cart events for AJAX reloads
-    $(document.body).on("updated_cart_totals updated_wc_div", function () {
+    // Note: frontend-cart.js handles updated_cart_totals specifically, so we don't bind it here to avoid duplicates
+    $(document.body).on("updated_wc_div", function () {
         reinitAutocomplete();
     });
 })(jQuery);

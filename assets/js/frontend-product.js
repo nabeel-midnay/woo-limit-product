@@ -469,6 +469,30 @@
                             JSON.stringify(variationStockQuantities)
                         );
 
+                        // Update available numbers list and refresh suggestions
+                        var $availableInput = $(".woo-limit-available-numbers");
+                        if ($availableInput.length && window.IJWLP_Frontend_Common) {
+                            var $wrapper = $limitedNumberInput.closest(
+                                ".woo-limit-field-wrapper"
+                            );
+                            var currentAvailable =
+                                window.IJWLP_Frontend_Common.getAvailableNumbers(
+                                    $wrapper
+                                );
+                            var addedNumber = String(value).trim();
+                            var newAvailable = currentAvailable.filter(
+                                function (n) {
+                                    return String(n).trim() !== addedNumber;
+                                }
+                            );
+                            $availableInput.val(JSON.stringify(newAvailable));
+
+                            // Refresh suggestions for the input
+                            window.IJWLP_Frontend_Common.refreshAutocomplete(
+                                $limitedNumberInput
+                            );
+                        }
+
                         // Update cart fragments
                         if (response.data.fragments) {
                             $.each(
