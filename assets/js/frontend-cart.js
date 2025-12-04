@@ -16,7 +16,8 @@
         // Function to setup validation and event listeners for a single input
         function setupLimitInput($input) {
             var $wrapper = $input.closest(".woo-limit-field-wrapper");
-            var $errorDiv = $wrapper.find(".woo-limit-message");
+            var $cartItem = $input.closest(".woo-limit-cart-item");
+            var $errorDiv = $cartItem.find(".woo-limit-message");
             var productId = $wrapper.data("product-id");
 
             window.IJWLP_Frontend_Common.setupNumberValidation({
@@ -53,7 +54,7 @@
                 if (
                     window.IJWLP_Frontend_Common &&
                     typeof window.IJWLP_Frontend_Common.attachAutocomplete ===
-                        "function"
+                    "function"
                 ) {
                     window.IJWLP_Frontend_Common.attachAutocomplete($input);
                 }
@@ -261,9 +262,9 @@
                 (action && action.productName) ||
                 (action && action.wrapper
                     ? action.wrapper
-                          .closest(".cart_item")
-                          .find(".product-name a")
-                          .text()
+                        .closest(".cart_item")
+                        .find(".product-name a")
+                        .text()
                     : "") ||
                 "";
             var escName = $("<div/>").text(productName).html();
@@ -275,10 +276,10 @@
             } else {
                 $message.html(
                     "<p><strong>" +
-                        escName +
-                        "</strong></p><p>" +
-                        $("<div/>").text(msgListTitle).html() +
-                        "</p>"
+                    escName +
+                    "</strong></p><p>" +
+                    $("<div/>").text(msgListTitle).html() +
+                    "</p>"
                 );
                 // build list with checkboxes inside modal
                 var $list = $('<div class="woo-limit-modal-list"></div>');
@@ -379,10 +380,10 @@
             var cartKey = matches ? matches[1] : null;
             var $wrapper = cartKey
                 ? $(
-                      '.woo-limit-field-wrapper[data-cart-item-key="' +
-                          cartKey +
-                          '"]'
-                  )
+                    '.woo-limit-field-wrapper[data-cart-item-key="' +
+                    cartKey +
+                    '"]'
+                )
                 : $qty.closest(".cart_item").find(".woo-limit-field-wrapper");
 
             var newQty = parseInt($qty.val() || 0, 10) || 0;
@@ -423,7 +424,7 @@
                 if (emptyCount > 0) {
                     showClientNotice(
                         ijwlp_frontend.fill_all_inputs_message ||
-                            "Please fill all existing Limited Edition Number inputs before increasing the quantity."
+                        "Please fill all existing Limited Edition Number inputs before increasing the quantity."
                     );
                     // revert qty to old value
                     $qty.val(oldQty);
@@ -438,8 +439,8 @@
                     );
                     var $inp = $(
                         '<input type="number" class="woo-limit" name="woo_limit[' +
-                            cartKey +
-                            '][]" />'
+                        cartKey +
+                        '][]" />'
                     );
                     $inp.attr("data-cart-key", cartKey);
                     $inp.attr("data-index", index);
@@ -448,7 +449,10 @@
                         $inp.attr("min", $wrapper.data("start"));
                     if ($wrapper.data("end"))
                         $inp.attr("max", $wrapper.data("end"));
-                    $div.append($inp);
+
+                    // Add error message div for this input
+                    var $errDiv = $('<div class="woo-limit-message" style="display: none;"></div>');
+                    $div.append($inp).append($errDiv);
                     // append before available hidden input or message
                     var $avail = $wrapper
                         .find(".woo-limit-available-numbers")
@@ -637,7 +641,7 @@
                     $btn.prop("disabled", true);
                     showClientNotice(
                         ijwlp_frontend.fix_errors_message ||
-                            "Please fix errors and fill all Limited Edition Number inputs before changing the quantity."
+                        "Please fix errors and fill all Limited Edition Number inputs before changing the quantity."
                     );
                     return;
                 }
@@ -646,7 +650,9 @@
                 var max =
                     parseInt($wrapper.data("max-quantity") || "", 10) || null;
                 if (max !== null && !isNaN(max) && current >= max) {
-                    var $errorDiv = $wrapper.find(".woo-limit-message");
+                    // Show error on the first input's error div
+                    var $firstInput = $wrapper.find(".woo-limit-cart-item input.woo-limit").first();
+                    var $errorDiv = $firstInput.closest(".woo-limit-cart-item").find(".woo-limit-message");
                     var prodName =
                         $row
                             .find(".product-name a, .product-name")
@@ -691,7 +697,7 @@
                     $btn.prop("disabled", true);
                     showClientNotice(
                         ijwlp_frontend.fix_errors_message ||
-                            "Please fix errors and fill all Limited Edition Number inputs before changing the quantity."
+                        "Please fix errors and fill all Limited Edition Number inputs before changing the quantity."
                     );
                     return;
                 }

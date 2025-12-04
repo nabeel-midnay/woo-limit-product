@@ -324,6 +324,7 @@ class IJWLP_Frontend_Cart
                         placeholder="<?php esc_attr_e('Enter edition number', 'woolimited'); ?>"
                         min="<?php echo esc_attr($start); ?>"
                         max="<?php echo esc_attr($end); ?>" />
+                    <div class="woo-limit-message" style="display: none;"></div>
                 </div>
             <?php endforeach; ?>
 
@@ -332,7 +333,6 @@ class IJWLP_Frontend_Cart
             <input type="hidden" name="woo-limit-variation-stock-quantity[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-variation-stock-quantity" value="<?php echo esc_attr($variation_stock_quantity); ?>" />
             <input type="hidden" name="woo-limit-available[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-available-numbers" value="<?php echo esc_attr($available_numbers); ?>" />
 
-            <div class="woo-limit-message" style="display: none;"></div>
         </div>
     <?php
     }
