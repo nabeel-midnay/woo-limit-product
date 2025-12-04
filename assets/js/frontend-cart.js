@@ -203,7 +203,7 @@
                         if (first && first.$wrapper && first.$wrapper.length) {
                             prodName = first.$wrapper
                                 .closest(".cart_item")
-                                .find(".product-name a, .product-name")
+                                .find(".product-name a")
                                 .first()
                                 .text()
                                 .trim();
@@ -650,12 +650,11 @@
                 var max =
                     parseInt($wrapper.data("max-quantity") || "", 10) || null;
                 if (max !== null && !isNaN(max) && current >= max) {
-                    // Show error on the first input's error div
-                    var $firstInput = $wrapper.find(".woo-limit-cart-item input.woo-limit").first();
-                    var $errorDiv = $firstInput.closest(".woo-limit-cart-item").find(".woo-limit-message");
+                    // Show error in the woo-limit-quantity-message div
+                    var $quantityErrorDiv = $wrapper.find(".woo-limit-quantity-message");
                     var prodName =
                         $row
-                            .find(".product-name a, .product-name")
+                            .find(".product-name a")
                             .first()
                             .text()
                             .trim() ||
@@ -663,14 +662,31 @@
                         document.title ||
                         "";
                     var msg =
-                        "Max quantity for " +
+                        "Maximum quantity of " +
+                        max +
+                        " reached for " +
                         prodName +
-                        " reached (" +
-                        max +
-                        ")" +
-                        max +
-                        " is the max quantity";
-                    window.IJWLP_Frontend_Common.showError(msg, $errorDiv);
+                        ". Cannot increase quantity further.";
+
+                    var msg =
+                        "Maximum quantity for " +
+                        prodName +
+                        " reached (" + max + ")";
+
+
+                    // Display error message
+                    $quantityErrorDiv
+                        .text(msg)
+                        .addClass("woo-limit-error")
+                        .show();
+
+                    // Auto-hide after 5 seconds
+                    setTimeout(function () {
+                        $quantityErrorDiv.fadeOut(300, function () {
+                            $(this).removeClass("woo-limit-error");
+                        });
+                    }, 5000);
+
                     return;
                 }
 

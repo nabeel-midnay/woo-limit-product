@@ -328,6 +328,9 @@ class IJWLP_Frontend_Cart
                 </div>
             <?php endforeach; ?>
 
+
+            <div class="woo-limit-quantity-message" style="display: none;"></div>
+
             <!-- Hidden fields for stock information -->
             <input type="hidden" name="woo-limit-parent-stock-quantity[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-parent-stock-quantity" value="<?php echo esc_attr($parent_stock_quantity); ?>" />
             <input type="hidden" name="woo-limit-variation-stock-quantity[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-variation-stock-quantity" value="<?php echo esc_attr($variation_stock_quantity); ?>" />
