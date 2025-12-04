@@ -58,8 +58,8 @@ class IJWLP_Frontend_Common
         add_filter('woocommerce_get_cart_item_from_session', array($this, 'get_cart_item_from_session'), 10, 2);
         add_action('woocommerce_after_shop_loop_stock_labels', array($this, 'limit_display_shop_loop'), 15, 0);
         add_action('woocommerce_after_shop_loop_stock_labels', array($this, 'out_of_stock_display_shop_loop'), 20, 0);
-    
-         // Add backorder help icon
+
+        // Add backorder help icon
         add_filter('woocommerce_get_stock_html', array($this, 'add_backorder_help_icon'), 10, 2);
     }
 
@@ -120,81 +120,80 @@ class IJWLP_Frontend_Common
      */
     public function enqueue_scripts()
     {
-        // Common script - loaded on all relevant pages
-        if (is_product() || is_cart() || is_checkout()) {
+
+        wp_enqueue_script(
+            'jQuery-autocomplete',
+            $this->assets_url . 'js/autocomplete.js',
+            array(),
+            $this->_version,
+            true
+        );
+
+
+        // Enqueue common script first
+        wp_enqueue_script(
+            'ijwlp-frontend-common',
+            $this->assets_url . 'js/frontend-common.js',
+            array('jquery'),
+            $this->_version,
+            true
+        );
+
+        // Prepare AJAX data for all scripts
+        $ajax_data = array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('ijwlp_frontend_nonce')
+        );
+
+        // Localize script data to common script
+        wp_localize_script('ijwlp-frontend-common', 'ijwlp_frontend', $ajax_data);
+
+        // Enqueue timer script
+        wp_enqueue_script(
+            'ijwlp-frontend-timer',
+            $this->assets_url . 'js/frontend-timer.js',
+            array('jquery'),
+            $this->_version,
+            true
+        );
+
+        // Product page specific script
+        if (is_product()) {
             wp_enqueue_script(
-                'jQuery-autocomplete',
-                $this->assets_url . 'js/autocomplete.js',
-                array(),
+                'ijwlp-frontend-product',
+                $this->assets_url . 'js/frontend-product.js',
+                array('jquery', 'ijwlp-frontend-common'),
                 $this->_version,
                 true
             );
 
-
-            // Enqueue common script first
-            wp_enqueue_script(
-                'ijwlp-frontend-common',
-                $this->assets_url . 'js/frontend-common.js',
-                array('jquery'),
-                $this->_version,
-                true
-            );
-
-            // Prepare AJAX data for all scripts
-            $ajax_data = array(
-                'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('ijwlp_frontend_nonce')
-            );
-
-            // Localize script data to common script
-            wp_localize_script('ijwlp-frontend-common', 'ijwlp_frontend', $ajax_data);
-
-            // Enqueue timer script
-            wp_enqueue_script(
-                'ijwlp-frontend-timer',
-                $this->assets_url . 'js/frontend-timer.js',
-                array('jquery'),
-                $this->_version,
-                true
-            );
-
-            // Product page specific script
-            if (is_product()) {
-                wp_enqueue_script(
-                    'ijwlp-frontend-product',
-                    $this->assets_url . 'js/frontend-product.js',
-                    array('jquery', 'ijwlp-frontend-common'),
-                    $this->_version,
-                    true
-                );
-
-                // Localize limit time setting for product page
-                $limit_time = IJWLP_Options::get_setting('limittime', 15);
-                wp_localize_script('ijwlp-frontend-product', 'ijwlp_limit_time', intval($limit_time));
-            }
-
-            // Cart page specific script
-            if (is_cart()) {
-                wp_enqueue_script(
-                    'ijwlp-frontend-cart',
-                    $this->assets_url . 'js/frontend-cart.js',
-                    array('jquery', 'ijwlp-frontend-common'),
-                    $this->_version,
-                    true
-                );
-            }
-
-            // Checkout page specific script
-            if (is_checkout()) {
-                wp_enqueue_script(
-                    'ijwlp-frontend-checkout',
-                    $this->assets_url . 'js/frontend-checkout.js',
-                    array('jquery', 'ijwlp-frontend-common'),
-                    $this->_version,
-                    true
-                );
-            }
+            // Localize limit time setting for product page
+            $limit_time = IJWLP_Options::get_setting('limittime', 15);
+            wp_localize_script('ijwlp-frontend-product', 'ijwlp_limit_time', intval($limit_time));
         }
+
+        // Cart page specific script
+        if (is_cart()) {
+            wp_enqueue_script(
+                'ijwlp-frontend-cart',
+                $this->assets_url . 'js/frontend-cart.js',
+                array('jquery', 'ijwlp-frontend-common'),
+                $this->_version,
+                true
+            );
+        }
+
+        // Checkout page specific script
+        if (is_checkout()) {
+            wp_enqueue_script(
+                'ijwlp-frontend-checkout',
+                $this->assets_url . 'js/frontend-checkout.js',
+                array('jquery', 'ijwlp-frontend-common'),
+                $this->_version,
+                true
+            );
+        }
+
     }
 
     /**
@@ -202,22 +201,22 @@ class IJWLP_Frontend_Common
      */
     public function enqueue_styles()
     {
-        if (is_product() || is_cart() || is_checkout()) {
-            wp_enqueue_style(
-                'ijwlp-frontend-style',
-                $this->assets_url . 'css/frontend.css',
-                array(),
-                $this->_version
-            );
 
-            // Enqueue timer styles
-            wp_enqueue_style(
-                'ijwlp-timer-style',
-                $this->assets_url . 'css/timer.css',
-                array(),
-                $this->_version
-            );
-        }
+        wp_enqueue_style(
+            'ijwlp-frontend-style',
+            $this->assets_url . 'css/frontend.css',
+            array(),
+            $this->_version
+        );
+
+        // Enqueue timer styles
+        wp_enqueue_style(
+            'ijwlp-timer-style',
+            $this->assets_url . 'css/timer.css',
+            array(),
+            $this->_version
+        );
+
     }
 
     /**
@@ -267,30 +266,30 @@ class IJWLP_Frontend_Common
         }
     }
 
-     /**
+    /**
      * Add backorder help icon to stock display on product single page and cart page
-	 * 
-	 * @param string $html The stock HTML
-	 * @param WC_Product $product The product object
-	 * @return string Modified stock HTML
-	 */
-	public function add_backorder_help_icon($html, $product)
-	{
-		// Add on product single page and cart page
-		if (!is_product() && !is_cart()) {
-			return $html;
-		}
+     * 
+     * @param string $html The stock HTML
+     * @param WC_Product $product The product object
+     * @return string Modified stock HTML
+     */
+    public function add_backorder_help_icon($html, $product)
+    {
+        // Add on product single page and cart page
+        if (!is_product() && !is_cart()) {
+            return $html;
+        }
 
-		// Check if this is a backorder message (both product page and cart page formats)
-		if (strpos($html, 'available-on-backorder') !== false || strpos($html, 'backorder_notification') !== false) {
-			// Wrap the text with backorder-help-text and add help icon
-			$html = str_replace(
-				'Available on backorder',
-				'<span class="backorder-help-text">Available on backorder</span><span class="help-icon" data-tooltip="' . esc_attr__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woocommerce') . '">?</span>',
-				$html
-			);
-		}
+        // Check if this is a backorder message (both product page and cart page formats)
+        if (strpos($html, 'available-on-backorder') !== false || strpos($html, 'backorder_notification') !== false) {
+            // Wrap the text with backorder-help-text and add help icon
+            $html = str_replace(
+                'Available on backorder',
+                '<span class="backorder-help-text">Available on backorder</span><span class="help-icon" data-tooltip="' . esc_attr__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woocommerce') . '">?</span>',
+                $html
+            );
+        }
 
-		return $html;
-	}
+        return $html;
+    }
 }
