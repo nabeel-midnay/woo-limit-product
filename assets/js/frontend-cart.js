@@ -649,7 +649,7 @@
                 var current = parseInt($qty.val() || 0, 10) || 0;
                 var max =
                     parseInt($wrapper.data("max-quantity") || "", 10) || null;
-                var inputMax = $qty.attr("max");
+                var inputMax = parseInt($qty.attr("max") || "", 10) || null;
 
                 var triggeredMax = null; // Variable to track which max was triggered
 
