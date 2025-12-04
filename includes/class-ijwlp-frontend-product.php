@@ -64,14 +64,23 @@ class IJWLP_Frontend_Product
         $limit_label = IJWLP_Options::get_setting('limitlabel', __('Limited Edition Number', 'woolimited'));
 
         // Get stock quantity for the main product
-        $stock_quantity = $product->get_stock_quantity();
+        $stock_quantity = null;
+        if ($product->get_manage_stock() && $product->get_backorders() === 'no') {
+            $stock_quantity = $product->get_stock_quantity();
+        }
 
         // Get stock quantities for variations (if product is variable)
         $variation_quantities = [];
         if ($product->is_type('variable')) {
             foreach ($product->get_children() as $variation_id) {
                 $variation = wc_get_product($variation_id);
-                $variation_quantities[$variation_id] = $variation ? intval($variation->get_stock_quantity()) : 0;
+                if ($variation) {
+                    if ($variation->get_manage_stock() && $variation->get_backorders() === 'no') {
+                        $variation_quantities[$variation_id] = intval($variation->get_stock_quantity());
+                    } else {
+                        $variation_quantities[$variation_id] = null;
+                    }
+                }
             }
         }
 
@@ -88,19 +97,19 @@ class IJWLP_Frontend_Product
                         $cart_variation_product = wc_get_product($cart_variation_id);
                         $parent_id = $cart_variation_product ? intval($cart_variation_product->get_parent_id()) : 0;
                         if ($parent_id === $pro_id) {
-                            if (isset($variation_quantities[$cart_variation_id])) {
+                            if (isset($variation_quantities[$cart_variation_id]) && $variation_quantities[$cart_variation_id] !== null) {
                                 $variation_quantities[$cart_variation_id] = max(0, $variation_quantities[$cart_variation_id] - $cart_qty);
                             }
                         }
                     } else {
                         // In rare cases a parent product might be added directly; reduce parent stock
-                        if ($cart_product_id === $pro_id) {
+                        if ($cart_product_id === $pro_id && $stock_quantity !== null) {
                             $stock_quantity = max(0, intval($stock_quantity) - $cart_qty);
                         }
                     }
                 } else {
                     // Simple (non-variable) product: reduce stock when product matches
-                    if ($cart_product_id === $pro_id) {
+                    if ($cart_product_id === $pro_id && $stock_quantity !== null) {
                         $stock_quantity = max(0, intval($stock_quantity) - $cart_qty);
                     }
                 }

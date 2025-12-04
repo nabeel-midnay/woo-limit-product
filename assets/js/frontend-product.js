@@ -28,8 +28,9 @@
         var $selectionErrorDiv = $(".woo-limit-selection-message");
 
         // Stock quantities parsed from data attributes
+        var stockVal = $(".woo-limit-stock-quantity").val();
         var stockQuantityRemaining =
-            parseInt($(".woo-limit-stock-quantity").val()) || 99;
+            stockVal === "" ? Infinity : parseInt(stockVal);
         var variationStockQuantities = {};
 
         // Parse variation stock quantities from JSON
@@ -50,7 +51,9 @@
                 variationId &&
                 variationStockQuantities[variationId] !== undefined
             ) {
-                return variationStockQuantities[variationId];
+                return variationStockQuantities[variationId] === null
+                    ? Infinity
+                    : variationStockQuantities[variationId];
             }
             return stockQuantityRemaining;
         }
@@ -523,7 +526,7 @@
                     } else {
                         window.IJWLP_Frontend_Common.showError(
                             response.data.message ||
-                                "Failed to add product to cart.",
+                            "Failed to add product to cart.",
                             $errorDiv
                         );
                     }
@@ -564,7 +567,7 @@
                         // Find label from parent tr > th > label
                         var $tr = $(this).closest("tr");
                         var $label = $tr.find("th label");
-                        labelText = $label.length ? $label.text().trim() : "";
+                        labelText = $label.length ? $label.text().trim().toLowerCase() : "";
                         return false;
                     }
                 });
@@ -575,15 +578,14 @@
                         .remove();
                     // Insert error into message div and ensure it's visible
                     var errorMsg =
-                        "Please select " +
-                        (labelText ? labelText : "a variation") +
-                        ".";
+                        "Please select a " +
+                        (labelText ? labelText : "a variation");
                     // Show error message instead of disabling button
                     $selectionErrorDiv
                         .append(
                             '<div class="woo-limit-variation-error">' +
-                                errorMsg +
-                                "</div>"
+                            errorMsg +
+                            "</div>"
                         )
                         .slideDown();
                     return false;
@@ -730,7 +732,7 @@
                         } else {
                             window.IJWLP_Frontend_Common.showError(
                                 response.data.message ||
-                                    "Failed to add product to cart.",
+                                "Failed to add product to cart.",
                                 $errorDiv
                             );
                         }
