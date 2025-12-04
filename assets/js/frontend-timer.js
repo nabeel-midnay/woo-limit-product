@@ -184,6 +184,7 @@
 
             // Hide timer display
             const $timerDisplay = $("#woo-limit-timer");
+            const $timerContainer = $(".timer-container");
             if ($timerDisplay.length) {
                 $timerDisplay.hide();
             }
@@ -257,9 +258,9 @@
 
             // Add/remove danger class if less than 3 minutes
             if (remaining < this.DANGER_THRESHOLD) {
-                $timerDisplay.addClass("danger");
+                $timerContainer.addClass("danger");
             } else {
-                $timerDisplay.removeClass("danger");
+                $timerContainer.removeClass("danger");
             }
 
             // Show timer if hidden
