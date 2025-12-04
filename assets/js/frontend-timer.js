@@ -277,13 +277,13 @@
             this.stopTimer();
 
             // Check if nonce is available
-            const nonce = window.ijwlpTimerNonce || "";
+            const nonce = ijwlp_frontend.nonce || "";
 
             if (!nonce) {
                 console.error("ijwlpTimer: Nonce not available for AJAX");
                 // Fallback: just clear and reload
                 this.clearTimer();
-                location.reload();
+                //                 location.reload();
                 return;
             }
 
@@ -305,7 +305,7 @@
                     if (typeof $(document.body).trigger === "function") {
                         $(document.body).trigger("updated_cart_totals");
                     }
-                    location.reload();
+                    //                     location.reload();
                 },
                 error: function (error) {
                     console.error("ijwlpTimer: AJAX error", error);
@@ -315,7 +315,7 @@
                     if (typeof $(document.body).trigger === "function") {
                         $(document.body).trigger("updated_cart_totals");
                     }
-                    location.reload();
+                    //                     location.reload();
                 },
             });
         },

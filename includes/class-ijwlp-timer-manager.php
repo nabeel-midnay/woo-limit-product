@@ -92,7 +92,7 @@ class IJWLP_Timer_Manager
     public function ajax_remove_expired_limited_products()
     {
         // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'ijwlp-timer-nonce')) {
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'ijwlp_frontend_nonce')) {
             wp_send_json_error(array(
                 'message' => __('Security check failed', 'woolimited')
             ));
