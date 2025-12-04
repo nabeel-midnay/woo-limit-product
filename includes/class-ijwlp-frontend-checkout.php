@@ -26,6 +26,11 @@ class IJWLP_Frontend_Checkout
         add_action('woocommerce_checkout_order_created', array($this, 'update_limited_edition_status'), 10, 1);
 
         add_action('woocommerce_checkout_after_customer_details', array($this, 'custom_checkout_order_summary'), 5);
+    	
+        add_action('woocommerce_after_checkout_billing_form', array($this, 'add_delivery_preference_field'), 10, 1);
+		add_action('woocommerce_checkout_process', array($this, 'validate_delivery_preference_field'), 10, 1);
+		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_delivery_preference_field'), 10, 1);
+
     }
 
     /**
@@ -268,4 +273,88 @@ class IJWLP_Frontend_Checkout
         </div>
 <?php
     }
+
+    /**
+	 * Add delivery preference field to checkout page
+	 * 
+	 * @param WC_Checkout $checkout
+	 */
+	public function add_delivery_preference_field($checkout)
+	{
+		// Check if there are any backordered items in the cart
+		$has_backordered_items = $this->check_for_backordered_items();
+
+		if (!$has_backordered_items) {
+			return; // Don't show the field if no backordered items
+		}
+
+		echo '<div id="delivery_preference_field">';
+		echo '<h3><span class="backorder-help-text">' . __('Backorder Delivery', 'woocommerce') . '</span><span class="required" aria-hidden="true">*</span><span class="help-icon" data-tooltip="' . esc_attr(__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woocommerce')) . '">?</span></h3>';
+		echo '<p class="backorder-para">' . __('Choose how to deliver items with backorders:', 'woocommerce') . '</p>';
+		// Custom HTML for radio buttons with individual div wrappers
+		$field_value = $checkout->get_value('delivery_preference') ?: 'partial_delivery';
+
+		echo '<div class="woocommerce-input-wrapper">';
+
+		// Partial delivery option
+		echo '<div class="radio-option-wrapper">';
+		echo '<input type="radio" class="input-radio" value="partial_delivery" name="delivery_preference" aria-required="true" id="delivery_preference_partial_delivery"' .
+			($field_value === 'partial_delivery' ? ' checked="checked"' : '') . '>';
+		echo '<label for="delivery_preference_partial_delivery" class="radio required_field">' .
+			__('Deliver available items now; backordered items later', 'woocommerce') .
+			'</label>';
+		echo '</div>';
+
+		// Complete delivery option
+		echo '<div class="radio-option-wrapper">';
+		echo '<input type="radio" class="input-radio" value="complete_delivery" name="delivery_preference" aria-required="true" id="delivery_preference_complete_delivery"' .
+			($field_value === 'complete_delivery' ? ' checked="checked"' : '') . '>';
+		echo '<label for="delivery_preference_complete_delivery" class="radio required_field">' .
+			__('Deliver everything together when all items are available', 'woocommerce') .
+			'</label>';
+		echo '</div>';
+
+		echo '</div>';
+		echo '</div>';
+	}
+
+	/**
+	 * Validate delivery preference field
+	 */
+	public function validate_delivery_preference_field()
+	{
+		// Check if there are any backordered items in the cart
+		$has_backordered_items = $this->check_for_backordered_items();
+
+		if (!$has_backordered_items) {
+			return; // Don't validate if no backordered items
+		}
+
+		if (empty($_POST['delivery_preference'])) {
+			wc_add_notice(__('Please select a delivery preference for your backordered items.', 'woocommerce'), 'error');
+		}
+	}
+
+	/**
+	 * Save delivery preference to order meta
+	 * 
+	 * @param int $order_id
+	 */
+	public function save_delivery_preference_field($order_id)
+	{
+		if (!empty($_POST['delivery_preference'])) {
+			$delivery_preference = sanitize_text_field($_POST['delivery_preference']);
+			update_post_meta($order_id, '_delivery_preference', $delivery_preference);
+
+			// Add a note to the order
+			$order = wc_get_order($order_id);
+			if ($order) {
+				$preference_text = $delivery_preference === 'partial_delivery' ?
+					__('Deliver available items now, backordered items when ready', 'woocommerce') :
+					__('Wait for all items to be available before delivery', 'woocommerce');
+
+				$order->add_order_note(sprintf(__('Customer delivery preference: %s', 'woocommerce'), $preference_text));
+			}
+		}
+	}
 }

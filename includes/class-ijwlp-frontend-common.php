@@ -58,6 +58,9 @@ class IJWLP_Frontend_Common
         add_filter('woocommerce_get_cart_item_from_session', array($this, 'get_cart_item_from_session'), 10, 2);
         add_action('woocommerce_after_shop_loop_stock_labels', array($this, 'limit_display_shop_loop'), 15, 0);
         add_action('woocommerce_after_shop_loop_stock_labels', array($this, 'out_of_stock_display_shop_loop'), 20, 0);
+    
+         // Add backorder help icon
+        add_filter('woocommerce_get_stock_html', array($this, 'add_backorder_help_icon'), 10, 2);
     }
 
     /**
@@ -263,4 +266,31 @@ class IJWLP_Frontend_Common
             echo '<div class="outofstock_wrapper shop-loop-outofstock"><span class="outofstock-label">' . esc_html__('Out of Stock', 'woolimit') . '</span></div>';
         }
     }
+
+     /**
+     * Add backorder help icon to stock display on product single page and cart page
+	 * 
+	 * @param string $html The stock HTML
+	 * @param WC_Product $product The product object
+	 * @return string Modified stock HTML
+	 */
+	public function add_backorder_help_icon($html, $product)
+	{
+		// Add on product single page and cart page
+		if (!is_product() && !is_cart()) {
+			return $html;
+		}
+
+		// Check if this is a backorder message (both product page and cart page formats)
+		if (strpos($html, 'available-on-backorder') !== false || strpos($html, 'backorder_notification') !== false) {
+			// Wrap the text with backorder-help-text and add help icon
+			$html = str_replace(
+				'Available on backorder',
+				'<span class="backorder-help-text">Available on backorder</span><span class="help-icon" data-tooltip="' . esc_attr__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woocommerce') . '">?</span>',
+				$html
+			);
+		}
+
+		return $html;
+	}
 }
