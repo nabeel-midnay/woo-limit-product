@@ -649,7 +649,17 @@
                 var current = parseInt($qty.val() || 0, 10) || 0;
                 var max =
                     parseInt($wrapper.data("max-quantity") || "", 10) || null;
-                if (max !== null && !isNaN(max) && current >= max) {
+                var inputMax = $qty.attr("max");
+
+                var triggeredMax = null; // Variable to track which max was triggered
+
+                if ((max !== null && !isNaN(max) && current >= max)) {
+                    triggeredMax = 'max-quantity'; // max-quantity was triggered
+                } else if ((inputMax !== null && !isNaN(inputMax) && current >= inputMax)) {
+                    triggeredMax = 'inputMax'; // inputMax was triggered
+                }
+
+                if (triggeredMax) {
                     // Show error in the woo-limit-quantity-message div
                     var $quantityErrorDiv = $wrapper.find(".woo-limit-quantity-message");
                     var prodName =
@@ -661,18 +671,13 @@
                         $(".product_title").first().text().trim() ||
                         document.title ||
                         "";
-                    var msg =
-                        "Maximum quantity of " +
-                        max +
-                        " reached for " +
-                        prodName +
-                        ". Cannot increase quantity further.";
 
                     var msg =
-                        "Maximum quantity for " +
+                        "Max quantity for " +
                         prodName +
-                        " reached (" + max + ")";
-
+                        " reached (" +
+                        (triggeredMax === 'max-quantity' ? max : inputMax) +
+                        ")";
 
                     // Display error message
                     $quantityErrorDiv
@@ -689,6 +694,7 @@
 
                     return;
                 }
+
 
                 $qty.val(current + 1).trigger("change");
                 // re-check buttons after change
