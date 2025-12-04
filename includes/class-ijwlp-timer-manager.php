@@ -109,6 +109,18 @@ class IJWLP_Timer_Manager
         // Iterate through cart items and remove limited products
         foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
             if (self::is_limited_product($cart_item)) {
+                // Remove from database first
+                global $wpdb, $table_prefix;
+                $table = $table_prefix . 'woo_limit';
+                $wpdb->delete(
+                    $table,
+                    array(
+                        'cart_key' => $cart_item_key,
+                        'status' => 'block'
+                    ),
+                    array('%s', '%s')
+                );
+
                 WC()->cart->remove_cart_item($cart_item_key);
                 $removed_count++;
             }
