@@ -218,9 +218,18 @@
                     .removeClass("disabled wc-variation-selection-needed")
                     .removeClass("woo-outofstock");
                 $limitedNumberInput
+                    .val("") // Clear input field when variation changes
                     .prop("disabled", false)
                     .removeClass("disabled")
-                    .removeClass("woo-outofstock");
+                    .removeClass("woo-outofstock")
+                    .removeClass("woo-limit-error")
+                    .removeClass("woo-limit-available")
+                    .removeClass("woo-limit-error-highlight");
+                // Clear all messages when variation changes
+                window.IJWLP_Frontend_Common.hideError($errorDiv);
+                $errorDiv.hide();
+                $selectionErrorDiv.find(".woo-limit-variation-error").remove();
+                $selectionErrorDiv.hide();
             });
 
             $form.on("reset_data", function () {
@@ -241,6 +250,17 @@
 
             // Also listen to variation select changes directly
             $(".variations select").on("change", function () {
+                // Clear input field and messages immediately when variation changes
+                $limitedNumberInput
+                    .val("")
+                    .removeClass("woo-limit-error")
+                    .removeClass("woo-limit-available")
+                    .removeClass("woo-limit-error-highlight");
+                window.IJWLP_Frontend_Common.hideError($errorDiv);
+                $errorDiv.hide();
+                $selectionErrorDiv.find(".woo-limit-variation-error").remove();
+                $selectionErrorDiv.hide();
+
                 // Small delay to let WooCommerce process the variation
                 setTimeout(function () {
                     checkVariationSelected();
@@ -398,6 +418,7 @@
             $addToCartButton.text("Adding...");
 
             // AJAX request
+            var wasSuccessful = false;
             $.ajax({
                 url: ijwlp_frontend.ajax_url,
                 type: "POST",
@@ -411,6 +432,8 @@
                 },
                 success: function (response) {
                     if (response.success) {
+                        wasSuccessful = true;
+
                         // Update stock quantities
                         if (
                             variationId &&
@@ -534,15 +557,11 @@
                         // Hide ALL messages immediately (checking, lucky, etc)
                         window.IJWLP_Frontend_Common.hideError($errorDiv);
                         $errorDiv.hide();
-                        $(".woo-limit-message").hide();
 
-                        // Show "Added!" success message for 2 seconds
-                        window.IJWLP_Frontend_Common.showInfo(
-                            "Added",
-                            $errorDiv
-                        );
+                        $addToCartButton.text("Added");
+
                         setTimeout(function () {
-                            window.IJWLP_Frontend_Common.hideError($errorDiv);
+                            $addToCartButton.text(originalText);
                         }, 2000);
 
                         // Reset form and clear input
@@ -596,27 +615,23 @@
                     );
                 },
                 complete: function () {
+                    // Only reset the button state immediately if the request was NOT successful
+                    // If successful, the success callback already handles the "Added" text for 2 seconds
+                    if (!wasSuccessful) {
+                        $addToCartButton.text(originalText);
+                    }
+
                     $addToCartButton
                         .prop("disabled", false)
                         .removeAttr("disabled")
                         .removeAttr("aria-disabled")
                         .removeClass(
                             "woo-limit-loading disabled wc-variation-selection-needed"
-                        )
-                        .text(originalText);
+                        );
                     checkAddToCartState();
                 },
             });
         }
-
-        // Prevent clicks on add to cart button while loading
-        $addToCartButton.on("click", function (e) {
-            if ($(this).hasClass("woo-limit-loading")) {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            }
-        });
 
         // Handle form submit with AJAX for both limited and normal products
         $form.on("submit", function (e) {
@@ -657,6 +672,11 @@
                         .slideDown();
                     return false;
                 }
+            }
+
+
+            if ($addToCartButton.hasClass("woo-limit-loading") || !$addToCartButton.hasClass("woo-limit-available")) {
+                return false;
             }
 
             var productId =
