@@ -22,6 +22,9 @@ class IJWLP_Timer_Manager
      */
     public function __construct()
     {
+        // Register limited timer shortcode
+        add_shortcode('limited_timer', array($this, 'render_limited_timer_shortcode'));
+
         // AJAX handler to remove limited products when timer expires
         add_action('wp_ajax_ijwlp_remove_expired_limited_products', array($this, 'ajax_remove_expired_limited_products'));
         add_action('wp_ajax_nopriv_ijwlp_remove_expired_limited_products', array($this, 'ajax_remove_expired_limited_products'));
@@ -32,6 +35,57 @@ class IJWLP_Timer_Manager
 
         // Hook into cart item removal to clear timer if no limited items remain
         add_action('woocommerce_cart_item_removed', array($this, 'check_and_clear_timer_if_needed'), 10, 2);
+    }
+
+    /**
+     * Render [limited_timer] shortcode
+     * 
+     * Shows countdown timer for limited-edition products
+     * - Shows on product page if it's a limited edition product
+     * - Shows on other pages if cart contains limited items
+     * - Hidden on checkout page
+     * 
+     * @param array $atts Shortcode attributes
+     * @return string HTML output
+     */
+    public function render_limited_timer_shortcode($atts = array())
+    {
+        // Skip on checkout page
+        if (is_checkout()) {
+            return '';
+        }
+
+        // Cart has limited products - show timer
+        $limitTime = self::get_setting('limittime', 15);
+
+        if ($limitTime < 1) {
+            return '';
+        }
+
+        return $this->get_timer_html($limitTime);
+    }
+
+    /**
+     * Get HTML markup for timer display
+     * 
+     * @param int $limitTime Time limit in minutes
+     * @return string HTML output
+     */
+    private function get_timer_html($limitTime)
+    { ?>
+        <div id="woo-limit-timer" data-limit-time="<?php echo esc_attr($limitTime); ?>">
+            <div class="timer-container">
+                <div class="time-box">
+                    <div class="time-number" id="timer-minutes">00</div>
+                    <div class="time-label">MINUTES</div>
+                </div>
+                <div class="time-box">
+                    <div class="time-number" id="timer-seconds">00</div>
+                    <div class="time-label">SECONDS</div>
+                </div>
+            </div>
+        </div>
+        <?php
     }
 
     /**
