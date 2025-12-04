@@ -242,22 +242,15 @@
         var pendingRemoval = null;
         function openRemoveModal(action) {
             pendingRemoval = action;
-            var $modal = $("#woo-limit-remove-modal");
+            var $modal = $("#field-selection-modal");
 
             // message area
-            var msgAll =
-                (window.ijwlp_frontend && ijwlp_frontend.modal_remove_all) ||
-                "You are about to remove ALL limited numbers for this item. This will remove the item from the cart.";
             var msgListTitle =
                 (window.ijwlp_frontend &&
                     ijwlp_frontend.modal_remove_list_title) ||
                 "You are about to remove the following Limited Edition Number(s):";
 
-            var $message = $modal.find(".woo-limit-modal-message");
-            var $listContainer = $modal.find(".woo-limit-modal-list-container");
-            $listContainer.empty();
-
-            // extract product name from cart row if available
+            // Update title
             var productName =
                 (action && action.productName) ||
                 (action && action.wrapper
@@ -267,52 +260,68 @@
                         .text()
                     : "") ||
                 "";
-            var escName = $("<div/>").text(productName).html();
+            
+            // Set the title in h3
+            $modal.find(".field-selection-modal-content h3").text(productName);
+            // Set the subtitle/instruction
+            $modal.find(".field-selection-modal-content p").text(msgListTitle);
+
+            var $listContainer = $("#field-selection-list");
+            $listContainer.empty();
 
             if (action.removeAll) {
                 // Don't show modal for single input removal - handle directly
                 closeRemoveModal();
                 return;
             } else {
-                $message.html(
-                    "<p><strong>" +
-                    escName +
-                    "</strong></p><p>" +
-                    $("<div/>").text(msgListTitle).html() +
-                    "</p>"
-                );
                 // build list with checkboxes inside modal
-                var $list = $('<div class="woo-limit-modal-list"></div>');
                 var preChecked = action.preChecked || [];
                 for (var i = 0; i < action.numbers.length; i++) {
                     var num = action.numbers[i] || "";
                     var esc = $("<div/>").text(num).html();
-                    var $row = $(
-                        '<label style="display:block; margin:4px 0;"></label>'
-                    );
+                    
+                    var $option = $('<div class="field-option"></div>');
+                    var $flex = $('<div style="display: flex; align-items: center;"></div>');
+                    
                     var $cb = $(
-                        '<input type="checkbox" class="woo-limit-modal-select" />'
-                    ).attr("data-number", num);
+                        '<input type="checkbox" name="field-selection" class="woo-limit-modal-select" style="margin-right: 10px;" />'
+                    ).attr("data-number", num).val(num);
+                    
                     // pre-check modal boxes only for numbers in preChecked (last N)
                     if (preChecked.indexOf(String(num)) !== -1) {
                         $cb.prop("checked", true);
                     }
-                    $row.append($cb).append(" " + esc);
-                    $list.append($row);
+                    
+                    var $labelDiv = $('<div><strong>' + esc + '</strong></div>');
+                    
+                    $flex.append($cb).append($labelDiv);
+                    $option.append($flex);
+                    $listContainer.append($option);
                 }
-                $listContainer.append($list);
             }
 
             $modal.show();
         }
 
+        function revertQty() {
+            if (pendingRemoval && pendingRemoval.wrapper) {
+                var $wrapper = pendingRemoval.wrapper;
+                var $qty = $wrapper.closest(".cart_item").find("input.qty");
+                var oldQty = $qty.data("old-qty");
+                if (oldQty !== undefined) {
+                    $qty.val(oldQty); // Revert visual value
+                    // We do NOT trigger change here to avoid loop, just reset value
+                }
+            }
+        }
+
         function closeRemoveModal() {
-            $("#woo-limit-remove-modal").hide();
+            $("#field-selection-modal").hide();
             pendingRemoval = null;
         }
 
         // Modal confirm/cancel handlers
-        $(document).on("click", "#woo-limit-confirm-remove", function () {
+        $(document).on("click", "#remove-selected-field", function () {
             if (!pendingRemoval) return closeRemoveModal();
             var action = pendingRemoval;
             var $wrapper = action.wrapper;
@@ -325,7 +334,7 @@
                 $wrapper.find(".woo-limit-cart-item input.woo-limit").length;
 
             // Determine which numbers are selected inside modal
-            var $modal = $("#woo-limit-remove-modal");
+            var $modal = $("#field-selection-modal");
             var $checked = $modal.find(".woo-limit-modal-select:checked");
 
             var performed = false;
@@ -364,9 +373,16 @@
             }
         });
 
+        // Cancel button handler
+        $(document).on("click", "#cancel-field-selection, .cancel-field-selection", function () {
+            revertQty();
+            closeRemoveModal();
+        });
+
         // Click outside modal to close
-        $(document).on("click", "#woo-limit-remove-modal", function (e) {
-            if (e.target.id === "woo-limit-remove-modal") {
+        $(document).on("click", "#field-selection-modal", function (e) {
+            if (e.target.id === "field-selection-modal") {
+                revertQty();
                 $(this).hide();
                 pendingRemoval = null;
             }
@@ -516,8 +532,8 @@
                 }
 
                 // otherwise, show modal listing ALL numbers and pre-check the last N
-                // If only one input to remove, remove it directly without modal
-                if (removeCount === 1) {
+                // If only one input to remove AND it's the only one (1 -> 0), remove it directly without modal
+                if (removeCount === 1 && currentCount === 1) {
                     $allInputs.last().closest(".woo-limit-cart-item").remove();
                     $qty.data("old-qty", newQty);
                     $qty.val(newQty).trigger("change");

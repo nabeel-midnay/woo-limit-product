@@ -295,11 +295,14 @@ class IJWLP_Frontend_Cart
             $variation_stock_quantity = 0; // No variation, so variation stock is 0
         }
 
-?>
+        ?>
         <?php $max_qty = get_post_meta($parent_product_id, '_woo_limit_max_quantity', true); ?>
-        <div class="woo-limit-product woo-limit-cart woo-limit-field-wrapper woo-limit-cart-item-wrapper" data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>" data-product-id="<?php echo esc_attr($parent_product_id); ?>" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" <?php if (!empty($max_qty)) {
-                                                                                                                                                                                                                                                                                                                                echo ' data-max-quantity="' . esc_attr($max_qty) . '"';
-                                                                                                                                                                                                                                                                                                                            } ?>>
+        <div class="woo-limit-product woo-limit-cart woo-limit-field-wrapper woo-limit-cart-item-wrapper"
+            data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>"
+            data-product-id="<?php echo esc_attr($parent_product_id); ?>" data-start="<?php echo esc_attr($start); ?>"
+            data-end="<?php echo esc_attr($end); ?>" <?php if (!empty($max_qty)) {
+                   echo ' data-max-quantity="' . esc_attr($max_qty) . '"';
+               } ?>>
             <p class="woo-limit-field-label">
                 <?php echo esc_html($limit_label_cart); ?>
             </p>
@@ -312,18 +315,12 @@ class IJWLP_Frontend_Cart
 
             <?php foreach ($limited_numbers as $index => $limited_number): ?>
                 <div class="woo-limit-cart-item woo-input-single gt-2">
-                    <input
-                        type="number"
-                        id="woo-limit-cart-<?php echo esc_attr($cart_item_key); ?>-<?php echo esc_attr($index); ?>"
-                        name="woo_limit[<?php echo esc_attr($cart_item_key); ?>][]"
-                        class="woo-limit"
-                        value="<?php echo esc_attr($limited_number); ?>"
-                        data-cart-key="<?php echo esc_attr($cart_item_key); ?>"
-                        data-index="<?php echo esc_attr($index); ?>"
-                        data-old-value="<?php echo esc_attr($limited_number); ?>"
+                    <input type="number" id="woo-limit-cart-<?php echo esc_attr($cart_item_key); ?>-<?php echo esc_attr($index); ?>"
+                        name="woo_limit[<?php echo esc_attr($cart_item_key); ?>][]" class="woo-limit"
+                        value="<?php echo esc_attr($limited_number); ?>" data-cart-key="<?php echo esc_attr($cart_item_key); ?>"
+                        data-index="<?php echo esc_attr($index); ?>" data-old-value="<?php echo esc_attr($limited_number); ?>"
                         placeholder="<?php esc_attr_e('Enter edition number', 'woolimited'); ?>"
-                        min="<?php echo esc_attr($start); ?>"
-                        max="<?php echo esc_attr($end); ?>" />
+                        min="<?php echo esc_attr($start); ?>" max="<?php echo esc_attr($end); ?>" />
                     <div class="woo-limit-message" style="display: none;"></div>
                 </div>
             <?php endforeach; ?>
@@ -332,12 +329,15 @@ class IJWLP_Frontend_Cart
             <div class="woo-limit-quantity-message" style="display: none;"></div>
 
             <!-- Hidden fields for stock information -->
-            <input type="hidden" name="woo-limit-parent-stock-quantity[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-parent-stock-quantity" value="<?php echo esc_attr($parent_stock_quantity); ?>" />
-            <input type="hidden" name="woo-limit-variation-stock-quantity[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-variation-stock-quantity" value="<?php echo esc_attr($variation_stock_quantity); ?>" />
-            <input type="hidden" name="woo-limit-available[<?php echo esc_attr($cart_item_key); ?>]" class="woo-limit-available-numbers" value="<?php echo esc_attr($available_numbers); ?>" />
+            <input type="hidden" name="woo-limit-parent-stock-quantity[<?php echo esc_attr($cart_item_key); ?>]"
+                class="woo-limit-parent-stock-quantity" value="<?php echo esc_attr($parent_stock_quantity); ?>" />
+            <input type="hidden" name="woo-limit-variation-stock-quantity[<?php echo esc_attr($cart_item_key); ?>]"
+                class="woo-limit-variation-stock-quantity" value="<?php echo esc_attr($variation_stock_quantity); ?>" />
+            <input type="hidden" name="woo-limit-available[<?php echo esc_attr($cart_item_key); ?>]"
+                class="woo-limit-available-numbers" value="<?php echo esc_attr($available_numbers); ?>" />
 
         </div>
-    <?php
+        <?php
     }
 
 
@@ -422,7 +422,8 @@ class IJWLP_Frontend_Cart
                 if ($user_rows) {
                     foreach ($user_rows as $r) {
                         $r = trim($r);
-                        if ($r === '') continue;
+                        if ($r === '')
+                            continue;
                         $parts = array_map('trim', explode(',', $r));
                         $user_numbers = array_merge($user_numbers, $parts);
                     }
@@ -444,7 +445,8 @@ class IJWLP_Frontend_Cart
                     if ($guest_rows) {
                         foreach ($guest_rows as $r) {
                             $r = trim($r);
-                            if ($r === '') continue;
+                            if ($r === '')
+                                continue;
                             $parts = array_map('trim', explode(',', $r));
                             $user_numbers = array_merge($user_numbers, $parts);
                         }
@@ -846,22 +848,21 @@ class IJWLP_Frontend_Cart
 
     public function remove_modal()
     {
-    ?>
-        <div id="woo-limit-remove-modal" class="woo-limit-modal" style="display: none;">
-            <div class="woo-limit-modal-content">
-                <span class="woo-limit-close">&times;</span>
-                <div class="woo-limit-modal-message">
-                    <p><?php esc_html_e('Are you sure you want to remove this item from the cart?', 'woolimited'); ?></p>
+        ?>
+        <div id="field-selection-modal" class="field-selection-modal" style="display:none;">
+            <div class="field-selection-modal-content">
+                <h3 style="margin-top: 0; color: #333;"></h3>
+                <p style="color: #666; margin-bottom: 20px;">Choose which number(s) you want to remove:</p>
+
+                <div id="field-selection-list" style="margin-bottom: 20px;">
+                    <!-- Field options will be populated here -->
                 </div>
-                <div class="woo-limit-modal-list-container" style="margin-top:10px;">
-                    <!-- JS will inject list with checkboxes here -->
-                </div>
-                <div style="margin-top:12px;">
-                    <button id="woo-limit-confirm-remove" class="button"><?php esc_html_e('Yes, Remove', 'woolimited'); ?></button>
-                    <button id="woo-limit-cancel-remove" class="button"><?php esc_html_e('Cancel', 'woolimited'); ?></button>
+                <div style="text-align: right;">
+                    <button class="cancel-field-selection" id="cancel-field-selection">Cancel</button>
+                    <button class="remove-selected-field" id="remove-selected-field">Remove Selected Fields</button>
                 </div>
             </div>
         </div>
-<?php
+        <?php
     }
 }
