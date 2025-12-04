@@ -250,8 +250,12 @@
                         if (data.available && data.status === "available") {
                             // Number is available
                             if (!silent) {
+                                var luckyMsg = "You are lucky! Click on Add to cart";
+                                if ($('body').hasClass('woocommerce-cart')) {
+                                    luckyMsg = "You are lucky!";
+                                }
                                 self.showInfo(
-                                    "You are lucky! Click on Add to cart",
+                                    luckyMsg,
                                     $errorDiv
                                 );
                             }

@@ -252,7 +252,7 @@
     font-weight: 500;
 }
 
-.single-product .number-availability-message {
+.single-product .woo-limit-message {
     position: absolute;
     /* 	bottom: 60px; */
 }
@@ -630,52 +630,6 @@ body [name="update_cart"] {
 
 .single_add_to_cart_button. {
     position: relative;
-}
-
-.single_add_to_cart_button.woo-limit-loading:before {
-    content: "";
-
-    background: rgb(0, 0, 0, 0.5);
-
-    position: absolute;
-
-    right: 0px;
-
-    bottom: 0px;
-
-    top: 0px;
-
-    left: 0px;
-}
-
-.single_add_to_cart_button.woo-limit-loading:after {
-    content: "";
-
-    box-sizing: border-box;
-
-    position: absolute;
-
-    top: 50%;
-
-    left: 50%;
-
-    width: 24px;
-
-    height: 24px;
-
-    margin-top: -12px;
-
-    margin-left: -12px;
-
-    border-radius: 50%;
-
-    border: 2px solid transparent;
-
-    border-top-color: #fff;
-
-    border-bottom-color: #fff;
-
-    animation: spinner 0.8s ease infinite;
 }
 
 /* .woocommerce button[name="update_cart"],
