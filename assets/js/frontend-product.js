@@ -417,47 +417,51 @@
                             variationStockQuantities[variationId] !== undefined
                         ) {
                             // Reduce variation-specific stock
-                            variationStockQuantities[variationId] = Math.max(
-                                0,
-                                variationStockQuantities[variationId] - 1
-                            );
-                            // If this variation is now out of stock, mark persistent state
-                            if (variationStockQuantities[variationId] <= 0) {
-                                $addToCartButton
-                                    .prop("disabled", true)
-                                    .addClass("disabled")
-                                    .addClass("woo-outofstock");
-                                $limitedNumberInput
-                                    .prop("disabled", true)
-                                    .addClass("disabled")
-                                    .addClass("woo-outofstock");
-                            } else {
-                                // Clear out-of-stock marker if stock remains
-                                $addToCartButton.removeClass("woo-outofstock");
-                                $limitedNumberInput.removeClass(
-                                    "woo-outofstock"
+                            if (variationStockQuantities[variationId] !== null) {
+                                variationStockQuantities[variationId] = Math.max(
+                                    0,
+                                    variationStockQuantities[variationId] - 1
                                 );
+                                // If this variation is now out of stock, mark persistent state
+                                if (variationStockQuantities[variationId] <= 0) {
+                                    $addToCartButton
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock");
+                                    $limitedNumberInput
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock");
+                                } else {
+                                    // Clear out-of-stock marker if stock remains
+                                    $addToCartButton.removeClass("woo-outofstock");
+                                    $limitedNumberInput.removeClass(
+                                        "woo-outofstock"
+                                    );
+                                }
                             }
                         } else {
                             // Reduce main product stock
-                            stockQuantityRemaining = Math.max(
-                                0,
-                                stockQuantityRemaining - 1
-                            );
-                            if (stockQuantityRemaining <= 0) {
-                                $addToCartButton
-                                    .prop("disabled", true)
-                                    .addClass("disabled")
-                                    .addClass("woo-outofstock");
-                                $limitedNumberInput
-                                    .prop("disabled", true)
-                                    .addClass("disabled")
-                                    .addClass("woo-outofstock");
-                            } else {
-                                $addToCartButton.removeClass("woo-outofstock");
-                                $limitedNumberInput.removeClass(
-                                    "woo-outofstock"
+                            if (stockQuantityRemaining !== Infinity) {
+                                stockQuantityRemaining = Math.max(
+                                    0,
+                                    stockQuantityRemaining - 1
                                 );
+                                if (stockQuantityRemaining <= 0) {
+                                    $addToCartButton
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock");
+                                    $limitedNumberInput
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock");
+                                } else {
+                                    $addToCartButton.removeClass("woo-outofstock");
+                                    $limitedNumberInput.removeClass(
+                                        "woo-outofstock"
+                                    );
+                                }
                             }
                         }
 
