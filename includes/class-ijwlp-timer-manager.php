@@ -56,7 +56,7 @@ class IJWLP_Timer_Manager
         }
 
         // Cart has limited products - show timer
-        $limitTime = self::get_setting('limittime', 15);
+        $limitTime = IJWLP_Options::get_setting('limittime', 15);
 
         if ($limitTime < 1) {
             return '';
