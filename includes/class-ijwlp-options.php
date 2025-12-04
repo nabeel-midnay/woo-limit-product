@@ -699,38 +699,40 @@ class IJWLP_Options
 		));
 
 		if ($blocked) {
-			// Check if it's in current user's cart
-			if ($user_id > 0 && $blocked->user_id == $user_id) {
-				// Check if it's the same cart item (for cart page updates)
-				if (!empty($cart_item_key) && $blocked->cart_key === $cart_item_key) {
-					wp_send_json_success(array(
-						'available' => true,
-						'message' => __('Already in your cart', 'woolimited'),
-						'status' => 'in_your_cart'
-					));
-				} else {
-					// Check if it's in current user's cart (any cart item)
-					$cart = WC()->cart;
-					if ($cart) {
-						$cart_item = $cart->get_cart_item($blocked->cart_key);
-						if ($cart_item) {
-							wp_send_json_success(array(
-								'available' => true,
-								'message' => __('Already in your cart', 'woolimited'),
-								'status' => 'in_your_cart'
-							));
-						}
-					}
-				}
-			}
+		// Check if the blocked cart_key exists in the current user's WooCommerce cart
+		// This works for both logged-in users AND guest users
+		$cart = WC()->cart;
+		$is_in_current_cart = false;
 
-			// It's in someone else's cart
+		if ($cart) {
+			$cart_item = $cart->get_cart_item($blocked->cart_key);
+			if ($cart_item) {
+				$is_in_current_cart = true;
+			}
+		}
+
+		// Additional check for logged-in users: verify user_id matches
+		// This provides an extra layer of validation for logged-in users
+		if ($user_id > 0 && $blocked->user_id == $user_id) {
+			$is_in_current_cart = true;
+		}
+
+		if ($is_in_current_cart) {
+			// Number is in current user's cart (works for both logged-in and guest users)
 			wp_send_json_success(array(
-				'available' => false,
-				'message' => __('Number currently in someone else\’s cart', 'woolimited'),
-				'status' => 'in_other_cart'
+				'available' => true,
+				'message' => __('Already in your cart', 'woolimited'),
+				'status' => 'in_your_cart'
 			));
 		}
+
+		// It's in someone else's cart (not in current user's cart)
+		wp_send_json_success(array(
+			'available' => false,
+			'message' => __("Number currently in someone else's cart", 'woolimited'),
+			'status' => 'in_other_cart'
+		));
+	}
 
 		// Check if number is within valid range
 		$start = get_post_meta($parent_product_id, '_woo_limit_start_value', true);
