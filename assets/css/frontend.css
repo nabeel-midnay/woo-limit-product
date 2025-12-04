@@ -912,6 +912,12 @@ body [name="update_cart"] {
     cursor: pointer;
 }
 
+.woo-limit-cart-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 /* Responsive adjustments */
 @media only screen and (max-width: 768px) {
     .help-icon[data-tooltip]:hover::after {
