@@ -357,4 +357,26 @@ class IJWLP_Frontend_Checkout
 			}
 		}
 	}
+
+    /**
+	 * Check if cart has backordered items
+	 * 
+	 * @return bool
+	 */
+	private function check_for_backordered_items()
+	{
+		$cart = WC()->cart;
+		if (!$cart) {
+			return false;
+		}
+
+		foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+			$product = $cart_item['data'];
+			if ($product && $product->is_on_backorder($cart_item['quantity'])) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }
