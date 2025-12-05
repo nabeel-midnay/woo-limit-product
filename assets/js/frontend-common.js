@@ -58,15 +58,36 @@
          * Show error message
          * @param {string} message - Error message to display
          * @param {jQuery} $errorDiv - Optional error div element
+         * @param {number} timeout - Optional timeout in ms to auto-hide
          */
-        showError: function (message, $errorDiv) {
+        showError: function (message, $errorDiv, timeout) {
             $errorDiv = $errorDiv || $(".woo-limit-message");
             if ($errorDiv.length) {
+                // Clear any existing timer
+                var timerId = $errorDiv.data("error-timer");
+                if (timerId) {
+                    clearTimeout(timerId);
+                    $errorDiv.removeData("error-timer");
+                }
+
                 $errorDiv
                     .removeClass("woo-limit-info")
                     .addClass("woo-limit-error")
                     .text(message)
                     .show();
+
+                if (timeout) {
+                    var newTimerId = setTimeout(function () {
+                        $errorDiv.fadeOut(300, function () {
+                            $(this)
+                                .removeClass("woo-limit-error")
+                                .hide()
+                                .removeData("error-timer");
+                            $(this).closest('.woo-limit-cart-item').find('input').trigger('input');
+                        });
+                    }, timeout);
+                    $errorDiv.data("error-timer", newTimerId);
+                }
             }
         },
 
@@ -92,6 +113,14 @@
          */
         hideError: function ($errorDiv) {
             $errorDiv = $errorDiv || $(".woo-limit-message");
+
+            // Clear any existing timer
+            var timerId = $errorDiv.data("error-timer");
+            if (timerId) {
+                clearTimeout(timerId);
+                $errorDiv.removeData("error-timer");
+            }
+
             $errorDiv
                 .hide()
                 .removeClass("woo-limit-error woo-limit-info loading");
@@ -343,11 +372,12 @@
                                     maxVal +
                                     ")";
 
-                                self.showError(friendly, $errorDiv);
+                                self.showError(friendly, $errorDiv, 5000);
 
                                 $input
                                     .addClass("woo-limit-error")
-                                    .removeClass("woo-limit-available");
+                                    .removeClass("woo-limit-available")
+                                    .val(''); // Clear input on error
 
                                 if ($button && $button.length) {
                                     $button
@@ -387,11 +417,12 @@
                                         ? data.message
                                         : "This number is not available.";
                                 if (!silent) {
-                                    self.showError(msg, $errorDiv);
+                                    self.showError(msg, $errorDiv, 5000);
                                 }
                                 $input
                                     .addClass("woo-limit-error")
-                                    .removeClass("woo-limit-available");
+                                    .removeClass("woo-limit-available")
+                                    .val(''); // Clear input on error
 
                                 if ($button && $button.length) {
                                     $button
@@ -441,7 +472,8 @@
                             response.data && response.data.message
                                 ? response.data.message
                                 : "Error checking availability.",
-                            $errorDiv
+                            $errorDiv,
+                            5000
                         );
                         $input
                             .removeClass("woo-limit-loading")
@@ -454,7 +486,8 @@
                         }
                         $input
                             .removeClass("woo-limit-available")
-                            .addClass("woo-limit-error");
+                            .addClass("woo-limit-error")
+                            .val(''); // Clear input on error
                     }
                 },
                 error: function (xhr, status, error) {
@@ -476,7 +509,8 @@
 
                     self.showError(
                         "An error occurred while checking availability. Please try again.",
-                        $errorDiv
+                        $errorDiv,
+                        5000
                     );
                 },
             });

@@ -165,7 +165,8 @@
             return groups;
         }
 
-        function enforceGroups(groups, showMessage) {
+        function enforceGroups(groups, showMessage, $triggerTarget) {
+            var limitEnforced = false;
             $.each(groups, function (parentId, info) {
                 var max = info.max;
                 if (!max) return; // no limit configured
@@ -176,6 +177,7 @@
                 });
                 if (total <= max) return;
 
+                limitEnforced = true;
                 var excess = total - max;
                 // reduce starting from last row
                 var rev = info.items.slice().reverse();
@@ -187,47 +189,120 @@
                     var reduce = Math.min(rowQty, excess);
                     var newQty = rowQty - reduce;
                     it.$qty.val(newQty);
-                    // trigger change so WooCommerce picks it up if user will submit
-                    it.$qty.trigger("change");
+                    // We do NOT trigger change here to avoid recursive loop and unwanted cart updates
+                    // it.$qty.trigger("change");
                     excess -= reduce;
                 });
 
                 if (showMessage) {
-                    // Build friendly message including product name and max value
+                    // Try to find a place for inline message first
+                    var shownInline = false;
+                    var first = info.items && info.items.length ? info.items[0] : null;
+
+                    // Determine which item to show the error on
+                    var targetItem = first;
+                    if ($triggerTarget && info.items) {
+                        $.each(info.items, function (i, it) {
+                            if (it.$qty.is($triggerTarget)) {
+                                targetItem = it;
+                                return false;
+                            }
+                        });
+                    }
+
+                    var maxVal = info.max;
                     var prodName = "";
-                    try {
-                        var first =
-                            info.items && info.items.length
-                                ? info.items[0]
-                                : null;
-                        if (first && first.$wrapper && first.$wrapper.length) {
-                            prodName = first.$wrapper
+
+                    if (targetItem && targetItem.$wrapper && targetItem.$wrapper.length) {
+                        try {
+                            prodName = targetItem.$wrapper
                                 .closest(".cart_item")
                                 .find(".product-name a")
                                 .first()
                                 .text()
                                 .trim();
+                        } catch (e) {
+                            prodName = "";
                         }
-                    } catch (e) {
-                        prodName = "";
-                    }
-                    if (!prodName) {
-                        prodName =
-                            $(".product_title").first().text().trim() ||
-                            document.title ||
-                            "";
-                    }
-                    var maxVal = info.max;
-                    var msg =
-                        "Max quantity for " +
-                        prodName +
-                        " reached (" +
-                        maxVal +
-                        ")";
 
-                    showClientNotice(msg);
+                        var $rowErr = targetItem.$wrapper.find(".woo-limit-quantity-message").first();
+                        if ($rowErr.length) {
+                            if (!prodName) prodName = "Product";
+                            var msg = "Max quantity for " + prodName + " reached (" + maxVal + ")";
+
+                            // Clear existing timer
+                            var timerId = $rowErr.data("error-timer");
+                            if (timerId) {
+                                clearTimeout(timerId);
+                                $rowErr.removeData("error-timer");
+                            }
+
+                            $rowErr.text(msg).addClass("woo-limit-error").show();
+
+                            var newTimerId = setTimeout(function () {
+                                $rowErr.fadeOut(300, function () {
+                                    $(this).removeClass("woo-limit-error").removeData("error-timer");
+                                    // Re-enable buttons after error clears
+                                    if (targetItem && targetItem.$wrapper) {
+                                        var $row = targetItem.$wrapper.closest(".cart_item");
+                                        if ($row.length) {
+                                            updateQtyButtonsState($row);
+                                        }
+                                    }
+                                });
+                            }, 5000);
+                            $rowErr.data("error-timer", newTimerId);
+                            shownInline = true;
+                        }
+                    }
+
+                    if (!shownInline) {
+                        // Fallback to global notice
+                        if (!prodName) {
+                            prodName =
+                                $(".product_title").first().text().trim() ||
+                                document.title ||
+                                "";
+                        }
+                        var msg =
+                            "Max quantity for " +
+                            prodName +
+                            " reached (" +
+                            maxVal +
+                            ")";
+
+                        showClientNotice(msg);
+                    }
                 }
             });
+            return limitEnforced;
+        }
+
+        // Capture phase listener to intercept invalid changes before WooCommerce sees them
+        if (document.body.addEventListener) {
+            document.body.addEventListener("change", function (e) {
+                // Only interest in qty inputs
+                if (!e.target || !e.target.classList.contains("qty")) return;
+
+                // We must use the same logic as enforceGroups to see if this specific input needs reverting
+                // We can run enforceGroups and see if it modifies our target
+
+                var $target = $(e.target);
+                var valBefore = $target.val();
+
+                var groups = collectGroups();
+                var enforced = enforceGroups(groups, true, $target);
+
+                var valAfter = $target.val();
+
+                if (enforced && String(valBefore) !== String(valAfter)) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                    // Also update old-qty to the reverted value so future checks are correct
+                    $target.data("old-qty", valAfter);
+                }
+            }, true);
         }
 
         // Initialize quantity old values and checkbox UI
@@ -402,7 +477,7 @@
                 // still enforce groups globally
                 setTimeout(function () {
                     var groups = collectGroups();
-                    enforceGroups(groups, true);
+                    enforceGroups(groups, true, $qty);
                 }, 50);
                 return;
             }
@@ -414,8 +489,9 @@
                 // still enforce groups globally (this will handle max quantity check)
                 setTimeout(function () {
                     var groups = collectGroups();
-                    enforceGroups(groups, true);
-                    triggerCartUpdate();
+                    if (!enforceGroups(groups, true, $qty)) {
+                        triggerCartUpdate();
+                    }
                 }, 50);
                 return;
             }
@@ -489,7 +565,7 @@
                 // re-run group enforcement without modal
                 setTimeout(function () {
                     var groups = collectGroups();
-                    enforceGroups(groups, true);
+                    enforceGroups(groups, true, $qty);
                 }, 50);
                 return;
             }
@@ -522,11 +598,10 @@
                     // re-run group enforcement without modal
                     setTimeout(function () {
                         var groups = collectGroups();
-                        enforceGroups(groups, true);
+                        if (!enforceGroups(groups, true, $qty)) {
+                            triggerCartUpdate();
+                        }
                     }, 50);
-
-                    // trigger a cart update so server persists changes
-                    triggerCartUpdate();
 
                     return;
                 }
@@ -539,9 +614,10 @@
                     $qty.val(newQty).trigger("change");
                     setTimeout(function () {
                         var groups = collectGroups();
-                        enforceGroups(groups, true);
+                        if (!enforceGroups(groups, true, $qty)) {
+                            triggerCartUpdate();
+                        }
                     }, 50);
-                    triggerCartUpdate();
                     return;
                 }
 
@@ -667,9 +743,24 @@
                     parseInt($wrapper.data("max-quantity") || "", 10) || null;
                 var inputMax = parseInt($qty.attr("max") || "", 10) || null;
 
+                // Calculate total quantity for this product group
+                var totalQty = current;
+                var productId = String($wrapper.data("product-id"));
+                if (productId) {
+                    var groups = collectGroups();
+                    if (groups[productId]) {
+                        var info = groups[productId];
+                        var groupTotal = 0;
+                        $.each(info.items, function (i, it) {
+                            groupTotal += it.qty;
+                        });
+                        totalQty = groupTotal;
+                    }
+                }
+
                 var triggeredMax = null; // Variable to track which max was triggered
 
-                if ((max !== null && !isNaN(max) && current >= max)) {
+                if ((max !== null && !isNaN(max) && totalQty >= max)) {
                     triggeredMax = 'max-quantity'; // max-quantity was triggered
                 } else if ((inputMax !== null && !isNaN(inputMax) && current >= inputMax)) {
                     triggeredMax = 'inputMax'; // inputMax was triggered
@@ -696,17 +787,27 @@
                         ")";
 
                     // Display error message
+                    // Clear existing timer
+                    var timerId = $quantityErrorDiv.data("error-timer");
+                    if (timerId) {
+                        clearTimeout(timerId);
+                        $quantityErrorDiv.removeData("error-timer");
+                    }
+
                     $quantityErrorDiv
                         .text(msg)
                         .addClass("woo-limit-error")
                         .show();
 
                     // Auto-hide after 5 seconds
-                    setTimeout(function () {
+                    var newTimerId = setTimeout(function () {
                         $quantityErrorDiv.fadeOut(300, function () {
-                            $(this).removeClass("woo-limit-error");
+                            $(this).removeClass("woo-limit-error").removeData("error-timer");
+                            // Re-enable buttons after error clears
+                            updateQtyButtonsState($row);
                         });
                     }, 5000);
+                    $quantityErrorDiv.data("error-timer", newTimerId);
 
                     return;
                 }
