@@ -517,6 +517,8 @@
             // Clear error/available message on input
             $input.on("input", function () {
                 var value = $(this).val().trim();
+
+
                 $input
                     .removeClass("woo-limit-error")
                     .removeClass("woo-limit-available");
@@ -609,6 +611,9 @@
                         var clean = parseInt(value, 10);
                         if (isNaN(clean) || clean < start || clean > end) {
                             if ($rangeInfo.length) {
+                                if (clean === 0) {
+                                    $input.val('');
+                                }
                                 $rangeInfo.addClass("woo-limit-error");
                             }
                             // Do not trigger availability AJAX
@@ -687,6 +692,9 @@
                     if (isNaN(clean) || clean < start || clean > end) {
                         if ($rangeInfo.length) {
                             $rangeInfo.addClass("woo-limit-error");
+                            if (clean === 0) {
+                                $input.val('');
+                            }
                         }
                         // Do not schedule availability AJAX
                         return;
