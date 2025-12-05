@@ -994,7 +994,13 @@
                             if (typeof wc_add_to_cart_params !== "undefined") {
                                 $(document.body).trigger("wc_fragment_refresh");
                             }
-                        } else {
+
+							// Only reset swatches if we are NOT out of stock/limit reached
+							if (!$addToCartButton.hasClass("woo-outofstock")) {
+								$(".rtwpvs-wc-select").val("").trigger("change");
+							}
+
+						} else {
                             window.IJWLP_Frontend_Common.showError(
                                 response.data.message ||
                                 "Failed to add product to cart.",
