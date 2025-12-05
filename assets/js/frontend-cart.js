@@ -661,15 +661,42 @@
         // Inline checkbox UI removed; modal-only selection will be used on qty decrease
 
         // Quantity +/- buttons: handle clicks while respecting validation state
-        function wrapperHasErrors($wrapper) {
+        function wrapperHasErrors($wrapper, ignoreTypeYourNumber) {
             if (!$wrapper || !$wrapper.length) return false;
             var $err = $wrapper.find(".woo-limit-message.woo-limit-error");
-            if ($err.length && $err.is(":visible")) return true;
+            if ($err.length && $err.is(":visible")) {
+                if (ignoreTypeYourNumber) {
+                    var hasOtherErrors = false;
+                    $err.each(function () {
+                        if ($(this).text() !== "Type your number") {
+                            hasOtherErrors = true;
+                            return false;
+                        }
+                    });
+                    if (hasOtherErrors) return true;
+                } else {
+                    return true;
+                }
+            }
             var $range = $wrapper.find(".woo-number-range.woo-limit-error");
             if ($range.length) return true;
             // any inputs with validation class indicating error?
             var $invalidInputs = $wrapper.find(".woo-limit.woo-limit-error");
-            if ($invalidInputs.length) return true;
+            if ($invalidInputs.length) {
+                if (ignoreTypeYourNumber) {
+                    var hasOtherInputErrors = false;
+                    $invalidInputs.each(function () {
+                        var $msg = $(this).siblings(".woo-limit-message");
+                        if ($msg.text() !== "Type your number") {
+                            hasOtherInputErrors = true;
+                            return false;
+                        }
+                    });
+                    if (hasOtherInputErrors) return true;
+                } else {
+                    return true;
+                }
+            }
             return false;
         }
 
@@ -699,7 +726,7 @@
                 .first();
             if ($plus && $plus.length) $plus.prop("disabled", invalid);
             if ($minus && $minus.length)
-                $minus.prop("disabled", wrapperHasErrors($wrapper));
+                $minus.prop("disabled", wrapperHasErrors($wrapper, true));
         }
 
         // Attach listeners to keep buttons up-to-date when limited inputs change
@@ -832,7 +859,7 @@
                 var $wrapper = $row.find(".woo-limit-field-wrapper").first();
 
                 // If errors or empty fields exist, do not allow clicking
-                if (wrapperHasErrors($wrapper)) {
+                if (wrapperHasErrors($wrapper, true)) {
                     $btn.prop("disabled", true);
                     showClientNotice(
                         ijwlp_frontend.fix_errors_message ||
