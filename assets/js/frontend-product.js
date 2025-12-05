@@ -723,7 +723,6 @@
 
                 var value = $limitedNumberInput.val().trim();
                 if (value === "") {
-                    console.log('1212');
                     // Highlight error after variation is selected
                     $limitedNumberInput.addClass("woo-limit-error-highlight");
                     // Remove any previous error

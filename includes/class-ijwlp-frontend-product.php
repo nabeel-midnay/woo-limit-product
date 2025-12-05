@@ -141,8 +141,7 @@ class IJWLP_Frontend_Product
                     class="woo-limit"
                     value=""
                     min="<?php echo esc_attr($start); ?>"
-                    max="<?php echo esc_attr($end); ?>"
-                    required />
+                    max="<?php echo esc_attr($end); ?>" />
             </div>
 
             <input
