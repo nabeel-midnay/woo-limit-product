@@ -879,6 +879,7 @@
                 var originalText = $addToCartButton.text();
                 $addToCartButton.text("Adding...");
 
+                var wasSuccessful = false;
                 $.ajax({
                     url: ijwlp_frontend.ajax_url,
                     type: "POST",
@@ -891,6 +892,7 @@
                     },
                     success: function (response) {
                         if (response.success) {
+                            wasSuccessful = true;
                             if (response.data.fragments) {
                                 $.each(
                                     response.data.fragments,
@@ -899,6 +901,13 @@
                                     }
                                 );
                             }
+
+                            $addToCartButton.text("Added");
+
+                            setTimeout(function () {
+                                $addToCartButton.text(originalText);
+                            }, 2000);
+
                             $(document.body).trigger("added_to_cart", [
                                 response.data.fragments,
                                 response.data.cart_hash,
@@ -1000,6 +1009,9 @@
                         );
                     },
                     complete: function () {
+                        if (!wasSuccessful) {
+                            $addToCartButton.text(originalText);
+                        }
                         // Check if we are out of stock/limit reached before re-enabling
                         var isOutOfStock = $addToCartButton.hasClass("woo-outofstock");
 
@@ -1008,13 +1020,11 @@
                                 .prop("disabled", false)
                                 .removeAttr("disabled")
                                 .removeAttr("aria-disabled")
-                                .removeClass("woo-limit-loading")
-                                .text(originalText);
+                                .removeClass("woo-limit-loading");
                             checkAddToCartState();
                         } else {
                             $addToCartButton
-                                .removeClass("woo-limit-loading")
-                                .text(originalText);
+                                .removeClass("woo-limit-loading");
                         }
                     },
                 });
