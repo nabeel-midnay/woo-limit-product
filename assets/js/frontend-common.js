@@ -548,6 +548,9 @@
                 end = null;
             }
 
+            // Initialize last valid value
+            $input.data("last-valid-value", $input.val().replace(/[^0-9]/g, ''));
+
             // Clear error/available message on input
             $input.on("input", function () {
                 var value = $(this).val();
@@ -559,8 +562,17 @@
                 if (end !== null && numericValue !== "") {
                     var intValue = parseInt(numericValue, 10);
                     if (intValue > end) {
-                        numericValue = String(end);
+                        var lastValid = $input.data("last-valid-value");
+                        if (typeof lastValid !== "undefined") {
+                            numericValue = lastValid;
+                        } else {
+                            numericValue = String(end);
+                        }
+                    } else {
+                        $input.data("last-valid-value", numericValue);
                     }
+                } else {
+                    $input.data("last-valid-value", numericValue);
                 }
 
                 // Update input if value changed
