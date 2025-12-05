@@ -148,15 +148,7 @@ class IJWLP_Frontend_Common
         // Localize script data to common script
         wp_localize_script('ijwlp-frontend-common', 'ijwlp_frontend', $ajax_data);
 
-        // Enqueue timer script
-        wp_enqueue_script(
-            'ijwlp-frontend-timer',
-            $this->assets_url . 'js/frontend-timer.js',
-            array('jquery'),
-            $this->_version,
-            true
-        );
-
+  
         // Product page specific script
         if (is_product()) {
             wp_enqueue_script(
@@ -189,6 +181,15 @@ class IJWLP_Frontend_Common
                 'ijwlp-frontend-checkout',
                 $this->assets_url . 'js/frontend-checkout.js',
                 array('jquery', 'ijwlp-frontend-common'),
+                $this->_version,
+                true
+            );
+        }else{
+        // Enqueue timer script
+            wp_enqueue_script(
+                'ijwlp-frontend-timer',
+                $this->assets_url . 'js/frontend-timer.js',
+                array('jquery'),
                 $this->_version,
                 true
             );
