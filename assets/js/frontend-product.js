@@ -723,14 +723,15 @@
 
                 var value = $limitedNumberInput.val().trim();
                 if (value === "") {
+                    console.log('121');
                     // Highlight error after variation is selected
                     $limitedNumberInput.addClass("woo-limit-error-highlight");
                     // Remove any previous error
-                    $('woo-number-range').addClass('woo-limit-error');
+                    $('.woo-number-range').addClass('woo-limit-error');
                     $limitedNumberInput.focus();
                     return false;
                 } else {
-                    $('woo-number-range').removeClass(
+                    $('.woo-number-range').removeClass(
                         "woo-limit-error"
                     );
                 }
