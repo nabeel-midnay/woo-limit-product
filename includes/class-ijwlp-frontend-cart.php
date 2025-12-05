@@ -86,8 +86,13 @@ class IJWLP_Frontend_Cart
 
         // For each parent product that has a max quantity configured, validate totals
         foreach ($parents as $parent_id => $keys) {
+            // Check if product is limited edition OR has max quantity set
+            // We want to validate max quantity regardless of limited status
             $is_limited = get_post_meta($parent_id, '_woo_limit_status', true);
-            if ($is_limited !== 'yes') {
+            $max_quantity = get_post_meta($parent_id, '_woo_limit_max_quantity', true);
+
+            // If not limited AND no max quantity, skip
+            if ($is_limited !== 'yes' && empty($max_quantity)) {
                 continue;
             }
 
@@ -237,18 +242,6 @@ class IJWLP_Frontend_Cart
      */
     public function append_limited_edition_input_to_name($cart_item, $cart_item_key)
     {
-        // Only append if this cart item has limited edition number(s)
-        if (!isset($cart_item['woo_limit']) || empty($cart_item['woo_limit'])) {
-            return;
-        }
-
-        // Convert to array if it's a single value (backward compatibility)
-        $limited_numbers = is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit']);
-
-        if (count($limited_numbers) === 1 && strpos($limited_numbers[0], ',') !== false) {
-            $limited_numbers = array_map('trim', explode(',', $limited_numbers[0]));
-        }
-
         // Get product ID and variation ID
         $product_id = $cart_item['product_id'];
         $variation_id = $cart_item['variation_id'];
@@ -265,8 +258,27 @@ class IJWLP_Frontend_Cart
 
         // Check if product is limited edition
         $is_limited = get_post_meta($parent_product_id, '_woo_limit_status', true);
-        if ($is_limited !== 'yes') {
-            return;
+        $max_qty = get_post_meta($parent_product_id, '_woo_limit_max_quantity', true);
+
+        // If not limited AND no max quantity, we still want to output the wrapper 
+        // so that JS can handle stock quantity limits (error messages & auto-update)
+        // if ($is_limited !== 'yes' && empty($max_qty)) {
+        //    return;
+        // }
+
+        $limited_numbers = array();
+        if ($is_limited === 'yes') {
+            // Only append if this cart item has limited edition number(s)
+            if (!isset($cart_item['woo_limit']) || empty($cart_item['woo_limit'])) {
+                return;
+            }
+
+            // Convert to array if it's a single value (backward compatibility)
+            $limited_numbers = is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit']);
+
+            if (count($limited_numbers) === 1 && strpos($limited_numbers[0], ',') !== false) {
+                $limited_numbers = array_map('trim', explode(',', $limited_numbers[0]));
+            }
         }
 
         // Get available numbers
@@ -300,30 +312,35 @@ class IJWLP_Frontend_Cart
         <div class="woo-limit-product woo-limit-cart woo-limit-field-wrapper woo-limit-cart-item-wrapper"
             data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>"
             data-product-id="<?php echo esc_attr($parent_product_id); ?>" data-start="<?php echo esc_attr($start); ?>"
-            data-end="<?php echo esc_attr($end); ?>" <?php if (!empty($max_qty)) {
+            data-end="<?php echo esc_attr($end); ?>" 
+            data-is-limited="<?php echo esc_attr($is_limited); ?>"
+            <?php if (!empty($max_qty)) {
                    echo ' data-max-quantity="' . esc_attr($max_qty) . '"';
                } ?>>
-            <p class="woo-limit-field-label">
-                <?php echo esc_html($limit_label_cart); ?>
-            </p>
-            <?php if ($start && $end): ?>
-                <span class="woo-number-range">
-                    <?php esc_html_e('Enter a number between: ', 'woolimited'); ?>
-                    <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
-                </span>
+            
+            <?php if ($is_limited === 'yes'): ?>
+                <p class="woo-limit-field-label">
+                    <?php echo esc_html($limit_label_cart); ?>
+                </p>
+                <?php if ($start && $end): ?>
+                    <span class="woo-number-range">
+                        <?php esc_html_e('Enter a number between: ', 'woolimited'); ?>
+                        <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
+                    </span>
+                <?php endif; ?>
+    
+                <?php foreach ($limited_numbers as $index => $limited_number): ?>
+                    <div class="woo-limit-cart-item woo-input-single gt-2">
+                        <input type="number" id="woo-limit-cart-<?php echo esc_attr($cart_item_key); ?>-<?php echo esc_attr($index); ?>"
+                            name="woo_limit[<?php echo esc_attr($cart_item_key); ?>][]" class="woo-limit"
+                            value="<?php echo esc_attr($limited_number); ?>" data-cart-key="<?php echo esc_attr($cart_item_key); ?>"
+                            data-index="<?php echo esc_attr($index); ?>" data-old-value="<?php echo esc_attr($limited_number); ?>"
+                            placeholder="<?php esc_attr_e('Enter edition number', 'woolimited'); ?>"
+                            min="<?php echo esc_attr($start); ?>" max="<?php echo esc_attr($end); ?>" />
+                        <div class="woo-limit-message" style="display: none;"></div>
+                    </div>
+                <?php endforeach; ?>
             <?php endif; ?>
-
-            <?php foreach ($limited_numbers as $index => $limited_number): ?>
-                <div class="woo-limit-cart-item woo-input-single gt-2">
-                    <input type="number" id="woo-limit-cart-<?php echo esc_attr($cart_item_key); ?>-<?php echo esc_attr($index); ?>"
-                        name="woo_limit[<?php echo esc_attr($cart_item_key); ?>][]" class="woo-limit"
-                        value="<?php echo esc_attr($limited_number); ?>" data-cart-key="<?php echo esc_attr($cart_item_key); ?>"
-                        data-index="<?php echo esc_attr($index); ?>" data-old-value="<?php echo esc_attr($limited_number); ?>"
-                        placeholder="<?php esc_attr_e('Enter edition number', 'woolimited'); ?>"
-                        min="<?php echo esc_attr($start); ?>" max="<?php echo esc_attr($end); ?>" />
-                    <div class="woo-limit-message" style="display: none;"></div>
-                </div>
-            <?php endforeach; ?>
 
 
             <div class="woo-limit-quantity-message" style="display: none;"></div>
@@ -802,46 +819,91 @@ class IJWLP_Frontend_Cart
     /**
      * Clear the cart on logout if cart contains any limited edition products.
      * Removes associated blocked limited-number DB records before emptying the cart.
+     * Also clears the persistent cart from user meta.
+     * 
+     * @param int $user_id The user ID being logged out.
      */
-    public function maybe_clear_cart_on_logout()
+    /**
+     * Clear limited edition products from cart on logout.
+     * Removes associated blocked limited-number DB records.
+     * Also clears limited products from the persistent cart in user meta.
+     * 
+     * @param int $user_id The user ID being logged out.
+     */
+    public function maybe_clear_cart_on_logout($user_id)
     {
+        // 1. Handle Session Cart (if loaded)
         $cart = WC()->cart;
-        if (!$cart) {
-            return;
+        if ($cart) {
+            $cart_contents = $cart->get_cart();
+            if (!empty($cart_contents)) {
+                foreach ($cart_contents as $cart_item_key => $cart_item) {
+                    $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : (isset($cart_item['variation_id']) && $cart_item['variation_id'] > 0 ? $cart_item['variation_id'] : $cart_item['product_id']);
+                    
+                    $product = wc_get_product($actual_pro_id);
+                    $parent_product_id = $actual_pro_id;
+                    if ($product && $product->is_type('variation')) {
+                        $parent_product_id = $product->get_parent_id();
+                    }
+
+                    $is_limited = get_post_meta($parent_product_id, '_woo_limit_status', true);
+                    
+                    if ($is_limited === 'yes') {
+                        // Remove DB records for this specific item
+                        $this->remove_limited_edition_from_database($cart_item_key, $cart_item);
+                        
+                        // Remove from session cart
+                        $cart->remove_cart_item($cart_item_key);
+                    }
+                }
+                
+                // Recalculate totals after removals
+                $cart->calculate_totals();
+                if (method_exists($cart, 'maybe_set_cart_cookies')) {
+                    $cart->maybe_set_cart_cookies();
+                }
+            }
         }
 
-        $cart_contents = $cart->get_cart();
-        if (empty($cart_contents) || !is_array($cart_contents)) {
-            return;
-        }
+        // 2. Handle Persistent Cart (User Meta)
+        $saved_cart_meta_key = '_woocommerce_persistent_cart_' . get_current_blog_id();
+        $saved_cart = get_user_meta($user_id, $saved_cart_meta_key, true);
 
-        $has_limited = false;
-        foreach ($cart_contents as $cart_item_key => $cart_item) {
-            $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : (isset($cart_item['variation_id']) && $cart_item['variation_id'] > 0 ? $cart_item['variation_id'] : $cart_item['product_id']);
-            $product = wc_get_product($actual_pro_id);
-            $parent_product_id = $actual_pro_id;
-            if ($product && $product->is_type('variation')) {
-                $parent_product_id = $product->get_parent_id();
+        if (isset($saved_cart['cart']) && is_array($saved_cart['cart'])) {
+            $persistent_cart_updated = false;
+            
+            foreach ($saved_cart['cart'] as $cart_item_key => $cart_item) {
+                $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : (isset($cart_item['variation_id']) && $cart_item['variation_id'] > 0 ? $cart_item['variation_id'] : $cart_item['product_id']);
+                
+                $product = wc_get_product($actual_pro_id);
+                // If product doesn't exist anymore, we might want to remove it, but let's stick to the limited logic
+                if (!$product) {
+                    continue; 
+                }
+
+                $parent_product_id = $actual_pro_id;
+                if ($product->is_type('variation')) {
+                    $parent_product_id = $product->get_parent_id();
+                }
+
+                $is_limited = get_post_meta($parent_product_id, '_woo_limit_status', true);
+
+                if ($is_limited === 'yes') {
+                    // Remove DB records (just in case they weren't caught by session cart loop)
+                    $this->remove_limited_edition_from_database($cart_item_key, $cart_item);
+
+                    // Remove from persistent cart array
+                    unset($saved_cart['cart'][$cart_item_key]);
+                    $persistent_cart_updated = true;
+                }
             }
 
-            $is_limited = get_post_meta($parent_product_id, '_woo_limit_status', true);
-            if ($is_limited === 'yes') {
-                $has_limited = true;
-                break;
-            }
-        }
-
-        if ($has_limited) {
-            // Remove DB records for each cart item (if present)
-            foreach ($cart_contents as $cart_item_key => $cart_item) {
-                $this->remove_limited_edition_from_database($cart_item_key, $cart_item);
-            }
-
-            // Empty WooCommerce cart and recalculate totals
-            $cart->empty_cart();
-            $cart->calculate_totals();
-            if (method_exists($cart, 'maybe_set_cart_cookies')) {
-                $cart->maybe_set_cart_cookies();
+            if ($persistent_cart_updated) {
+                if (empty($saved_cart['cart'])) {
+                    delete_user_meta($user_id, $saved_cart_meta_key);
+                } else {
+                    update_user_meta($user_id, $saved_cart_meta_key, $saved_cart);
+                }
             }
         }
     }
