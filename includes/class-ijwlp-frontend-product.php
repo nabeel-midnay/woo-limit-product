@@ -48,30 +48,6 @@ class IJWLP_Frontend_Product
         <?php
 
         $pro_id = $product->get_id();
-        $is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
-
-        if ($is_limited !== 'yes') {
-            return;
-        }
-
-        $start = get_post_meta($pro_id, '_woo_limit_start_value', true);
-        $end = get_post_meta($pro_id, '_woo_limit_end_value', true);
-
-        if (!$start || !$end) {
-            return;
-        }
-
-        // Get available numbers
-        $available_numbers = limitedNosAvailable($pro_id);
-
-        // Get admin settings for label
-        $limit_label = IJWLP_Options::get_setting('limitlabel', __('Limited Edition Number', 'woolimited'));
-
-        // Get stock quantity for the main product
-        $stock_quantity = null;
-        if ($product->get_manage_stock() && $product->get_backorders() === 'no') {
-            $stock_quantity = $product->get_stock_quantity();
-        }
 
         
         // Get stock quantities for variations (if product is variable)
@@ -128,6 +104,41 @@ class IJWLP_Frontend_Product
 
         // Get max quantity limit per user
         $max_limit = get_post_meta($pro_id, '_woo_limit_max_quantity', true);
+
+
+         $is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
+
+        if ($is_limited !== 'yes') {
+            ?>
+            <div class="unlimited-produt-wrap">
+                <div class="woo-limit-message" style="display: none;"></div>
+                <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity" value="<?php echo esc_attr($stock_quantity); ?>" />
+                <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities" value="<?php echo esc_attr($variation_quantities_json); ?>" />
+                <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining" value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
+                <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name" value="<?php echo esc_attr($product->get_name()); ?>" />
+            </div>
+            <?php
+            return;
+        }
+
+        $start = get_post_meta($pro_id, '_woo_limit_start_value', true);
+        $end = get_post_meta($pro_id, '_woo_limit_end_value', true);
+
+        if (!$start || !$end) {
+            return;
+        }
+
+        // Get available numbers
+        $available_numbers = limitedNosAvailable($pro_id);
+
+        // Get admin settings for label
+        $limit_label = IJWLP_Options::get_setting('limitlabel', __('Limited Edition Number', 'woolimited'));
+
+        // Get stock quantity for the main product
+        $stock_quantity = null;
+        if ($product->get_manage_stock() && $product->get_backorders() === 'no') {
+            $stock_quantity = $product->get_stock_quantity();
+        }
 ?>
         <div class="woo-limit-product woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
             <p class="woo-limit-field-label">

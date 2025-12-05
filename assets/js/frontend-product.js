@@ -555,15 +555,6 @@
                             .prop("disabled", true)
                             .addClass("disabled woo-limit-loading");
 
-                        $(".rtwpvs-wc-select").val("").trigger("change");
-
-                        // Show success notice
-                        if (typeof wc_add_to_cart_params !== "undefined") {
-                            $(document.body).trigger("wc_fragment_refresh");
-                        }
-
-
-
                         // Update stock quantities
                         if (
                             variationId &&
@@ -663,6 +654,7 @@
                                 // Disable variation swatches
                                 $(".variations select").prop("disabled", true);
                                 $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+                                $(".reset_variations").removeClass("show");
 
                                 // Show error message
                                 var productName = $(".woo-limit-product-name").val() || "this product";
@@ -681,6 +673,16 @@
                         $(".woo-limit-variation-quantities").val(
                             JSON.stringify(variationStockQuantities)
                         );
+
+                        // Only reset swatches if we are NOT out of stock/limit reached
+                        if (!$addToCartButton.hasClass("woo-outofstock")) {
+                            $(".rtwpvs-wc-select").val("").trigger("change");
+                        }
+
+                        // Show success notice
+                        if (typeof wc_add_to_cart_params !== "undefined") {
+                            $(document.body).trigger("wc_fragment_refresh");
+                        }
 
                     } else {
                         window.IJWLP_Frontend_Common.showError(
@@ -869,6 +871,7 @@
                 });
             } else {
                 // Normal product: submit via AJAX
+
                 // Disable button and show loading state
                 $addToCartButton
                     .prop("disabled", true)
@@ -905,6 +908,80 @@
                             $addToCartButton
                                 .prop("disabled", true)
                                 .addClass("disabled woo-limit-loading");
+
+                            // Update user limit remaining locally
+                            var enteredQuantity = parseInt(quantity);
+                            if (userLimitRemaining !== Infinity) {
+                                userLimitRemaining = Math.max(0, userLimitRemaining - enteredQuantity);
+                                $(".woo-limit-user-remaining").val(userLimitRemaining);
+
+                                if (userLimitRemaining <= 0) {
+                                    $addToCartButton
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock"); // Reuse outofstock class for simplicity
+
+                                    // Disable quantity input
+                                    $form.find('input[name="quantity"]').prop("disabled", true);
+
+                                    // Disable variation swatches
+                                    $(".variations select").prop("disabled", true);
+                                    $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+                                    $(".reset_variations").removeClass("show");
+
+                                    // Show error message
+                                    var productName = $(".woo-limit-product-name").val() || "this product";
+                                    window.IJWLP_Frontend_Common.showError(
+                                        "Max quantity for " + productName + " reached (" + userLimitVal + ")",
+                                        $errorDiv
+                                    );
+                                }
+                            }
+
+                            // Update stock locally
+                            if (variationId && variationStockQuantities[variationId] !== undefined) {
+                                if (variationStockQuantities[variationId] !== null) {
+                                    variationStockQuantities[variationId] = Math.max(0, variationStockQuantities[variationId] - enteredQuantity);
+                                    if (variationStockQuantities[variationId] <= 0) {
+                                        // If this variation is now out of stock, mark persistent state
+                                        $addToCartButton
+                                            .prop("disabled", true)
+                                            .addClass("disabled")
+                                            .addClass("woo-outofstock");
+
+                                        // Disable quantity input
+                                        $form.find('input[name="quantity"]').prop("disabled", true);
+
+                                        // Disable variation swatches
+                                        $(".variations select").prop("disabled", true);
+                                        $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+
+                                        // Show error message
+                                        window.IJWLP_Frontend_Common.showError(
+                                            "This variation is now out of stock.",
+                                            $errorDiv
+                                        );
+                                    }
+                                }
+                            } else if (stockQuantityRemaining !== Infinity) {
+                                stockQuantityRemaining = Math.max(0, stockQuantityRemaining - enteredQuantity);
+                                if (stockQuantityRemaining <= 0) {
+                                    $addToCartButton
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock");
+
+                                    // Disable quantity input
+                                    $form.find('input[name="quantity"]').prop("disabled", true);
+
+                                    // Show error message
+                                    window.IJWLP_Frontend_Common.showError(
+                                        "This product is now out of stock.",
+                                        $errorDiv
+                                    );
+                                }
+                            }
+
                             if (typeof wc_add_to_cart_params !== "undefined") {
                                 $(document.body).trigger("wc_fragment_refresh");
                             }
@@ -923,13 +1000,22 @@
                         );
                     },
                     complete: function () {
-                        $addToCartButton
-                            .prop("disabled", false)
-                            .removeAttr("disabled")
-                            .removeAttr("aria-disabled")
-                            .removeClass("woo-limit-loading")
-                            .text(originalText);
-                        checkAddToCartState();
+                        // Check if we are out of stock/limit reached before re-enabling
+                        var isOutOfStock = $addToCartButton.hasClass("woo-outofstock");
+
+                        if (!isOutOfStock) {
+                            $addToCartButton
+                                .prop("disabled", false)
+                                .removeAttr("disabled")
+                                .removeAttr("aria-disabled")
+                                .removeClass("woo-limit-loading")
+                                .text(originalText);
+                            checkAddToCartState();
+                        } else {
+                            $addToCartButton
+                                .removeClass("woo-limit-loading")
+                                .text(originalText);
+                        }
                     },
                 });
             }
