@@ -43,6 +43,10 @@ class IJWLP_Frontend_Product
             return;
         }
 
+        ?>
+        <div class="woo-limit-selection-message" style="display:none"></div>
+        <?php
+
         $pro_id = $product->get_id();
         $is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
 
@@ -120,7 +124,6 @@ class IJWLP_Frontend_Product
         $variation_quantities_json = !empty($variation_quantities) ? wp_json_encode($variation_quantities) : '[]';
 
 ?>
-        <div class="woo-limit-selection-message" style="display:none"></div>
         <div class="woo-limit-product woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
             <p class="woo-limit-field-label">
                 <?php echo esc_html($limit_label); ?>
