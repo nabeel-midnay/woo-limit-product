@@ -254,7 +254,10 @@
 
 .single-product .woo-limit-message {
     position: absolute;
-    /* 	bottom: 60px; */
+}
+
+.single-product .unlimited-produt-wrap .woo-limit-message {
+    bottom: 0;
 }
 
 /* Error message styles */
