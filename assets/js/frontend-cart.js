@@ -260,7 +260,7 @@
                         .text()
                     : "") ||
                 "";
-            
+
             // Set the title in h3
             $modal.find(".field-selection-modal-content h3").text(productName);
             // Set the subtitle/instruction
@@ -279,21 +279,21 @@
                 for (var i = 0; i < action.numbers.length; i++) {
                     var num = action.numbers[i] || "";
                     var esc = $("<div/>").text(num).html();
-                    
+
                     var $option = $('<div class="field-option"></div>');
                     var $flex = $('<div style="display: flex; align-items: center;"></div>');
-                    
+
                     var $cb = $(
                         '<input type="checkbox" name="field-selection" class="woo-limit-modal-select" style="margin-right: 10px;" />'
                     ).attr("data-number", num).val(num);
-                    
+
                     // pre-check modal boxes only for numbers in preChecked (last N)
                     if (preChecked.indexOf(String(num)) !== -1) {
                         $cb.prop("checked", true);
                     }
-                    
+
                     var $labelDiv = $('<div><strong>' + esc + '</strong></div>');
-                    
+
                     $flex.append($cb).append($labelDiv);
                     $option.append($flex);
                     $listContainer.append($option);
@@ -416,6 +416,19 @@
                 setTimeout(function () {
                     var groups = collectGroups();
                     enforceGroups(groups, true);
+                }, 50);
+                return;
+            }
+
+            // Check if product is limited edition
+            var isLimited = $wrapper.data("is-limited");
+            if (isLimited !== 'yes') {
+                finalizeQty(newQty);
+                // still enforce groups globally (this will handle max quantity check)
+                setTimeout(function () {
+                    var groups = collectGroups();
+                    enforceGroups(groups, true);
+                    triggerCartUpdate();
                 }, 50);
                 return;
             }
@@ -749,5 +762,43 @@
                 }, 50);
             }
         );
+
+        // Prevent checkout if any limited edition input is empty
+        $(document.body).on("click", ".checkout-button", function (e) {
+            var isValid = true;
+            var $firstError = null;
+
+            $(".woo-limit-cart-item input.woo-limit").each(function () {
+                var $input = $(this);
+                var val = $input.val();
+                if (!val || val.trim() === "") {
+                    isValid = false;
+                    var $msg = $input.siblings(".woo-limit-message");
+                    $msg.text("Type your number").show();
+                    $input.addClass("woo-limit-error");
+
+                    if (!$firstError) {
+                        $firstError = $input;
+                    }
+                } else {
+                    // Clear error if user fixed it but didn't trigger other events yet
+                    $input.siblings(".woo-limit-message").hide();
+                    $input.removeClass("woo-limit-error");
+                }
+            });
+
+            if (!isValid) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                if ($firstError) {
+                    $("html, body").animate({
+                        scrollTop: $firstError.offset().top - 100
+                    }, 500);
+                    $firstError.focus();
+                }
+                return false;
+            }
+        });
     });
 })(jQuery);
