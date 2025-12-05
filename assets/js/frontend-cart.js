@@ -244,13 +244,7 @@
             pendingRemoval = action;
             var $modal = $("#field-selection-modal");
 
-            // message area
-            var msgListTitle =
-                (window.ijwlp_frontend &&
-                    ijwlp_frontend.modal_remove_list_title) ||
-                "You are about to remove the following Limited Edition Number(s):";
 
-            // Update title
             var productName =
                 (action && action.productName) ||
                 (action && action.wrapper
@@ -263,8 +257,6 @@
 
             // Set the title in h3
             $modal.find(".field-selection-modal-content h3").text(productName);
-            // Set the subtitle/instruction
-            $modal.find(".field-selection-modal-content p").text(msgListTitle);
 
             var $listContainer = $("#field-selection-list");
             $listContainer.empty();
@@ -286,11 +278,6 @@
                     var $cb = $(
                         '<input type="checkbox" name="field-selection" class="woo-limit-modal-select" style="margin-right: 10px;" />'
                     ).attr("data-number", num).val(num);
-
-                    // pre-check modal boxes only for numbers in preChecked (last N)
-                    if (preChecked.indexOf(String(num)) !== -1) {
-                        $cb.prop("checked", true);
-                    }
 
                     var $labelDiv = $('<div><strong>' + esc + '</strong></div>');
 
@@ -775,6 +762,7 @@
                     isValid = false;
                     var $msg = $input.siblings(".woo-limit-message");
                     $msg.text("Type your number").show();
+                    $msg.addClass("woo-limit-error");
                     $input.addClass("woo-limit-error");
 
                     if (!$firstError) {
@@ -792,9 +780,6 @@
                 e.stopImmediatePropagation();
 
                 if ($firstError) {
-                    $("html, body").animate({
-                        scrollTop: $firstError.offset().top - 100
-                    }, 500);
                     $firstError.focus();
                 }
                 return false;
