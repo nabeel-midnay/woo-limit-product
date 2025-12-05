@@ -830,7 +830,7 @@ body [name="update_cart"] {
     visibility: hidden;
 }
 
-.quantity {
+input.qty {
     pointer-events: none;
     cursor: none;
 }
