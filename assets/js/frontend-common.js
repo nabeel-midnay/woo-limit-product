@@ -550,7 +550,26 @@
 
             // Clear error/available message on input
             $input.on("input", function () {
-                var value = $(this).val().trim();
+                var value = $(this).val();
+
+                // Remove non-numeric characters
+                var numericValue = value.replace(/[^0-9]/g, '');
+
+                // Check max value if exists
+                if (end !== null && numericValue !== "") {
+                    var intValue = parseInt(numericValue, 10);
+                    if (intValue > end) {
+                        numericValue = String(end);
+                    }
+                }
+
+                // Update input if value changed
+                if (value !== numericValue) {
+                    $(this).val(numericValue);
+                    value = numericValue;
+                }
+
+                value = value.trim();
 
 
                 $input
