@@ -73,6 +73,7 @@ class IJWLP_Frontend_Product
             $stock_quantity = $product->get_stock_quantity();
         }
 
+        
         // Get stock quantities for variations (if product is variable)
         $variation_quantities = [];
         if ($product->is_type('variable')) {
@@ -119,10 +120,14 @@ class IJWLP_Frontend_Product
                 }
             }
         }
+        
 
         // Prepare variation quantities in a JSON format for hidden field
         $variation_quantities_json = !empty($variation_quantities) ? wp_json_encode($variation_quantities) : '[]';
 
+
+        // Get max quantity limit per user
+        $max_limit = get_post_meta($pro_id, '_woo_limit_max_quantity', true);
 ?>
         <div class="woo-limit-product woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
             <p class="woo-limit-field-label">
@@ -135,6 +140,8 @@ class IJWLP_Frontend_Product
 
             <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity" value="<?php echo esc_attr($stock_quantity); ?>" />
             <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities" value="<?php echo esc_attr($variation_quantities_json); ?>" />
+            <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining" value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
+            <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name" value="<?php echo esc_attr($product->get_name()); ?>" />
 
             <div class="woo-limit-input-group">
                 <input

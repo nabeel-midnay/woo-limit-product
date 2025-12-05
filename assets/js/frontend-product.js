@@ -43,6 +43,10 @@
             }
         }
 
+        // User limit remaining
+        var userLimitVal = $(".woo-limit-user-remaining").val();
+        var userLimitRemaining = userLimitVal === "" ? Infinity : parseInt(userLimitVal);
+
         // Function to get current variation stock
         function getCurrentVariationStock() {
             var variationId =
@@ -456,68 +460,6 @@
                     if (response.success) {
                         wasSuccessful = true;
 
-                        // Update stock quantities
-                        if (
-                            variationId &&
-                            variationStockQuantities[variationId] !== undefined
-                        ) {
-                            // Reduce variation-specific stock
-                            if (variationStockQuantities[variationId] !== null) {
-                                variationStockQuantities[variationId] = Math.max(
-                                    0,
-                                    variationStockQuantities[variationId] - 1
-                                );
-                                // If this variation is now out of stock, mark persistent state
-                                if (variationStockQuantities[variationId] <= 0) {
-                                    $addToCartButton
-                                        .prop("disabled", true)
-                                        .addClass("disabled")
-                                        .addClass("woo-outofstock");
-                                    $limitedNumberInput
-                                        .prop("disabled", true)
-                                        .addClass("disabled")
-                                        .addClass("woo-outofstock");
-                                } else {
-                                    // Clear out-of-stock marker if stock remains
-                                    $addToCartButton.removeClass("woo-outofstock");
-                                    $limitedNumberInput.removeClass(
-                                        "woo-outofstock"
-                                    );
-                                }
-                            }
-                        } else {
-                            // Reduce main product stock
-                            if (stockQuantityRemaining !== Infinity) {
-                                stockQuantityRemaining = Math.max(
-                                    0,
-                                    stockQuantityRemaining - 1
-                                );
-                                if (stockQuantityRemaining <= 0) {
-                                    $addToCartButton
-                                        .prop("disabled", true)
-                                        .addClass("disabled")
-                                        .addClass("woo-outofstock");
-                                    $limitedNumberInput
-                                        .prop("disabled", true)
-                                        .addClass("disabled")
-                                        .addClass("woo-outofstock");
-                                } else {
-                                    $addToCartButton.removeClass("woo-outofstock");
-                                    $limitedNumberInput.removeClass(
-                                        "woo-outofstock"
-                                    );
-                                }
-                            }
-                        }
-
-                        // Update the hidden fields with new stock values
-                        $(".woo-limit-stock-quantity").val(
-                            stockQuantityRemaining
-                        );
-                        $(".woo-limit-variation-quantities").val(
-                            JSON.stringify(variationStockQuantities)
-                        );
-
                         // Update available numbers list and refresh suggestions
                         var $availableInput = $(".woo-limit-available-numbers");
                         if ($availableInput.length && window.IJWLP_Frontend_Common) {
@@ -571,9 +513,6 @@
                             typeof window.ijwlpTimer.restartTimer === "function"
                         ) {
                             window.ijwlpTimer.restartTimer(limitTime);
-                            console.log(
-                                "Timer restarted for limited product addition"
-                            );
                         }
 
                         // Hide ALL messages immediately (checking, lucky, etc)
@@ -622,6 +561,127 @@
                         if (typeof wc_add_to_cart_params !== "undefined") {
                             $(document.body).trigger("wc_fragment_refresh");
                         }
+
+
+
+                        // Update stock quantities
+                        if (
+                            variationId &&
+                            variationStockQuantities[variationId] !== undefined
+                        ) {
+                            // Reduce variation-specific stock
+                            if (variationStockQuantities[variationId] !== null) {
+                                variationStockQuantities[variationId] = Math.max(
+                                    0,
+                                    variationStockQuantities[variationId] - 1
+                                );
+                                // If this variation is now out of stock, mark persistent state
+                                if (variationStockQuantities[variationId] <= 0) {
+                                    $addToCartButton
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock");
+                                    $limitedNumberInput
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock");
+
+                                    // Disable quantity input
+                                    $form.find('input[name="quantity"]').prop("disabled", true);
+
+                                    // Disable variation swatches
+                                    $(".variations select").prop("disabled", true);
+                                    $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+
+                                    // Show error message
+                                    window.IJWLP_Frontend_Common.showError(
+                                        "This variation is now out of stock.",
+                                        $errorDiv
+                                    );
+                                } else {
+                                    // Clear out-of-stock marker if stock remains
+                                    $addToCartButton.removeClass("woo-outofstock");
+                                    $limitedNumberInput.removeClass(
+                                        "woo-outofstock"
+                                    );
+                                }
+                            }
+                        } else {
+                            // Reduce main product stock
+                            if (stockQuantityRemaining !== Infinity) {
+                                stockQuantityRemaining = Math.max(
+                                    0,
+                                    stockQuantityRemaining - 1
+                                );
+                                if (stockQuantityRemaining <= 0) {
+                                    $addToCartButton
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock");
+                                    $limitedNumberInput
+                                        .prop("disabled", true)
+                                        .addClass("disabled")
+                                        .addClass("woo-outofstock");
+
+                                    // Disable quantity input
+                                    $form.find('input[name="quantity"]').prop("disabled", true);
+
+                                    // Show error message
+                                    window.IJWLP_Frontend_Common.showError(
+                                        "This product is now out of stock.",
+                                        $errorDiv
+                                    );
+                                } else {
+                                    $addToCartButton.removeClass("woo-outofstock");
+                                    $limitedNumberInput.removeClass(
+                                        "woo-outofstock"
+                                    );
+                                }
+                            }
+                        }
+
+                        // Reduce user limit remaining
+                        if (userLimitRemaining !== Infinity) {
+                            userLimitRemaining = Math.max(0, userLimitRemaining - parseInt(quantity));
+
+                            // Update hidden field
+                            $(".woo-limit-user-remaining").val(userLimitRemaining);
+
+                            if (userLimitRemaining <= 0) {
+                                $addToCartButton
+                                    .prop("disabled", true)
+                                    .addClass("disabled")
+                                    .addClass("woo-outofstock"); // Reuse outofstock class for simplicity in complete callback
+                                $limitedNumberInput
+                                    .prop("disabled", true)
+                                    .addClass("disabled")
+                                    .addClass("woo-outofstock");
+
+                                // Disable quantity input
+                                $form.find('input[name="quantity"]').prop("disabled", true);
+
+                                // Disable variation swatches
+                                $(".variations select").prop("disabled", true);
+                                $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+
+                                // Show error message
+                                var productName = $(".woo-limit-product-name").val() || "this product";
+
+                                window.IJWLP_Frontend_Common.showError(
+                                    "Max quantity for " + productName + " reached (" + userLimitVal + ")",
+                                    $errorDiv
+                                );
+                            }
+                        }
+
+                        // Update the hidden fields with new stock values
+                        $(".woo-limit-stock-quantity").val(
+                            stockQuantityRemaining
+                        );
+                        $(".woo-limit-variation-quantities").val(
+                            JSON.stringify(variationStockQuantities)
+                        );
+
                     } else {
                         window.IJWLP_Frontend_Common.showError(
                             response.data.message ||
@@ -643,19 +703,30 @@
                         $addToCartButton.text(originalText);
                     }
 
-                    $addToCartButton
-                        .prop("disabled", false)
-                        .removeAttr("disabled")
-                        .removeAttr("aria-disabled")
-                        .removeClass(
-                            "woo-limit-loading disabled wc-variation-selection-needed"
-                        );
+                    // Check if we are out of stock before re-enabling
+                    var isOutOfStock = $addToCartButton.hasClass("woo-outofstock");
 
-                    // Re-enable swatches and variations
-                    $(".variations select").prop("disabled", false);
-                    $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("disabled");
+                    if (!isOutOfStock) {
+                        $addToCartButton
+                            .prop("disabled", false)
+                            .removeAttr("disabled")
+                            .removeAttr("aria-disabled")
+                            .removeClass(
+                                "woo-limit-loading disabled wc-variation-selection-needed"
+                            );
 
-                    checkAddToCartState();
+                        // Re-enable swatches and variations
+                        $(".variations select").prop("disabled", false);
+                        $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("disabled");
+
+                        // Re-enable quantity input
+                        $form.find('input[name="quantity"]').prop("disabled", false);
+
+                        checkAddToCartState();
+                    } else {
+                        // Ensure loading class is removed even if out of stock
+                        $addToCartButton.removeClass("woo-limit-loading");
+                    }
                 },
             });
         }
