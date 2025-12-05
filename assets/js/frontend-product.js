@@ -43,6 +43,121 @@
             }
         }
 
+        // Helper function to get variation attribute values from variation ID
+        function getVariationAttributes(variationId) {
+            // Try to get from WooCommerce's variation form data
+            var $variationsForm = $form;
+            if ($variationsForm.length && $variationsForm.data('product_variations')) {
+                var variations = $variationsForm.data('product_variations');
+                for (var i = 0; i < variations.length; i++) {
+                    if (variations[i].variation_id == variationId) {
+                        return variations[i].attributes;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Helper function to disable only a specific variation swatch
+        function disableVariationSwatch(variationId) {
+            var attrs = getVariationAttributes(variationId);
+            if (!attrs) return;
+
+            // For each attribute in this variation, find and disable that specific swatch
+            $.each(attrs, function(attrName, attrValue) {
+                if (!attrValue) return; // Skip "any" values
+                
+                // Only disable if this is the ONLY variation using this attribute value
+                // and that variation is out of stock
+                var shouldDisable = isOnlyVariationForAttributeOutOfStock(attrName, attrValue, variationId);
+                if (!shouldDisable) return;
+
+                // Find the swatch with this value
+                // The swatch typically has data-value or data-term attribute matching the value
+                $('.rtwpvs-terms-wrapper .rtwpvs-term').each(function() {
+                    var $swatch = $(this);
+                    var swatchValue = $swatch.data('value') || $swatch.data('term') || $swatch.attr('data-value');
+                    
+                    if (swatchValue && String(swatchValue).toLowerCase() === String(attrValue).toLowerCase()) {
+                        $swatch.addClass('disabled out-of-stock');
+                    }
+                });
+
+                // Also disable the option in the native select dropdown
+                // The attribute name format is like "attribute_pa_size" or "attribute_pa_color"
+                var selectName = attrName.replace('attribute_', '');
+                $('.variations select').each(function() {
+                    var $select = $(this);
+                    var selectAttrName = $select.attr('name') || $select.attr('id') || $select.data('attribute_name');
+                    
+                    // Check if this select matches the attribute
+                    if (selectAttrName && (selectAttrName === attrName || selectAttrName === selectName || selectAttrName.indexOf(selectName) !== -1)) {
+                        // Find and disable the option with matching value
+                        $select.find('option').each(function() {
+                            var $option = $(this);
+                            var optionValue = $option.val();
+                            
+                            if (optionValue && String(optionValue).toLowerCase() === String(attrValue).toLowerCase()) {
+                                $option.remove();
+                            }
+                        });
+                    }
+                });
+            });
+        }
+
+        // Check if this attribute value is ONLY used by out-of-stock variations
+        function isOnlyVariationForAttributeOutOfStock(attrName, attrValue, currentVariationId) {
+            var $variationsForm = $form;
+            if (!$variationsForm.length || !$variationsForm.data('product_variations')) {
+                return true; // Fall back to disabling if we can't check
+            }
+            
+            var variations = $variationsForm.data('product_variations');
+            
+            // Find all variations that have this attribute value
+            for (var i = 0; i < variations.length; i++) {
+                var variation = variations[i];
+                var varAttrs = variation.attributes;
+                
+                // Check if this variation uses the same attribute value
+                if (varAttrs && varAttrs[attrName] && 
+                    (String(varAttrs[attrName]).toLowerCase() === String(attrValue).toLowerCase() || varAttrs[attrName] === '')) {
+                    
+                    // If this is a different variation that's still in stock, don't disable
+                    if (variation.variation_id != currentVariationId) {
+                        var varStock = variationStockQuantities[variation.variation_id];
+                        // If stock is null (infinite) or > 0, this attribute value is still usable
+                        if (varStock === null || varStock === undefined || varStock > 0) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            
+            return true; // All variations with this attribute value are out of stock
+        }
+
+        // Check if all variations are out of stock
+        function areAllVariationsOutOfStock() {
+            // If no variation stock data, assume not all are out of stock
+            if (!variationStockQuantities || Object.keys(variationStockQuantities).length === 0) {
+                return false;
+            }
+            
+            for (var varId in variationStockQuantities) {
+                if (variationStockQuantities.hasOwnProperty(varId)) {
+                    var stock = variationStockQuantities[varId];
+                    // null means infinite stock, or stock > 0 means in stock
+                    if (stock === null || stock > 0) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+        }
+
         // User limit remaining
         var userLimitVal = $(".woo-limit-user-remaining").val();
         var userLimitRemaining = userLimitVal === "" ? Infinity : parseInt(userLimitVal);
@@ -148,6 +263,42 @@
 
         // Check initial variation state
         checkVariationSelected();
+
+        // Function to initialize out-of-stock swatches on page load
+        function initializeOutOfStockSwatches() {
+            if (!isVariableProduct) return;
+
+            // First check: if user limit is already reached, disable all
+            if (userLimitRemaining <= 0) {
+                $(".variations select").prop("disabled", true);
+                $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+                return;
+            }
+
+            // Second check: if all variations are out of stock, disable all
+            if (areAllVariationsOutOfStock()) {
+                $(".variations select").prop("disabled", true);
+                $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+                return;
+            }
+
+            // Third check: disable specific out-of-stock variation swatches
+            // Loop through all variations and disable swatches for out-of-stock ones
+            for (var varId in variationStockQuantities) {
+                if (variationStockQuantities.hasOwnProperty(varId)) {
+                    var stock = variationStockQuantities[varId];
+                    // If stock is 0 or less (and not null which means infinite)
+                    if (stock !== null && stock <= 0) {
+                        disableVariationSwatch(varId);
+                    }
+                }
+            }
+        }
+
+        // Initialize out-of-stock swatches on page load (with small delay to ensure DOM is ready)
+        setTimeout(function() {
+            initializeOutOfStockSwatches();
+        }, 100);
 
         // MutationObserver to block YITH Wishlist and other plugins from re-adding disabled classes
         // This watches the button and strips 'disabled' and 'wc-variation-selection-needed' classes
@@ -580,9 +731,15 @@
                                     // Disable quantity input
                                     $form.find('input[name="quantity"]').prop("disabled", true);
 
-                                    // Disable variation swatches
-                                    $(".variations select").prop("disabled", true);
-                                    $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+                                    // Check if ALL variations are now out of stock
+                                    if (areAllVariationsOutOfStock()) {
+                                        // Disable all variation swatches
+                                        $(".variations select").prop("disabled", true);
+                                        $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+                                    } else {
+                                        // Only disable the specific variation swatch
+                                        disableVariationSwatch(variationId);
+                                    }
 
                                     // Show error message
                                     window.IJWLP_Frontend_Common.showError(
@@ -961,9 +1118,15 @@
                                         // Disable quantity input
                                         $form.find('input[name="quantity"]').prop("disabled", true);
 
-                                        // Disable variation swatches
-                                        $(".variations select").prop("disabled", true);
-                                        $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+                                        // Check if ALL variations are now out of stock
+                                        if (areAllVariationsOutOfStock()) {
+                                            // Disable all variation swatches
+                                            $(".variations select").prop("disabled", true);
+                                            $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+                                        } else {
+                                            // Only disable the specific variation swatch
+                                            disableVariationSwatch(variationId);
+                                        }
 
                                         // Show error message
                                         window.IJWLP_Frontend_Common.showError(
