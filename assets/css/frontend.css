@@ -830,6 +830,11 @@ body [name="update_cart"] {
     visibility: hidden;
 }
 
+.quantity {
+    pointer-events: none;
+    cursor: none;
+}
+
 .woo-limit-variation-error {
     color: #ff0000;
 }
