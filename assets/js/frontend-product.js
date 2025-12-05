@@ -208,6 +208,13 @@
             // Listen for WooCommerce variation events
 
             $form.on("found_variation", function (event, variation) {
+                // Clear any pending timer
+                var inputId = $limitedNumberInput.attr("id") || "default";
+                if (window.IJWLP_Frontend_Common && window.IJWLP_Frontend_Common.checkTimers && window.IJWLP_Frontend_Common.checkTimers[inputId]) {
+                    clearTimeout(window.IJWLP_Frontend_Common.checkTimers[inputId]);
+                    delete window.IJWLP_Frontend_Common.checkTimers[inputId];
+                }
+
                 variationSelected = true;
                 checkVariationSelected();
                 updateFieldStates();
@@ -224,7 +231,9 @@
                     .removeClass("woo-outofstock")
                     .removeClass("woo-limit-error")
                     .removeClass("woo-limit-available")
-                    .removeClass("woo-limit-error-highlight");
+                    .removeClass("woo-limit-error-highlight")
+                    .removeClass("woo-limit-loading");
+                $addToCartButton.removeClass("woo-limit-loading");
                 // Clear all messages when variation changes
                 window.IJWLP_Frontend_Common.hideError($errorDiv);
                 $errorDiv.hide();
@@ -250,12 +259,21 @@
 
             // Also listen to variation select changes directly
             $(".variations select").on("change", function () {
+                // Clear any pending timer
+                var inputId = $limitedNumberInput.attr("id") || "default";
+                if (window.IJWLP_Frontend_Common && window.IJWLP_Frontend_Common.checkTimers && window.IJWLP_Frontend_Common.checkTimers[inputId]) {
+                    clearTimeout(window.IJWLP_Frontend_Common.checkTimers[inputId]);
+                    delete window.IJWLP_Frontend_Common.checkTimers[inputId];
+                }
+
                 // Clear input field and messages immediately when variation changes
                 $limitedNumberInput
                     .val("")
                     .removeClass("woo-limit-error")
                     .removeClass("woo-limit-available")
-                    .removeClass("woo-limit-error-highlight");
+                    .removeClass("woo-limit-error-highlight")
+                    .removeClass("woo-limit-loading");
+                $addToCartButton.removeClass("woo-limit-loading");
                 window.IJWLP_Frontend_Common.hideError($errorDiv);
                 $errorDiv.hide();
                 $selectionErrorDiv.find(".woo-limit-variation-error").remove();
@@ -416,6 +434,10 @@
                 .addClass("woo-limit-loading");
             var originalText = $addToCartButton.text();
             $addToCartButton.text("Adding...");
+
+            // Disable swatches and variations to prevent changes during submission
+            $(".variations select").prop("disabled", true);
+            $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
 
             // AJAX request
             var wasSuccessful = false;
@@ -628,6 +650,11 @@
                         .removeClass(
                             "woo-limit-loading disabled wc-variation-selection-needed"
                         );
+
+                    // Re-enable swatches and variations
+                    $(".variations select").prop("disabled", false);
+                    $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("disabled");
+
                     checkAddToCartState();
                 },
             });
@@ -694,32 +721,19 @@
             // Limited product logic
             if (isLimitedProduct) {
 
-                if ($addToCartButton.hasClass("woo-limit-loading") || !$addToCartButton.hasClass("woo-limit-available")) {
-                    return false;
-                }
-
                 var value = $limitedNumberInput.val().trim();
                 if (value === "") {
+                    console.log('1212');
                     // Highlight error after variation is selected
                     $limitedNumberInput.addClass("woo-limit-error-highlight");
                     // Remove any previous error
-                    $errorDiv.find(".woo-limit-number-error").remove();
-                    // Insert error into message div and ensure it's visible
-                    var errorMsg =
-                        '<div class="woo-limit-number-error">Please enter a Limited Edition Number.</div>';
-                    $errorDiv.append(errorMsg);
-                    $errorDiv.css("display", "block");
+                    $('woo-number-range').addClass('woo-limit-error');
                     $limitedNumberInput.focus();
                     return false;
                 } else {
-                    $limitedNumberInput.removeClass(
-                        "woo-limit-error-highlight"
+                    $('woo-number-range').removeClass(
+                        "woo-limit-error"
                     );
-                    $errorDiv.find(".woo-limit-number-error").remove();
-                    // Hide message div if no errors
-                    if ($errorDiv.children().length === 0) {
-                        $errorDiv.css("display", "none");
-                    }
                 }
                 // Basic format validation
                 if (!window.IJWLP_Frontend_Common.validateNumberFormat(value)) {
@@ -729,6 +743,12 @@
                     );
                     return false;
                 }
+
+
+                if ($addToCartButton.hasClass("woo-limit-loading") || !$addToCartButton.hasClass("woo-limit-available")) {
+                    return false;
+                }
+
                 // Clear any pending timer
                 var inputId = $limitedNumberInput.attr("id") || "default";
                 if (window.IJWLP_Frontend_Common.checkTimers[inputId]) {
@@ -754,8 +774,10 @@
                         $addToCartButton
                             .addClass("woo-limit-checking")
                             .removeClass("woo-limit-available");
+                        $('.rtwpvs-terms-wrapper .rtwpvs-term').addClass('disabled');
                     },
                     onComplete: function (data) {
+                        $('.rtwpvs-terms-wrapper .rtwpvs-term').removeClass('disabled');
                         if (data.available) {
                             // Mark button as available (used as our gating mechanism)
                             $addToCartButton

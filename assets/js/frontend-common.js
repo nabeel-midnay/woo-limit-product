@@ -181,6 +181,11 @@
             var $button = options.$button;
             var $errorDiv = options.$errorDiv;
             var number = options.number;
+
+            if (!number && number !== 0 && number !== '0') {
+                return;
+            }
+
             var productId = options.productId;
             var variationId = options.variationId || 0;
             var cartItemKey = options.cartItemKey || "";
@@ -228,6 +233,12 @@
                     cart_item_key: cartItemKey,
                 },
                 success: function (response) {
+                    // Check if the input value has changed since the request was made
+                    // If so, ignore this response to prevent race conditions
+                    if ($input.val().trim() !== String(number).trim()) {
+                        return;
+                    }
+
                     // Remove loading state
                     $input
                         .removeClass("woo-limit-loading")
@@ -447,6 +458,11 @@
                     }
                 },
                 error: function (xhr, status, error) {
+                    // Check if the input value has changed since the request was made
+                    if ($input.val().trim() !== String(number).trim()) {
+                        return;
+                    }
+
                     // Remove loading state
                     $input
                         .removeClass("woo-limit-loading")
