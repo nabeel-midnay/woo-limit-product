@@ -679,7 +679,7 @@
                 }
             }
             var $range = $wrapper.find(".woo-number-range.woo-limit-error");
-            if ($range.length) return true;
+            if ($range.length && !ignoreTypeYourNumber) return true;
             // any inputs with validation class indicating error?
             var $invalidInputs = $wrapper.find(".woo-limit.woo-limit-error");
             if ($invalidInputs.length) {
