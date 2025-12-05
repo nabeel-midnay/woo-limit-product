@@ -166,6 +166,7 @@ class IJWLP_Frontend_Checkout
         }
 
         $cart_items = $cart->get_cart();
+        $total_items = $cart->get_cart_contents_count();
         $shipping_total = $cart->get_shipping_total();
         $total = $cart->get_total('raw');
         $coupons = $cart->get_coupons();
@@ -203,6 +204,10 @@ class IJWLP_Frontend_Checkout
                     </div>
 
                     <div class="order-summary-content">
+                        <div class="summary-line items-count">
+							<span class="label"><?php echo $total_items; ?> Item<?php echo $total_items > 1 ? 's' : ''; ?></span>
+							<span class="value">Total: <?php echo wc_price($total); ?></span>
+						</div>
                         <?php foreach ($cart_items as $ci_key => $ci_item) :
                             $product = isset($ci_item['data']) ? $ci_item['data'] : null;
                             if (! is_object($product)) {
@@ -245,7 +250,7 @@ class IJWLP_Frontend_Checkout
 
                                     <?php if (! empty($numbers)) : ?>
                                         <div class="limited-edition-display">
-                                            <span class="limited-edition-label"><?php echo esc_html__('Limited Edition Numbers', 'woo-limit-product'); ?></span>
+                                            <span class="limited-edition-label"><?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?></span>
                                             <div class="limited-number-list">
                                                 <?php foreach ($numbers as $num) : ?>
                                                     <span class="limited-number"><?php echo esc_html((string) $num); ?></span>
