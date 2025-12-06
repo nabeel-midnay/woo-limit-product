@@ -49,6 +49,7 @@ class IJWLP_Frontend_Common
         $this->_version = $version;
         $this->_file = $file;
         $this->assets_url = esc_url(trailingslashit(plugins_url('/assets/', $this->_file)));
+		$this->assets_path = IJWLP_PATH . '/assets/';
 
         // Enqueue scripts and styles
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
@@ -128,14 +129,16 @@ class IJWLP_Frontend_Common
             $this->_version,
             true
         );
-
-
+		
+		$common_js      = $this->assets_url . 'js/frontend-common.js';
+		$common_js_path = $this->assets_path . 'js/frontend-common.js';
+		
         // Enqueue common script first
         wp_enqueue_script(
             'ijwlp-frontend-common',
-            $this->assets_url . 'js/frontend-common.js',
+            $common_js,
             array('jquery'),
-            $this->_version,
+            filemtime($common_js_path),
             true
         );
 
@@ -151,11 +154,14 @@ class IJWLP_Frontend_Common
   
         // Product page specific script
         if (is_product()) {
+			$product_js      = $this->assets_url . 'js/frontend-product.js';
+			$product_js_path = $this->assets_path . 'js/frontend-product.js';
+			
             wp_enqueue_script(
                 'ijwlp-frontend-product',
-                $this->assets_url . 'js/frontend-product.js',
+                $product_js,
                 array('jquery', 'ijwlp-frontend-common'),
-                $this->_version,
+                filemtime($product_js_path),
                 true
             );
 
@@ -166,31 +172,39 @@ class IJWLP_Frontend_Common
 
         // Cart page specific script
         if (is_cart()) {
+			$cart_js      = $this->assets_url . 'js/frontend-cart.js';
+			$cart_js_path = $this->assets_path . 'js/frontend-cart.js';
+			
             wp_enqueue_script(
                 'ijwlp-frontend-cart',
-                $this->assets_url . 'js/frontend-cart.js',
+                $cart_js,
                 array('jquery', 'ijwlp-frontend-common'),
-                $this->_version,
+                filemtime($cart_js_path),
                 true
             );
         }
 
         // Checkout page specific script
         if (is_checkout()) {
+			$checkout_js      = $this->assets_url . 'js/frontend-checkout.js';
+			$checkout_js_path = $this->assets_path . 'js/frontend-checkout.js';
+			
             wp_enqueue_script(
                 'ijwlp-frontend-checkout',
-                $this->assets_url . 'js/frontend-checkout.js',
+                $checkout_js,
                 array('jquery', 'ijwlp-frontend-common'),
-                $this->_version,
+                filemtime($checkout_js_path),
                 true
             );
         }else{
         // Enqueue timer script
+        	$timer_js      = $this->assets_url . 'js/frontend-timer.js';
+			$timer_js_path = $this->assets_path . 'js/frontend-timer.js';
             wp_enqueue_script(
                 'ijwlp-frontend-timer',
-                $this->assets_url . 'js/frontend-timer.js',
+                $timer_js,
                 array('jquery'),
-                $this->_version,
+                filemtime($timer_js_path),
                 true
             );
         }
@@ -203,11 +217,14 @@ class IJWLP_Frontend_Common
     public function enqueue_styles()
     {
 
+		$frontend      = $this->assets_url . 'css/frontend.css';
+		$frontend_path = $this->assets_path . 'css/frontend.css';
+		
         wp_enqueue_style(
             'ijwlp-frontend-style',
-            $this->assets_url . 'css/frontend.css',
+            $frontend,
             array(),
-            $this->_version
+            $frontend_path
         );
 
         // Enqueue timer styles
