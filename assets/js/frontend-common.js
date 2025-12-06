@@ -29,6 +29,88 @@
         },
 
         /**
+         * Helper: Disable other limited inputs in the same wrapper
+         * @param {jQuery} $input - Current input
+         */
+        _disableOtherInputs: function ($input) {
+            var $wrapper = $input.closest(".woo-limit-field-wrapper");
+            if ($wrapper && $wrapper.length) {
+                $wrapper.find(".woo-limit").not($input).prop("disabled", true);
+            }
+        },
+
+        /**
+         * Helper: Enable other limited inputs in the same wrapper
+         * @param {jQuery} $input - Current input
+         */
+        _enableOtherInputs: function ($input) {
+            var $wrapper = $input.closest(".woo-limit-field-wrapper");
+            if ($wrapper && $wrapper.length) {
+                $wrapper.find(".woo-limit").not($input).prop("disabled", false);
+            }
+        },
+
+        /**
+         * Helper: Disable all cart action buttons
+         */
+        _disableCartActions: function () {
+            $(".woo-coupon-btn").prop("disabled", true);
+            $(".wc-forward").addClass("disabled").prop("disabled", true);
+            $(".wc-forward").on("click.woo-limit", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            });
+        },
+
+        /**
+         * Helper: Set input and button to error state
+         * @param {jQuery} $input - Input element
+         * @param {jQuery} $button - Button element (optional)
+         */
+        _setInputErrorState: function ($input, $button) {
+            $input
+                .addClass("woo-limit-error")
+                .removeClass("woo-limit-available")
+                .val("");
+            if ($button && $button.length) {
+                $button.prop("disabled", true).addClass("disabled");
+            }
+        },
+
+        /**
+         * Helper: Clear check timer for an input
+         * @param {string} inputId - Input identifier
+         */
+        _clearCheckTimer: function (inputId) {
+            if (this.checkTimers[inputId]) {
+                clearTimeout(this.checkTimers[inputId]);
+                delete this.checkTimers[inputId];
+            }
+        },
+
+        /**
+         * Helper: Build check options object for checkNumberAvailability
+         * @param {object} baseOptions - Base options with callbacks
+         * @param {string} value - Number value to check
+         * @returns {object} - Complete options object
+         */
+        _buildCheckOptions: function (baseOptions, value) {
+            return {
+                number: value,
+                productId: baseOptions.getProductId(),
+                variationId: baseOptions.getVariationId ? baseOptions.getVariationId() : 0,
+                cartItemKey: baseOptions.getCartItemKey ? baseOptions.getCartItemKey() : "",
+                $input: baseOptions.$input,
+                $button: baseOptions.$button,
+                $errorDiv: baseOptions.$errorDiv,
+                onStart: baseOptions.onStart,
+                onEnd: baseOptions.onEnd,
+                onComplete: baseOptions.onComplete,
+            };
+        },
+
+        /**
          * Handle out-of-stock state: show message, disable button, add class
          * @param {boolean} isVariation - true if variation, false if product
          * @param {jQuery} $button - Button to disable
@@ -316,15 +398,7 @@
                             }
 
                             // Re-enable all other limited inputs in the same wrapper on cart page
-                            var $wrapper = $input.closest(
-                                ".woo-limit-field-wrapper"
-                            );
-                            if ($wrapper && $wrapper.length) {
-                                $wrapper
-                                    .find(".woo-limit")
-                                    .not($input)
-                                    .prop("disabled", false);
-                            }
+                            self._enableOtherInputs($input);
 
                             // Re-enable cart action buttons if no other errors exist
                             self.updateCartActionButtons();
@@ -379,41 +453,9 @@
 
                                 self.showError(friendly, $errorDiv, 5000);
 
-                                $input
-                                    .addClass("woo-limit-error")
-                                    .removeClass("woo-limit-available")
-                                    .val(''); // Clear input on error
-
-                                if ($button && $button.length) {
-                                    $button
-                                        .prop("disabled", true)
-                                        .addClass("disabled");
-                                }
-
-                                // Disable all other limited inputs in the same wrapper on cart page
-                                var $wrapper2 = $input.closest(
-                                    ".woo-limit-field-wrapper"
-                                );
-                                if ($wrapper2 && $wrapper2.length) {
-                                    $wrapper2
-                                        .find(".woo-limit")
-                                        .not($input)
-                                        .prop("disabled", true);
-                                }
-
-                                // Disable all cart action buttons when error occurs
-                                $(".woo-coupon-btn").prop("disabled", true);
-                                $(".wc-forward")
-                                    .addClass("disabled")
-                                    .prop("disabled", true);
-                                $(".wc-forward").on(
-                                    "click.woo-limit",
-                                    function (e) {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        return false;
-                                    }
-                                );
+                                self._setInputErrorState($input, $button);
+                                self._disableOtherInputs($input);
+                                self._disableCartActions();
 
                                 data.available = false;
                             } else {
@@ -424,41 +466,9 @@
                                 if (!silent) {
                                     self.showError(msg, $errorDiv, 5000);
                                 }
-                                $input
-                                    .addClass("woo-limit-error")
-                                    .removeClass("woo-limit-available")
-                                    .val(''); // Clear input on error
-
-                                if ($button && $button.length) {
-                                    $button
-                                        .prop("disabled", true)
-                                        .addClass("disabled");
-                                }
-
-                                // Disable all other limited inputs in the same wrapper on cart page
-                                var $wrapper = $input.closest(
-                                    ".woo-limit-field-wrapper"
-                                );
-                                if ($wrapper && $wrapper.length) {
-                                    $wrapper
-                                        .find(".woo-limit")
-                                        .not($input)
-                                        .prop("disabled", true);
-                                }
-
-                                // Disable all cart action buttons when error occurs
-                                $(".woo-coupon-btn").prop("disabled", true);
-                                $(".wc-forward")
-                                    .addClass("disabled")
-                                    .prop("disabled", true);
-                                $(".wc-forward").on(
-                                    "click.woo-limit",
-                                    function (e) {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        return false;
-                                    }
-                                );
+                                self._setInputErrorState($input, $button);
+                                self._disableOtherInputs($input);
+                                self._disableCartActions();
 
                                 data.available = false;
                             }
@@ -489,10 +499,7 @@
                                 .prop("disabled", false)
                                 .addClass("disabled");
                         }
-                        $input
-                            .removeClass("woo-limit-available")
-                            .addClass("woo-limit-error")
-                            .val(''); // Clear input on error
+                        self._setInputErrorState($input, $button);
                     }
                 },
                 error: function (xhr, status, error) {
@@ -616,13 +623,7 @@
                     $input.data("cleared-error", true);
 
                     // Re-enable all other limited inputs in the same wrapper when current input is edited
-                    var $wrapper = $input.closest(".woo-limit-field-wrapper");
-                    if ($wrapper && $wrapper.length) {
-                        $wrapper
-                            .find(".woo-limit")
-                            .not($input)
-                            .prop("disabled", false);
-                    }
+                    self._enableOtherInputs($input);
 
                     // Restore cart action buttons state and remove any click block on .wc-forward
                     self.updateCartActionButtons();
@@ -642,20 +643,11 @@
                         $button.prop("disabled", true).addClass("disabled");
                     }
                     // Re-enable all other limited inputs in the same wrapper when current input is cleared
-                    var $wrapper = $input.closest(".woo-limit-field-wrapper");
-                    if ($wrapper && $wrapper.length) {
-                        $wrapper
-                            .find(".woo-limit")
-                            .not($input)
-                            .prop("disabled", false);
-                    }
+                    self._enableOtherInputs($input);
                     // Update cart action buttons state
                     self.updateCartActionButtons();
                     // Clear any pending check
-                    if (self.checkTimers[inputId]) {
-                        clearTimeout(self.checkTimers[inputId]);
-                        delete self.checkTimers[inputId];
-                    }
+                    self._clearCheckTimer(inputId);
                     // Hide the autocomplete box when input is cleared
                     var ac = $input.data("autocomplete");
                     if (ac) {
@@ -701,27 +693,9 @@
                     }
 
                     // Clear any pending timer
-                    if (self.checkTimers[inputId]) {
-                        clearTimeout(self.checkTimers[inputId]);
-                        delete self.checkTimers[inputId];
-                    }
+                    self._clearCheckTimer(inputId);
                     // Check immediately
-                    self.checkNumberAvailability({
-                        number: value,
-                        productId: options.getProductId(),
-                        variationId: options.getVariationId
-                            ? options.getVariationId()
-                            : 0,
-                        cartItemKey: options.getCartItemKey
-                            ? options.getCartItemKey()
-                            : "",
-                        $input: $input,
-                        $button: $button,
-                        $errorDiv: $errorDiv,
-                        onStart: options.onStart,
-                        onEnd: options.onEnd,
-                        onComplete: options.onComplete,
-                    });
+                    self.checkNumberAvailability(self._buildCheckOptions(options, value));
                 }
             });
 
@@ -739,10 +713,7 @@
                 if ($input.data("cleared-error")) {
                     $input.removeData("cleared-error");
                     // Clear any existing timer so we start fresh
-                    if (self.checkTimers[inputId]) {
-                        clearTimeout(self.checkTimers[inputId]);
-                        delete self.checkTimers[inputId];
-                    }
+                    self._clearCheckTimer(inputId);
                     // Don't return - let the code below schedule the timeout check
                 }
 
@@ -753,10 +724,7 @@
                     String(value) === String(oldVal2)
                 ) {
                     // Clear any pending timer and bail out
-                    if (self.checkTimers[inputId]) {
-                        clearTimeout(self.checkTimers[inputId]);
-                        delete self.checkTimers[inputId];
-                    }
+                    self._clearCheckTimer(inputId);
                     return;
                 }
 
@@ -784,22 +752,7 @@
 
                 // Set new timer
                 self.checkTimers[inputId] = setTimeout(function () {
-                    self.checkNumberAvailability({
-                        number: value,
-                        productId: options.getProductId(),
-                        variationId: options.getVariationId
-                            ? options.getVariationId()
-                            : 0,
-                        cartItemKey: options.getCartItemKey
-                            ? options.getCartItemKey()
-                            : "",
-                        $input: $input,
-                        $button: $button,
-                        $errorDiv: $errorDiv,
-                        onStart: options.onStart,
-                        onEnd: options.onEnd,
-                        onComplete: options.onComplete,
-                    });
+                    self.checkNumberAvailability(self._buildCheckOptions(options, value));
                     delete self.checkTimers[inputId];
                 }, delay);
             });
