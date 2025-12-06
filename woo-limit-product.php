@@ -14,12 +14,13 @@
 if (!defined('ABSPATH'))
     exit;
 
-define('IJWLP_TOKEN', 'ijwlp');
-define('IJWLP_VERSION', '3.0.2');
-define('IJWLP_FILE', __FILE__);
-define('IJWLP_PLUGIN_NAME', 'Woo Limited Products');
-define('IJWLP_PRODUCTS_TRANSIENT_KEY', 'ijwlp_key');
-define('IJWLP_WPV', get_bloginfo('version'));
+define( 'IJWLP_TOKEN', 'ijwlp');
+define( 'IJWLP_VERSION', '3.0.2');
+define( 'IJWLP_FILE', __FILE__);
+define( 'IJWLP_PATH', __DIR__ );
+define( 'IJWLP_PLUGIN_NAME', 'Woo Limited Products');
+define( 'IJWLP_PRODUCTS_TRANSIENT_KEY', 'ijwlp_key');
+define( 'IJWLP_WPV', get_bloginfo('version'));
 
 if (!class_exists('Link_List_Table')) {
     require_once(ABSPATH . 'wp-admin/includes/class-wp-list-table.php');
