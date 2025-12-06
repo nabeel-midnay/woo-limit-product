@@ -891,11 +891,22 @@ class IJWLP_Options
 			$user_identifier = self::get_user_identifier();
 			
 			// Gather all existing numbers (blocked) and count them
-			$rows = $wpdb->get_col($wpdb->prepare(
-				"SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
-				$parent_product_id,
-				$user_identifier
-			));
+			// If cart_item_key is provided (editing from cart page), exclude that cart item's numbers
+			// to avoid false "max reached" when user is just changing their existing number
+			if (!empty($cart_item_key)) {
+				$rows = $wpdb->get_col($wpdb->prepare(
+					"SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s AND cart_key != %s",
+					$parent_product_id,
+					$user_identifier,
+					$cart_item_key
+				));
+			} else {
+				$rows = $wpdb->get_col($wpdb->prepare(
+					"SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
+					$parent_product_id,
+					$user_identifier
+				));
+			}
 			$all_numbers = array();
 			if ($rows) {
 				foreach ($rows as $r) {
