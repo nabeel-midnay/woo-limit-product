@@ -33,34 +33,46 @@ class IJWLP_Frontend_Product
     }
 
     /**
-     * Add limited edition number input field
+     * Output hidden fields for stock and limit tracking
+     * 
+     * @param int|null $stock_quantity Stock quantity for simple products
+     * @param string $variation_quantities_json JSON-encoded variation stock quantities
+     * @param string|int|null $max_limit Maximum quantity limit per user
+     * @param string $product_name Product name
      */
-    public function add_limited_edition_number_field()
+    private function output_hidden_fields($stock_quantity, $variation_quantities_json, $max_limit, $product_name)
     {
-        global $product;
-
-        if (!$product) {
-            return;
-        }
-
-        $pro_id = $product->get_id();
-        $is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
-
-        if ($is_limited == 'yes') {
-            $limitedNosAvailableCount = limitedNosAvailableCount($pro_id);
-            if ($limitedNosAvailableCount == 0) {
-                echo '<div class="soldout_wrapper"><span class="soldout-label">' . esc_html__('Sold Out', 'sarcom') . '</span></div>';
-                return;
-            }
-        }
-
-
         ?>
-        <div class="woo-limit-selection-message <?php echo esc_attr($is_limited); ?>" style="display:none"></div>
+        <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity"
+            value="<?php echo esc_attr($stock_quantity); ?>" />
+        <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities"
+            value="<?php echo esc_attr($variation_quantities_json); ?>" />
+        <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining"
+            value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
+        <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name"
+            value="<?php echo esc_attr($product_name); ?>" />
         <?php
-        // Get stock quantities for variations (if product is variable)
+    }
+
+    /**
+     * Calculate stock quantities and cart deductions
+     * 
+     * @param WC_Product $product The product object
+     * @param int $pro_id Product ID
+     * @return array Array with 'stock_quantity', 'variation_quantities', 'cart_quantity_for_product'
+     */
+    private function calculate_stock_and_cart_quantities($product, $pro_id)
+    {
         $variation_quantities = [];
-        $stock_quantity = '';
+        $stock_quantity = null;
+        $cart_quantity_for_product = 0;
+
+        // Get stock quantity for the main product (simple products)
+        if (!$product->is_type('variable') && $product->get_manage_stock() && $product->get_backorders() === 'no') {
+            $stock_quantity = intval($product->get_stock_quantity());
+        }
+
+        // Get stock quantities for variations (if product is variable)
         if ($product->is_type('variable')) {
             foreach ($product->get_children() as $variation_id) {
                 $variation = wc_get_product($variation_id);
@@ -87,52 +99,95 @@ class IJWLP_Frontend_Product
                         $cart_variation_product = wc_get_product($cart_variation_id);
                         $parent_id = $cart_variation_product ? intval($cart_variation_product->get_parent_id()) : 0;
                         if ($parent_id === $pro_id) {
+                            $cart_quantity_for_product += $cart_qty;
                             if (isset($variation_quantities[$cart_variation_id]) && $variation_quantities[$cart_variation_id] !== null) {
                                 $variation_quantities[$cart_variation_id] = max(0, $variation_quantities[$cart_variation_id] - $cart_qty);
                             }
                         }
-                    } else {
-                        // In rare cases a parent product might be added directly; reduce parent stock
-                        if ($cart_product_id === $pro_id && $stock_quantity !== null) {
-                            $stock_quantity = max(0, intval($stock_quantity) - $cart_qty);
-                        }
                     }
                 } else {
                     // Simple (non-variable) product: reduce stock when product matches
-                    if ($cart_product_id === $pro_id && $stock_quantity !== null) {
-                        $stock_quantity = max(0, intval($stock_quantity) - $cart_qty);
+                    if ($cart_product_id === $pro_id) {
+                        $cart_quantity_for_product += $cart_qty;
+                        if ($stock_quantity !== null) {
+                            $stock_quantity = max(0, $stock_quantity - $cart_qty);
+                        }
                     }
                 }
             }
         }
 
+        return [
+            'stock_quantity' => $stock_quantity,
+            'variation_quantities' => $variation_quantities,
+            'cart_quantity_for_product' => $cart_quantity_for_product,
+        ];
+    }
 
-        // Prepare variation quantities in a JSON format for hidden field
-        $variation_quantities_json = !empty($variation_quantities) ? wp_json_encode($variation_quantities) : '[]';
-
-
-        // Get max quantity limit per user
-        $max_limit = get_post_meta($pro_id, '_woo_limit_max_quantity', true);
-
-
-        // Get stock quantity for the main product
-        $stock_quantity = null;
-        if ($product->get_manage_stock() && $product->get_backorders() === 'no') {
-            $stock_quantity = $product->get_stock_quantity();
+    /**
+     * Calculate effective max limit considering user limit and cart contents
+     * 
+     * @param int|string|null $max_limit Maximum quantity limit from product meta
+     * @param int $cart_quantity_for_product Quantity already in cart for this product
+     * @return int|null Effective remaining limit, or null if unlimited
+     */
+    private function calculate_effective_max_limit($max_limit, $cart_quantity_for_product)
+    {
+        if ($max_limit === '' || $max_limit === null) {
+            return null; // No limit set
         }
+
+        $max_limit = intval($max_limit);
+        $remaining = max(0, $max_limit - $cart_quantity_for_product);
+        return $remaining;
+    }
+
+    /**
+     * Add limited edition number input field
+     */
+    public function add_limited_edition_number_field()
+    {
+        global $product;
+
+        if (!$product) {
+            return;
+        }
+
+        $pro_id = $product->get_id();
+        $is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
+
+        // Get max quantity limit per user from product meta
+        $max_limit_setting = get_post_meta($pro_id, '_woo_limit_max_quantity', true);
+
+        if ($is_limited == 'yes') {
+            $limitedNosAvailableCount = limitedNosAvailableCount($pro_id);
+            if ($limitedNosAvailableCount == 0) {
+                echo '<div class="soldout_wrapper"><span class="soldout-label">' . esc_html__('Sold Out', 'sarcom') . '</span></div>';
+                return;
+            }
+        }
+
+        ?>
+        <div class="woo-limit-selection-message <?php echo esc_attr($is_limited); ?>" style="display:none"></div>
+        <?php
+
+        // Calculate stock quantities and cart deductions
+        $stock_data = $this->calculate_stock_and_cart_quantities($product, $pro_id);
+        $stock_quantity = $stock_data['stock_quantity'];
+        $variation_quantities = $stock_data['variation_quantities'];
+        $cart_quantity_for_product = $stock_data['cart_quantity_for_product'];
+
+        // Calculate effective max limit (user limit minus what's in cart)
+        $effective_max_limit = $this->calculate_effective_max_limit($max_limit_setting, $cart_quantity_for_product);
+
+        // Prepare variation quantities in JSON format for hidden field
+        $variation_quantities_json = !empty($variation_quantities) ? wp_json_encode($variation_quantities) : '[]';
 
         if ($is_limited !== 'yes') {
             ?>
             <div class="unlimited-produt-wrap">
                 <div class="woo-limit-message" style="display: none;"></div>
-                <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity"
-                    value="<?php echo esc_attr($stock_quantity); ?>" />
-                <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities"
-                    value="<?php echo esc_attr($variation_quantities_json); ?>" />
-                <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining"
-                    value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
-                <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name"
-                    value="<?php echo esc_attr($product->get_name()); ?>" />
+                <?php $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $product->get_name()); ?>
             </div>
             <?php
             return;
@@ -162,14 +217,7 @@ class IJWLP_Frontend_Product
                 <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
             </span>
 
-            <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity"
-                value="<?php echo esc_attr($stock_quantity); ?>" />
-            <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities"
-                value="<?php echo esc_attr($variation_quantities_json); ?>" />
-            <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining"
-                value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
-            <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name"
-                value="<?php echo esc_attr($product->get_name()); ?>" />
+            <?php $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $product->get_name()); ?>
 
             <div class="woo-limit-input-group">
                 <input type="number" id="woo-limit" name="woo-limit" class="woo-limit" value=""
