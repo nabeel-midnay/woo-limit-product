@@ -1035,6 +1035,7 @@
                     .addClass("woo-limit-loading");
                 var originalText = $addToCartButton.text();
                 $addToCartButton.text("Adding...");
+			
 
                 var wasSuccessful = false;
                 $.ajax({
@@ -1060,7 +1061,7 @@
                             }
 
                             $addToCartButton.text("Added");
-
+							
                             setTimeout(function () {
                                 $addToCartButton.text(originalText);
                             }, 2000);
