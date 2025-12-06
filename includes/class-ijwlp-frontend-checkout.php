@@ -172,7 +172,7 @@ class IJWLP_Frontend_Checkout
         $coupons = $cart->get_coupons();
 
         if (!empty($coupons)) {
-            $coupon_discount = $cart_items->get_discount_total();
+            $coupon_discount = $cart->get_discount_total();
         }
 ?>
         <div class="checkout-order-summary-container">
