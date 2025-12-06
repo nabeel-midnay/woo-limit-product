@@ -49,7 +49,7 @@ class IJWLP_Frontend_Common
         $this->_version = $version;
         $this->_file = $file;
         $this->assets_url = esc_url(trailingslashit(plugins_url('/assets/', $this->_file)));
-		$this->assets_path = IJWLP_PATH . '/assets/';
+        $this->assets_path = IJWLP_PATH . '/assets/';
 
         // Enqueue scripts and styles
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
@@ -62,6 +62,9 @@ class IJWLP_Frontend_Common
 
         // Add backorder help icon
         add_filter('woocommerce_get_stock_html', array($this, 'add_backorder_help_icon'), 10, 2);
+
+        // Add stock status classes to product list items in shop loop
+        add_filter('post_class', array($this, 'woo_add_stock_status_post_class'), 20, 3);
     }
 
     /**
@@ -129,10 +132,10 @@ class IJWLP_Frontend_Common
             $this->_version,
             true
         );
-		
-		$common_js      = $this->assets_url . 'js/frontend-common.js';
-		$common_js_path = $this->assets_path . 'js/frontend-common.js';
-		
+
+        $common_js = $this->assets_url . 'js/frontend-common.js';
+        $common_js_path = $this->assets_path . 'js/frontend-common.js';
+
         // Enqueue common script first
         wp_enqueue_script(
             'ijwlp-frontend-common',
@@ -151,12 +154,12 @@ class IJWLP_Frontend_Common
         // Localize script data to common script
         wp_localize_script('ijwlp-frontend-common', 'ijwlp_frontend', $ajax_data);
 
-  
+
         // Product page specific script
         if (is_product()) {
-			$product_js      = $this->assets_url . 'js/frontend-product.js';
-			$product_js_path = $this->assets_path . 'js/frontend-product.js';
-			
+            $product_js = $this->assets_url . 'js/frontend-product.js';
+            $product_js_path = $this->assets_path . 'js/frontend-product.js';
+
             wp_enqueue_script(
                 'ijwlp-frontend-product',
                 $product_js,
@@ -172,9 +175,9 @@ class IJWLP_Frontend_Common
 
         // Cart page specific script
         if (is_cart()) {
-			$cart_js      = $this->assets_url . 'js/frontend-cart.js';
-			$cart_js_path = $this->assets_path . 'js/frontend-cart.js';
-			
+            $cart_js = $this->assets_url . 'js/frontend-cart.js';
+            $cart_js_path = $this->assets_path . 'js/frontend-cart.js';
+
             wp_enqueue_script(
                 'ijwlp-frontend-cart',
                 $cart_js,
@@ -186,9 +189,9 @@ class IJWLP_Frontend_Common
 
         // Checkout page specific script
         if (is_checkout()) {
-			$checkout_js      = $this->assets_url . 'js/frontend-checkout.js';
-			$checkout_js_path = $this->assets_path . 'js/frontend-checkout.js';
-			
+            $checkout_js = $this->assets_url . 'js/frontend-checkout.js';
+            $checkout_js_path = $this->assets_path . 'js/frontend-checkout.js';
+
             wp_enqueue_script(
                 'ijwlp-frontend-checkout',
                 $checkout_js,
@@ -196,10 +199,10 @@ class IJWLP_Frontend_Common
                 filemtime($checkout_js_path),
                 true
             );
-        }else{
-        // Enqueue timer script
-        	$timer_js      = $this->assets_url . 'js/frontend-timer.js';
-			$timer_js_path = $this->assets_path . 'js/frontend-timer.js';
+        } else {
+            // Enqueue timer script
+            $timer_js = $this->assets_url . 'js/frontend-timer.js';
+            $timer_js_path = $this->assets_path . 'js/frontend-timer.js';
             wp_enqueue_script(
                 'ijwlp-frontend-timer',
                 $timer_js,
@@ -217,9 +220,9 @@ class IJWLP_Frontend_Common
     public function enqueue_styles()
     {
 
-		$frontend      = $this->assets_url . 'css/frontend.css';
-		$frontend_path = $this->assets_path . 'css/frontend.css';
-		
+        $frontend = $this->assets_url . 'css/frontend.css';
+        $frontend_path = $this->assets_path . 'css/frontend.css';
+
         wp_enqueue_style(
             'ijwlp-frontend-style',
             $frontend,
@@ -310,4 +313,39 @@ class IJWLP_Frontend_Common
 
         return $html;
     }
+
+    /**
+     * Add stock status classes to product <li> elements in shop/catalog loops.
+     * - Adds 'product-soldout' when limited numbers are enabled and none are available
+     * - Adds 'product-outofstock' when WooCommerce product stock is out
+     */
+    public function woo_add_stock_status_post_class($classes, $class, $post_id)
+    {
+        // Only target products in loops
+        if (get_post_type($post_id) !== 'product') {
+            return $classes;
+        }
+
+        $product = wc_get_product($post_id);
+        if (!$product) {
+            return $classes;
+        }
+
+        // Limited edition sold-out (custom logic in this plugin)
+        $status = get_post_meta($post_id, '_woo_limit_status', true);
+        if ($status === 'yes') {
+            $limitedNosAvailableCount = function_exists('limitedNosAvailableCount') ? limitedNosAvailableCount($post_id) : null;
+            if ($limitedNosAvailableCount !== null && (int) $limitedNosAvailableCount === 0) {
+                $classes[] = 'product-soldout';
+            }
+        }
+
+        // Standard WooCommerce out-of-stock
+        if (!$product->is_in_stock()) {
+            $classes[] = 'product-outofstock';
+        }
+
+        return array_values(array_unique($classes));
+    }
+
 }
