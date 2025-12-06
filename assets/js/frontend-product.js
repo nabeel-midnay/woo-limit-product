@@ -430,7 +430,7 @@
          */
         function updateUserLimitAfterPurchase(quantity) {
             if (userLimitRemaining === Infinity) return false;
-
+			
             userLimitRemaining = Math.max(0, userLimitRemaining - quantity);
             $(".woo-limit-user-remaining").val(userLimitRemaining);
 
