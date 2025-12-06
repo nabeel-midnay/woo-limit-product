@@ -426,23 +426,22 @@ class IJWLP_Frontend_Cart
             $table = $table_prefix . 'woo_limit';
 
             $user_numbers = array();
-            $user_id = get_current_user_id();
+            // Get user identifier (works for both logged-in users and guests via IP)
+            $user_identifier = IJWLP_Options::get_user_identifier();
 
-            // Numbers blocked for this user_id
-            if ($user_id > 0) {
-                $user_rows = $wpdb->get_col($wpdb->prepare(
-                    "SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
-                    $parent_product_id,
-                    $user_id
-                ));
-                if ($user_rows) {
-                    foreach ($user_rows as $r) {
-                        $r = trim($r);
-                        if ($r === '')
-                            continue;
-                        $parts = array_map('trim', explode(',', $r));
-                        $user_numbers = array_merge($user_numbers, $parts);
-                    }
+            // Numbers blocked for this user
+            $user_rows = $wpdb->get_col($wpdb->prepare(
+                "SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
+                $parent_product_id,
+                $user_identifier
+            ));
+            if ($user_rows) {
+                foreach ($user_rows as $r) {
+                    $r = trim($r);
+                    if ($r === '')
+                        continue;
+                    $parts = array_map('trim', explode(',', $r));
+                    $user_numbers = array_merge($user_numbers, $parts);
                 }
             }
 
@@ -557,10 +556,10 @@ class IJWLP_Frontend_Cart
         $old_numbers = is_array($old_numbers) ? $old_numbers : (!empty($old_numbers) ? array($old_numbers) : array());
         $new_numbers = is_array($new_numbers) ? $new_numbers : array($new_numbers);
 
-        // Get product type and user ID
+        // Get product type and user identifier
         $product = wc_get_product($actual_pro_id);
         $product_type = $product ? $product->get_type() : 'simple';
-        $user_id = get_current_user_id();
+        $user_id = IJWLP_Options::get_user_identifier();
 
         // Store new numbers as comma-separated string
         $limit_no_string = implode(',', $new_numbers);
@@ -711,11 +710,8 @@ class IJWLP_Frontend_Cart
         global $wpdb, $table_prefix;
         $table = $table_prefix . 'woo_limit';
 
-        // Get current user ID
-        $user_id = get_current_user_id();
-        if (!$user_id) {
-            $user_id = 0; // Guest user
-        }
+        // Get user identifier (user ID for logged-in, IP-based for guests)
+        $user_id = IJWLP_Options::get_user_identifier();
 
         // Get product type
         $product_type = $product ? $product->get_type() : 'simple';

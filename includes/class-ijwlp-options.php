@@ -84,6 +84,74 @@ class IJWLP_Options
 	}
 
 	/**
+	 * Get unique user identifier for limit tracking
+	 * 
+	 * For logged-in users: returns WordPress user ID
+	 * For guests: returns a unique identifier based on IP address
+	 * 
+	 * This ensures each guest user has their own limit tracking instead of 
+	 * all guests sharing user ID 0.
+	 * 
+	 * @return string User identifier (user ID or IP-based hash for guests)
+	 */
+	public static function get_user_identifier()
+	{
+		$user_id = get_current_user_id();
+		
+		if ($user_id > 0) {
+			// Logged-in user - use their WordPress user ID
+			return (string) $user_id;
+		}
+		
+		// Guest user - use IP address as identifier
+		$ip = self::get_client_ip();
+		
+		// Create a consistent identifier from IP
+		// Using 'guest_' prefix to distinguish from user IDs
+		return 'guest_' . md5($ip . 'woo_limit_salt');
+	}
+
+	/**
+	 * Get client IP address
+	 * 
+	 * Checks various server variables to get the real client IP,
+	 * accounting for proxies and load balancers.
+	 * 
+	 * @return string Client IP address
+	 */
+	public static function get_client_ip()
+	{
+		$ip = '';
+		
+		// Check for forwarded IP (behind proxy/load balancer)
+		if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+			$ip = sanitize_text_field($_SERVER['HTTP_CLIENT_IP']);
+		} elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+			// Can contain multiple IPs (client, proxy1, proxy2...)
+			$ips = explode(',', sanitize_text_field($_SERVER['HTTP_X_FORWARDED_FOR']));
+			$ip = trim($ips[0]);
+		} elseif (!empty($_SERVER['HTTP_X_FORWARDED'])) {
+			$ip = sanitize_text_field($_SERVER['HTTP_X_FORWARDED']);
+		} elseif (!empty($_SERVER['HTTP_X_CLUSTER_CLIENT_IP'])) {
+			$ip = sanitize_text_field($_SERVER['HTTP_X_CLUSTER_CLIENT_IP']);
+		} elseif (!empty($_SERVER['HTTP_FORWARDED_FOR'])) {
+			$ip = sanitize_text_field($_SERVER['HTTP_FORWARDED_FOR']);
+		} elseif (!empty($_SERVER['HTTP_FORWARDED'])) {
+			$ip = sanitize_text_field($_SERVER['HTTP_FORWARDED']);
+		} elseif (!empty($_SERVER['REMOTE_ADDR'])) {
+			$ip = sanitize_text_field($_SERVER['REMOTE_ADDR']);
+		}
+		
+		// Validate IP address
+		if (!empty($ip) && filter_var($ip, FILTER_VALIDATE_IP)) {
+			return $ip;
+		}
+		
+		// Fallback to REMOTE_ADDR if validation fails
+		return isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '0.0.0.0';
+	}
+
+	/**
 	 * Update limited edition status when order status changes
 	 * 
 	 * @param int $order_id Order ID
@@ -508,10 +576,10 @@ class IJWLP_Options
 		$old_numbers = is_array($old_numbers) ? $old_numbers : (!empty($old_numbers) ? array($old_numbers) : array());
 		$new_numbers = is_array($new_numbers) ? $new_numbers : array($new_numbers);
 
-		// Get product type and user ID
+		// Get product type and user identifier
 		$product = wc_get_product($actual_pro_id);
 		$product_type = $product ? $product->get_type() : 'simple';
-		$user_id = get_current_user_id();
+		$user_id = self::get_user_identifier();
 
 		// Store new numbers as comma-separated string
 		$limit_no_string = implode(',', $new_numbers);
@@ -577,7 +645,7 @@ class IJWLP_Options
 						'status' => 'block',
 						'time' => current_time('mysql'),
 					),
-					array('%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s')
+					array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
 				);
 			}
 		}
@@ -657,7 +725,7 @@ class IJWLP_Options
 
 		global $wpdb, $table_prefix;
 		$table = $table_prefix . 'woo_limit';
-		$user_id = get_current_user_id();
+		$user_id = self::get_user_identifier();
 
 		// Check number status in database
 		$clean_number = intval($limited_number);
@@ -739,11 +807,14 @@ class IJWLP_Options
 		// Check maximum quantity limit (if configured) and compute counts
 		$max_quantity = get_post_meta($parent_product_id, '_woo_limit_max_quantity', true);
 		if (!empty($max_quantity)) {
+			// Get user identifier for limit tracking
+			$user_identifier = self::get_user_identifier();
+			
 			// Gather all existing numbers (blocked) and count them
 			$rows = $wpdb->get_col($wpdb->prepare(
 				"SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
 				$parent_product_id,
-				$user_id
+				$user_identifier
 			));
 			$all_numbers = array();
 			if ($rows) {
@@ -760,25 +831,22 @@ class IJWLP_Options
 			$existing_count = count($all_numbers);
 
 			// Count how many of those numbers are in the current user's cart (or their cart_key)
-			$user_id = get_current_user_id();
 			$user_numbers = array();
 
-			// Numbers blocked for this user_id
-			if ($user_id > 0) {
-				$user_rows = $wpdb->get_col($wpdb->prepare(
-					"SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
-					$parent_product_id,
-					$user_id
-				));
-				if ($user_rows) {
-					foreach ($user_rows as $r) {
-						$r = trim($r);
-						if ($r === '') {
-							continue;
-						}
-						$parts = array_map('trim', explode(',', $r));
-						$user_numbers = array_merge($user_numbers, $parts);
+			// Numbers blocked for this user (works for both logged-in and guests via IP)
+			$user_rows = $wpdb->get_col($wpdb->prepare(
+				"SELECT limit_no FROM $table WHERE parent_product_id = %s AND status = 'block' AND user_id = %s",
+				$parent_product_id,
+				$user_identifier
+			));
+			if ($user_rows) {
+				foreach ($user_rows as $r) {
+					$r = trim($r);
+					if ($r === '') {
+						continue;
 					}
+					$parts = array_map('trim', explode(',', $r));
+					$user_numbers = array_merge($user_numbers, $parts);
 				}
 			}
 
@@ -870,11 +938,8 @@ class IJWLP_Options
 		global $wpdb, $table_prefix;
 		$table = $table_prefix . 'woo_limit';
 
-		// Get current user ID
-		$user_id = get_current_user_id();
-		if (!$user_id) {
-			$user_id = 0; // Guest user
-		}
+		// Get user identifier (user ID for logged-in, IP-based for guests)
+		$user_id = self::get_user_identifier();
 
 		// Get product type
 		$product = wc_get_product($actual_pro_id);
@@ -954,7 +1019,7 @@ class IJWLP_Options
 						'order_id' => 'block',
 						'time' => current_time('mysql'),
 					),
-					array('%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s')
+					array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
 				);
 			}
 		}
