@@ -951,9 +951,10 @@ class IJWLP_Options
 						'product_type' => $product_type,
 						'limit_no' => $limit_no_string,
 						'status' => 'block',
+						'order_id' => 'block',
 						'time' => current_time('mysql'),
 					),
-					array('%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s')
+					array('%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s')
 				);
 			}
 		}

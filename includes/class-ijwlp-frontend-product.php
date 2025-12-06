@@ -42,16 +42,17 @@ class IJWLP_Frontend_Product
         if (!$product) {
             return;
         }
+		
+		$pro_id = $product->get_id();
+		$is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
+
 
         ?>
-        <div class="woo-limit-selection-message" style="display:none"></div>
+        <div class="woo-limit-selection-message <?php echo esc_attr($is_limited); ?>" style="display:none"></div>
         <?php
-
-        $pro_id = $product->get_id();
-
-        
         // Get stock quantities for variations (if product is variable)
         $variation_quantities = [];
+		$stock_quantity = '';
         if ($product->is_type('variable')) {
             foreach ($product->get_children() as $variation_id) {
                 $variation = wc_get_product($variation_id);
@@ -104,9 +105,6 @@ class IJWLP_Frontend_Product
 
         // Get max quantity limit per user
         $max_limit = get_post_meta($pro_id, '_woo_limit_max_quantity', true);
-
-
-         $is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
 
         if ($is_limited !== 'yes') {
             ?>

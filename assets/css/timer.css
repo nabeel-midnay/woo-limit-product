@@ -1,83 +1,68 @@
 /**
  * WooCommerce Limited Product - Timer CSS
  * 
- * Styles for countdown timer display with separate minutes and seconds boxes
+ * Styles for countdown timer display
  * 
  * @package WooCommerce Limited Product
  */
 
-/* Timer container - main wrapper */
-#woo-limit-timer {
-    padding: 20px;
+/* Timer container */
+.limited-timer {
+    padding: 15px 20px;
     background-color: #f0f0f0;
     border-left: 4px solid #007cba;
     margin: 15px 0;
     border-radius: 4px;
+    font-family: "Arial", sans-serif;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
 }
 
-/* Timer container itself - flexbox layout */
-#woo-limit-timer .timer-container {
-    display: flex;
-    gap: 20px;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-/* Individual time box */
-.time-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 15px 20px;
-    background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    min-width: 100px;
-    transition: all 0.3s ease;
-}
-
-/* Time number display */
-.time-box .time-number {
+/* Timer label text */
+.limited-timer .timer-label {
     display: block;
-    font-size: 36px;
+    font-size: 14px;
+    color: #333;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Countdown display (mm:ss format) */
+.limited-timer .timer-countdown {
+    display: block;
+    font-size: 28px;
     font-weight: bold;
     color: #007cba;
     font-family: "Courier New", monospace;
     letter-spacing: 2px;
-    margin-bottom: 5px;
-    line-height: 1;
     transition: color 0.3s ease;
 }
 
-/* Time label text */
-.time-box .time-label {
-    display: block;
-    font-size: 12px;
-    color: #666;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin: 0;
+/* Timer when inactive (no timer started yet, shows --:--)  */
+.limited-timer .timer-countdown.inactive {
+    color: #999;
+    font-size: 24px;
+    opacity: 0.7;
+}
+
+/* Timer when active and running (normal countdown) */
+.limited-timer .timer-countdown.active {
+    color: #007cba;
+    font-size: 28px;
+    opacity: 1;
 }
 
 /* DANGER STATE: Less than 3 minutes remaining */
-#woo-limit-timer.danger {
+.limited-timer.danger {
     background-color: #fde7e7;
     border-left-color: #d32f2f;
     animation: ijwlp-pulse-danger 1s infinite;
 }
 
-#woo-limit-timer.danger .time-number {
+.limited-timer.danger .timer-countdown {
     color: #d32f2f;
-}
-
-#woo-limit-timer.danger .time-box {
-    background-color: #fff3e0;
-    box-shadow: 0 2px 8px rgba(211, 47, 47, 0.2);
 }
 
 /* Pulsing animation for danger state */
@@ -88,82 +73,43 @@
     }
 
     50% {
-        opacity: 0.85;
+        opacity: 0.75;
     }
 }
 
 /* EXPIRED STATE: Timer reached 00:00 */
-#woo-limit-timer.expired {
+.limited-timer.expired {
     background-color: #ffe0e0;
     border-left-color: #c62828;
-    opacity: 0.8;
+    opacity: 0.7;
 }
 
-#woo-limit-timer.expired .time-number {
+.limited-timer.expired .timer-countdown {
     color: #c62828;
+    animation: none;
 }
 
-#woo-limit-timer.expired .time-box {
-    background-color: #ffcdd2;
-    opacity: 0.9;
-}
-
-/* Responsive: On medium screens */
-@media (max-width: 768px) {
-    #woo-limit-timer {
-        padding: 15px;
+/* Responsive: On smaller screens, reduce font size */
+@media (max-width: 600px) {
+    .limited-timer {
+        padding: 12px 15px;
+        margin: 12px 0;
     }
 
-    #woo-limit-timer .timer-container {
-        gap: 15px;
+    .limited-timer .timer-label {
+        font-size: 12px;
+        margin-bottom: 6px;
     }
 
-    .time-box {
-        padding: 12px 18px;
-        min-width: 90px;
-    }
-
-    .time-box .time-number {
-        font-size: 28px;
-        letter-spacing: 1.5px;
-        margin-bottom: 4px;
-    }
-
-    .time-box .time-label {
-        font-size: 11px;
-    }
-}
-
-/* Responsive: On smaller screens */
-@media (max-width: 480px) {
-    #woo-limit-timer {
-        padding: 12px;
-    }
-
-    #woo-limit-timer .timer-container {
-        gap: 10px;
-    }
-
-    .time-box {
-        padding: 10px 15px;
-        min-width: 75px;
-    }
-
-    .time-box .time-number {
+    .limited-timer .timer-countdown {
         font-size: 24px;
-        letter-spacing: 1px;
-        margin-bottom: 3px;
-    }
-
-    .time-box .time-label {
-        font-size: 10px;
-        letter-spacing: 0.3px;
+        letter-spacing: 1.5px;
     }
 }
 
 /* Print styles: Hide timer when printing */
 @media print {
-    #woo-limit-timer {
+    .limited-timer {
         display: none !important;
     }
 }

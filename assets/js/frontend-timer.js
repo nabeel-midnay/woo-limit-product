@@ -228,7 +228,7 @@
         updateDisplay: function () {
             const $timerDisplay = $("#woo-limit-timer");
             const $timerContainer = $(".timer-container");
-
+			
             if (!$timerDisplay.length) {
                 return;
             }

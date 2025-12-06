@@ -4,5 +4,6 @@
 }
 .woocommerce_options_panel#woo_limit_product .form-field .description{
     display: inline-block;
+    float: left;
     width: auto;
 }

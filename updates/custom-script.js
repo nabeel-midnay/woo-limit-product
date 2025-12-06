@@ -1,3 +1,29 @@
+/*jQuery(document).ready(function(){ 
+    new DataTable('#woo-limit-ids', {
+        paging: false,
+        stripeClasses: [ 'odd-row', 'even-row' ],
+        initComplete: function () {
+            this.api()
+                .columns()
+                .every(function () {
+                    let column = this;
+                    let title = column.footer().textContent;
+     
+                    // Create input element
+                    let input = document.createElement('input');
+                    input.placeholder = title;
+                    column.footer().replaceChildren(input);
+     
+                    // Event listener for user input
+                    input.addEventListener('keyup', () => {
+                        if (column.search() !== this.value) {
+                            column.search(input.value).draw();
+                        }
+                    });
+                });
+        }
+    });
+});*/
 jQuery(document).ready(function () {
   var dataTable = new DataTable('#woo-limit-ids', {
     paging: false,
@@ -28,6 +54,9 @@ jQuery(document).ready(function () {
     });
       
        // Create drop-down filter for the third column (index 2)
+        /*api.column(7).data().unique().sort().each(function (data) {
+            jQuery('#woo-limit-ids tfoot .drop').html('<select class="filter"><option value="">Select</option><option value="' + data + '">' + data + '</option></select>');
+        });*/
         var select = jQuery('<select class="filter"><option value="">Select</option></select>').appendTo('#woo-limit-ids tfoot .drop');
       
         api.column(7).data().unique().sort().each(function (data) {
@@ -39,6 +68,11 @@ jQuery(document).ready(function () {
           jQuery('input', this.footer()).css('display', 'none');
         });
         // Event listener for select change
+        /*jQuery('select.filter', '#woo-limit-ids tfoot .drop').on('change', function () {
+          var columnIndex = jQuery(this).closest('td').index();
+          var column = api.column(columnIndex);
+          column.search(jQuery(this).val()).draw();
+        });*/
         select.on('change', function () {
           var value = jQuery(this).val();
           api.column(7).search(value).draw();
@@ -76,18 +110,38 @@ jQuery(document).ready(function() {
     tfoot.detach().insertBefore(table.find('tbody'));
   });
 /** Clear button - DataTables **/
-
+//jQuery(document).ready(function() {
+    
+    //var table = jQuery('.dataTable');
+    
+//});
 
 jQuery(document).ready(function(){
-    // Initially hide the content
-    jQuery(".tgl").hide();
-    // Attach click event to the button
-    jQuery(".tglhed").on("click", function(){
-        // Toggle the visibility of the content
-        jQuery(this).parent().find(".tgl").toggle();
-    });
-});
+            // Initially hide the content
+            jQuery(".tgl").hide();
+            // Attach click event to the button
+            jQuery(".tglhed").on("click", function(){
+                // Toggle the visibility of the content
+                jQuery(this).parent().find(".tgl").toggle();
+            });
+        });
 /************************************/
+
+/*jQuery(document).ready(function ($) {
+    $('.upload_image_button').click(function () {
+        var image = wp.media({
+            title: 'Upload Image',
+            multiple: false
+        }).open().on('select', function (e) {
+            var uploadedImage = image.state().get('selection').first();
+            var imageURL = uploadedImage.toJSON().url;
+
+            var targetInput = $(this).data('target');
+            $(targetInput).val(imageURL);
+        });
+    });
+});*/
+
 jQuery(document).ready(function ($) {
    $('.upload_image_button').click(function () {
        var button = $(this);
@@ -112,5 +166,9 @@ jQuery(document).ready(function ($) {
        mediaUploader.open();
    });
 });
+
+
+
+
 /************************************/
  

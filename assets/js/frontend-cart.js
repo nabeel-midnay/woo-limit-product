@@ -530,7 +530,7 @@
                         '<div class="woo-limit-cart-item woo-input-single gt-2"></div>'
                     );
                     var $inp = $(
-                        '<input type="number" class="woo-limit" name="woo_limit[' +
+                        '<input type="number" class="woo-limit woo-cart-items" name="woo_limit[' +
                         cartKey +
                         '][]" />'
                     );
@@ -913,5 +913,37 @@
                 return false;
             }
         });
-    });
+		 // Add backorder help icon functionality for cart page
+		function addBackorderHelpIconCart() {
+			// Find backorder notifications on cart page
+			var $backorderNotifications = jQuery("p.backorder_notification");
+
+			$backorderNotifications.each(function () {
+				var $notification = jQuery(this);
+
+				// Check if help icon already exists to avoid duplicates
+				if ($notification.find(".backorder-help-icon").length === 0) {
+					// Create the help icon
+					var helpIcon =
+						'<span class="backorder-help-icon help-icon" data-tooltip="Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).">?</span>';
+
+					// Add the help icon after the text
+					$notification.append(helpIcon);
+				}
+			});
+		}
+		addBackorderHelpIconCart();
+
+		jQuery(document.body).on("wc_fragments_refreshed added_to_cart updated_cart_item removed_from_cart ", function () {
+			setTimeout(function () {
+				addBackorderHelpIconCart();
+			}, 200);
+		});
+
+		jQuery(document).on("submit", ".woocommerce-cart-form", function () {
+			setTimeout(function () {
+				addBackorderHelpIconCart();
+			}, 500);
+		});
+	});
 })(jQuery);

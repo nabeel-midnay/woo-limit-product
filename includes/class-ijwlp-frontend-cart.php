@@ -332,7 +332,7 @@ class IJWLP_Frontend_Cart
                 <?php foreach ($limited_numbers as $index => $limited_number): ?>
                     <div class="woo-limit-cart-item woo-input-single gt-2">
                         <input type="number" id="woo-limit-cart-<?php echo esc_attr($cart_item_key); ?>-<?php echo esc_attr($index); ?>"
-                            name="woo_limit[<?php echo esc_attr($cart_item_key); ?>][]" class="woo-limit"
+                            name="woo_limit[<?php echo esc_attr($cart_item_key); ?>][]" class="woo-limit woo-cart-items"
                             value="<?php echo esc_attr($limited_number); ?>" data-cart-key="<?php echo esc_attr($cart_item_key); ?>"
                             data-index="<?php echo esc_attr($index); ?>" data-old-value="<?php echo esc_attr($limited_number); ?>"
                             min="<?php echo esc_attr($start); ?>" max="<?php echo esc_attr($end); ?>" />

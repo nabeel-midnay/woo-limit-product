@@ -2,6 +2,7 @@
 /********************************************************
 Create a unique array that contains all theme settings
 ********************************************************/
+require_once( ABSPATH . 'wp-admin/includes/upgrade.php' ); 
 error_reporting(E_ALL & ~E_NOTICE);
 global $wpdb, $woocommerce,$post;
 
@@ -1258,7 +1259,7 @@ for ($i = 5; $i >= 0; $i--) {
                                         </div>
                                         <div class="woo-limit-numbers-list" id="sold-<?php echo $product_id; ?>">
                                             <?php if (!empty($sold_details)): ?>
-                                                <?php foreach ($sold_details as $detail): ?>
+                                                <?php foreach ($sold_details as $detail):?>
                                                     <div class="number-item">
                                                         <strong><?php echo esc_html($detail['number']); ?></strong>
                                                         <?php if ($detail['order_status'] === 'ORDERED' && $detail['order_link'] !== 'N/A'): ?>

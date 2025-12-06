@@ -60,11 +60,21 @@ function woolimit_main_page() {
 
 function register_my_plugin_scripts() {
 
+    //wp_register_style( 'my-plugin', plugins_url( 'ddd/css/plugin.css' ) );
+
+    //wp_register_script( 'my-plugin', plugins_url( 'ddd/js/plugin.js' ) );
+
+    //wp_enqueue_script('boot_js', plugins_url('inc/bootstrap.js',__FILE__ ));
+
     wp_register_style( 'woo-limit-datatable_css', 'https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css', false, '1.0.0' );
 
     wp_enqueue_style( 'woo-limit-datatable_css' );
 
     
+
+    //wp_enqueue_script( 'woo-limit-datatable', 'https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js' );/*Nov15*/
+
+    //wp_enqueue_script( 'woo-limit-datatable', 'https://code.jquery.com/jquery-3.6.0.min.js' );
 
     wp_enqueue_script( 'woo-limit-datatable2', 'https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js' );
 
@@ -78,8 +88,37 @@ function register_my_plugin_scripts() {
 
 add_action( 'admin_enqueue_scripts', 'register_my_plugin_scripts' );
 
+function load_my_plugin_scripts( $hook ) {
+
+    // Load only on ?page=sample-page
+
+    if( $hook != 'toplevel_page_sample-page' ) {
+
+    return;
+
+    }
+
+    // Load style & scripts.
+
+    wp_enqueue_style( 'my-plugin' );
+
+    wp_enqueue_script( 'my-plugin' );
+
+}
+
+add_action( 'admin_enqueue_scripts', 'load_my_plugin_scripts' );
 
 /*****Addition to the plugin functionality - added on 12th Nov 2023****/
+
+add_action('woocommerce_checkout_create_order_line_item', 'save_cart_item_key_as_custom_order_item_metadata', 10, 4 );
+
+function save_cart_item_key_as_custom_order_item_metadata( $item, $cart_item_key, $values, $order ) {
+
+    // Save the cart item key as hidden order item meta data
+
+    $item->update_meta_data( '_cart_item_key', $cart_item_key );
+
+}
 
 
 
@@ -526,6 +565,36 @@ function debug_order_ids_action() {
     }
 }
 
+/**
+ * AJAX: Clear all in-cart (blocked) limited numbers
+ */
+add_action('wp_ajax_ijwlp_clear_in_cart', 'ijwlp_clear_in_cart');
+function ijwlp_clear_in_cart() {
+    if ( ! current_user_can('manage_options') ) {
+        wp_send_json_error(array('message' => 'forbidden'), 403);
+    }
+    check_ajax_referer('ijwlp_clear_in_cart');
+
+    global $table_prefix, $wpdb;
+    $table = $table_prefix . 'woo_limit';
+
+    $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
+
+    if ($product_id > 0) {
+        $where = $wpdb->prepare("WHERE status = 'block' AND parent_product_id = %d", $product_id);
+    } else {
+        $where = "WHERE status = 'block'";
+    }
+
+    $sql = "DELETE FROM {$table} {$where}";
+    $result = $wpdb->query($sql);
+
+    if ($result === false) {
+        wp_send_json_error(array('message' => 'db_error'));
+    }
+
+    wp_send_json_success(array('cleared' => intval($result)));
+}
 
 /**
  * Manual order ID update for specific order
@@ -684,7 +753,104 @@ function limitedNosAvailableCount($pid){
     return (count($limitedNosAvailableArray));
 
 }
+
+
+
+
+
 /************************************************************/
+
+/****************** Custom image for color Variant *********************/
+
+// Add a meta box for 'color' attribute images
+
+/*add_action('add_meta_boxes', 'add_color_attribute_images_meta_box');
+
+
+
+function add_color_attribute_images_meta_box() {
+
+    add_meta_box(
+
+        'color_attribute_images_meta_box',
+
+        __('Color Attribute Images', 'your-text-domain'),
+
+        'color_attribute_images_meta_box_content',
+
+        'product',
+
+        'normal',
+
+        'high'
+
+    );
+
+}
+
+
+
+function color_attribute_images_meta_box_content($post) {
+
+    // Output the form fields for each 'color' attribute term
+
+    $color_terms = get_terms(array('taxonomy' => 'pa_color', 'hide_empty' => false));
+
+
+
+    if (!empty($color_terms) && !is_wp_error($color_terms)) {
+
+        foreach ($color_terms as $color_term) {
+
+            $variation_image = get_post_meta($post->ID, '_variation_image_' . $color_term->slug, true);
+
+            ?>
+
+            <p>
+
+                <label for="variation_image_<?php echo esc_attr($color_term->slug); ?>">
+
+                    <?php echo esc_html($color_term->name); ?>:
+
+                </label>
+
+                <input type="text" id="variation_image_<?php echo esc_attr($color_term->slug); ?>" name="variation_image[<?php echo esc_attr($color_term->slug); ?>]" value="<?php echo esc_attr($variation_image); ?>" />
+
+                <button type="button" class="button upload_image_button" data-target="#variation_image_<?php echo esc_attr($color_term->slug); ?>">Upload Image</button>
+
+            </p>
+
+            <?php
+
+        }
+
+    }
+
+}
+
+// Enqueue media upload script
+
+add_action('admin_enqueue_scripts', 'enqueue_media_upload_script');
+
+
+
+function enqueue_media_upload_script($hook) {
+
+    global $post_type;
+
+    if ($hook == 'post-new.php' || $hook == 'post.php') {
+
+        if ('product' == $post_type) {
+
+            wp_enqueue_media();
+
+            wp_enqueue_script('custom-media-upload', get_template_directory_uri() . '/js/custom-media-upload.js', array('jquery'), null, true);
+
+        }
+
+    }
+
+}*/
 
 // Add a meta box for 'color' attribute images
 
@@ -806,7 +972,8 @@ function save_color_attribute_images_meta_box($post_id) {
 
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
 
-    $color_terms = get_terms(array('taxonomy' => 'pa_color', 'hide_empty' => false));
+    $color_terms = get_terms(array('taxonomy' => 'pa_color', 'hide_empty' => false));echo '<pre>'; print_r($color_terms); echo '</pre>';
+
     if (!empty($color_terms) && !is_wp_error($color_terms)) {
 
         foreach ($color_terms as $color_term) {
@@ -922,6 +1089,15 @@ function get_all_selected_variants_for_cart_item($cart_item_key) {
 
 
 /*****************/
+// add_action('admin_notices', 'display_admin_warning');
+
+function display_admin_warning() {
+    ?>
+    <div class="notice notice-warning is-dismissible" style="background-color: #ffeb3b;border-left-color: #ff9800;color: #000;">
+        <p><?php _e('Urgent!! Remove demolive link from frontend.js after going live'); ?></p>
+    </div>
+    <?php
+}
 
 /**
  * Manual fix for cart data issues

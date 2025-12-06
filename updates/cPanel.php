@@ -2,6 +2,8 @@
 /********************************************************
 Create a unique array that contains all theme settings
 ********************************************************/
+require_once( ABSPATH . 'wp-admin/includes/upgrade.php' ); 
+error_reporting(E_ALL & ~E_NOTICE);
 global $wpdb;
 class ControlPanel{
     var $default_settings = Array();
