@@ -931,7 +931,12 @@
                 containerClass:
                     "woo-limit-autocomplete autocomplete-suggestions",
                 onSelect: function (s) {
+                    console.log('Clicked suggestion value:', s.value);
                     $input.val(s.value).trigger("input").trigger("change");
+                    // Trigger Enter keypress to check availability immediately (like pressing Enter)
+                    // Use which, keyCode, and key for maximum browser compatibility
+                    var enterEvent = $.Event("keypress", { which: 13, keyCode: 13, key: "Enter" });
+                    $input.trigger(enterEvent);
                     setTimeout(function () {
                         var inst2 = $input.data("autocomplete");
                         if (inst2) inst2.hide();
