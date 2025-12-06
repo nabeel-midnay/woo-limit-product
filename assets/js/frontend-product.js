@@ -878,6 +878,9 @@
                         $(".variations select").prop("disabled", false);
                         $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("disabled");
 
+                        // Re-apply disabled state to out-of-stock variations
+                        initializeOutOfStockSwatches();
+
                         // Re-enable quantity input
                         $form.find('input[name="quantity"]').prop("disabled", false);
 
@@ -885,6 +888,14 @@
                     } else {
                         // Ensure loading class is removed even if out of stock
                         $addToCartButton.removeClass("woo-limit-loading");
+
+                        // Even when current variation is out of stock, re-enable swatches
+                        // for OTHER variations that are still in stock
+                        $(".variations select").prop("disabled", false);
+                        $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("disabled");
+
+                        // Re-apply disabled state only to out-of-stock variations
+                        initializeOutOfStockSwatches();
                     }
                 },
             });
