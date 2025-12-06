@@ -1199,6 +1199,19 @@ input.qty {
     color: #333;
 }
 
+.woocommerce-checkout span.limited-number {
+    width: 6.25rem;
+    height: 2.188rem;
+    border: 0.063rem solid var(--gray);
+    border-radius: 0;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .woocommerce-checkout .checkout-order-summary-container {
