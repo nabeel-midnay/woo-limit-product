@@ -152,6 +152,66 @@ class IJWLP_Options
 	}
 
 	/**
+	 * Clean up stale block records for the current user
+	 * 
+	 * When a user's session expires (browser closed, cookies cleared, etc.),
+	 * their "blocked" records in the database become stale because the cart_key
+	 * no longer exists in any active WooCommerce session.
+	 * 
+	 * This method finds all block records for the current user and removes any
+	 * whose cart_key is not in their current WooCommerce cart.
+	 * 
+	 * @param int|null $product_id Optional - limit cleanup to specific product
+	 * @return int Number of stale records cleaned up
+	 */
+	public static function cleanup_stale_user_blocks($product_id = null)
+	{
+		global $wpdb, $table_prefix;
+		$table = $table_prefix . 'woo_limit';
+		
+		$user_id = self::get_user_identifier();
+		$cart = WC()->cart;
+		
+		// Get all current cart keys for this session
+		$current_cart_keys = array();
+		if ($cart) {
+			$cart_items = $cart->get_cart();
+			if (!empty($cart_items)) {
+				$current_cart_keys = array_keys($cart_items);
+			}
+		}
+		
+		// Build query to find blocked records for this user
+		$sql = $wpdb->prepare(
+			"SELECT id, cart_key FROM $table WHERE user_id = %s AND status = 'block'",
+			$user_id
+		);
+		
+		if ($product_id) {
+			$sql .= $wpdb->prepare(" AND parent_product_id = %s", $product_id);
+		}
+		
+		$blocked_records = $wpdb->get_results($sql);
+		
+		$cleaned_count = 0;
+		if ($blocked_records) {
+			foreach ($blocked_records as $record) {
+				// If cart_key is not in current cart, it's stale
+				if (!in_array($record->cart_key, $current_cart_keys)) {
+					$wpdb->delete(
+						$table,
+						array('id' => $record->id),
+						array('%d')
+					);
+					$cleaned_count++;
+				}
+			}
+		}
+		
+		return $cleaned_count;
+	}
+
+	/**
 	 * Update limited edition status when order status changes
 	 * 
 	 * @param int $order_id Order ID
@@ -727,6 +787,10 @@ class IJWLP_Options
 		$table = $table_prefix . 'woo_limit';
 		$user_id = self::get_user_identifier();
 
+		// Clean up any stale block records for this user before checking availability
+		// This handles cases where user's session expired (closed browser, cleared cookies, etc.)
+		self::cleanup_stale_user_blocks($parent_product_id);
+
 		// Check number status in database
 		$clean_number = intval($limited_number);
 
@@ -777,13 +841,26 @@ class IJWLP_Options
 				}
 			}
 
-			// Additional check for logged-in users: verify user_id matches
-			// This provides an extra layer of validation for logged-in users
-			if ($user_id > 0 && $blocked->user_id == $user_id) {
-				$is_in_current_cart = true;
-			}
+			// Check if this block record belongs to the current user
+			$is_current_user_record = ($blocked->user_id == $user_id);
 
-			if ($is_in_current_cart) {
+			// If block record belongs to current user but cart_key is NOT in their current cart,
+			// this is a stale record (session expired, browser closed, etc.)
+			// We should clean it up and treat the number as available
+			if ($is_current_user_record && !$is_in_current_cart) {
+				// Delete the stale block record
+				$wpdb->delete(
+					$table,
+					array(
+						'id' => $blocked->id
+					),
+					array('%d')
+				);
+				
+				// Number is now available (stale record cleaned up)
+				// Continue to range check below instead of returning here
+				$blocked = null;
+			} elseif ($is_in_current_cart) {
 				// Number is in current user's cart (works for both logged-in and guest users)
 				wp_send_json_success(array(
 					'available' => true,
@@ -791,7 +868,10 @@ class IJWLP_Options
 					'status' => 'in_your_cart'
 				));
 			}
+		}
 
+		// If still blocked by someone else
+		if ($blocked) {
 			// It's in someone else's cart (not in current user's cart)
 			wp_send_json_success(array(
 				'available' => false,
