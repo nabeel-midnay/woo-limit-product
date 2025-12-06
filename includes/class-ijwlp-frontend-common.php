@@ -224,7 +224,7 @@ class IJWLP_Frontend_Common
             'ijwlp-frontend-style',
             $frontend,
             array(),
-            $frontend_path
+            filemtime($frontend_path)
         );
 
         // Enqueue timer styles
