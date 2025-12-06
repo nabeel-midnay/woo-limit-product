@@ -105,6 +105,13 @@ class IJWLP_Frontend_Product
 
         // Get max quantity limit per user
         $max_limit = get_post_meta($pro_id, '_woo_limit_max_quantity', true);
+		
+		
+        // Get stock quantity for the main product
+        $stock_quantity = null;
+        if ($product->get_manage_stock() && $product->get_backorders() === 'no') {
+            $stock_quantity = $product->get_stock_quantity();
+        }
 
         if ($is_limited !== 'yes') {
             ?>
@@ -131,12 +138,6 @@ class IJWLP_Frontend_Product
 
         // Get admin settings for label
         $limit_label = IJWLP_Options::get_setting('limitlabel', __('Limited Edition Number', 'woolimited'));
-
-        // Get stock quantity for the main product
-        $stock_quantity = null;
-        if ($product->get_manage_stock() && $product->get_backorders() === 'no') {
-            $stock_quantity = $product->get_stock_quantity();
-        }
 ?>
         <div class="woo-limit-product woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
             <p class="woo-limit-field-label">
