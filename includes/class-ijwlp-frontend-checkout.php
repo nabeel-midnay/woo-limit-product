@@ -27,7 +27,7 @@ class IJWLP_Frontend_Checkout
 
         add_action('woocommerce_checkout_after_customer_details', array($this, 'custom_checkout_order_summary'), 5);
     	
-        add_action('woocommerce_after_checkout_billing_form', array($this, 'add_delivery_preference_field'), 10, 1);
+        add_action('woocommerce_after_checkout_shipping_form', array($this, 'add_delivery_preference_field'), 10, 1);
 		add_action('woocommerce_checkout_process', array($this, 'validate_delivery_preference_field'), 10, 1);
 		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_delivery_preference_field'), 10, 1);
 
@@ -191,7 +191,7 @@ class IJWLP_Frontend_Checkout
                             </div>
                             <?php if ($coupon_discount > 0): ?>
                                 <div class="summary-line">
-                                    <span class="label">Discount:</span>
+                                    <span class="label">Coupon:</span>
                                     <span class="value"><?php echo wc_price($coupon_discount); ?></span>
                                 </div>
                             <?php endif; ?>
@@ -242,6 +242,31 @@ class IJWLP_Frontend_Checkout
                                 <div class="item-image"><?php echo $image; ?></div>
                                 <div class="item-details">
                                     <div class="item-name"><?php echo esc_html($product_name); ?></div>
+                                    
+                                    <?php 
+                                    // Display product attributes (for variable products)
+                                    if (!empty($ci_item['variation']) && is_array($ci_item['variation'])) : ?>
+                                        <div class="item-attributes">
+                                            <?php foreach ($ci_item['variation'] as $attr_key => $attr_value) : 
+                                                if (empty($attr_value)) continue;
+                                                
+                                                // Get clean attribute name
+                                                $attr_name = wc_attribute_label(str_replace('attribute_', '', $attr_key));
+                                                
+                                                // Get term name if it's a taxonomy attribute
+                                                $taxonomy = str_replace('attribute_', '', $attr_key);
+                                                if (taxonomy_exists($taxonomy)) {
+                                                    $term = get_term_by('slug', $attr_value, $taxonomy);
+                                                    if ($term && !is_wp_error($term)) {
+                                                        $attr_value = $term->name;
+                                                    }
+                                                }
+                                            ?>
+                                                <span class="product-attribute"><?php echo esc_html($attr_name); ?>: <?php echo esc_html($attr_value); ?></span>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    
                                     <div class="item-quantity"><?php echo '&#215;' . esc_html($quantity); ?></div>
 
                                     <?php if ($limited_range) : ?>
