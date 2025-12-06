@@ -42,9 +42,17 @@ class IJWLP_Frontend_Product
         if (!$product) {
             return;
         }
-		
-		$pro_id = $product->get_id();
-		$is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
+
+        $pro_id = $product->get_id();
+        $is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
+
+        if ($is_limited == 'yes') {
+            $limitedNosAvailableCount = limitedNosAvailableCount($pro_id);
+            if ($limitedNosAvailableCount == 0) {
+                echo '<div class="soldout_wrapper"><span class="soldout-label">' . esc_html__('Sold Out', 'sarcom') . '</span></div>';
+                return;
+            }
+        }
 
 
         ?>
@@ -52,7 +60,7 @@ class IJWLP_Frontend_Product
         <?php
         // Get stock quantities for variations (if product is variable)
         $variation_quantities = [];
-		$stock_quantity = '';
+        $stock_quantity = '';
         if ($product->is_type('variable')) {
             foreach ($product->get_children() as $variation_id) {
                 $variation = wc_get_product($variation_id);
@@ -97,7 +105,7 @@ class IJWLP_Frontend_Product
                 }
             }
         }
-        
+
 
         // Prepare variation quantities in a JSON format for hidden field
         $variation_quantities_json = !empty($variation_quantities) ? wp_json_encode($variation_quantities) : '[]';
@@ -105,8 +113,8 @@ class IJWLP_Frontend_Product
 
         // Get max quantity limit per user
         $max_limit = get_post_meta($pro_id, '_woo_limit_max_quantity', true);
-		
-		
+
+
         // Get stock quantity for the main product
         $stock_quantity = null;
         if ($product->get_manage_stock() && $product->get_backorders() === 'no') {
@@ -117,10 +125,14 @@ class IJWLP_Frontend_Product
             ?>
             <div class="unlimited-produt-wrap">
                 <div class="woo-limit-message" style="display: none;"></div>
-                <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity" value="<?php echo esc_attr($stock_quantity); ?>" />
-                <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities" value="<?php echo esc_attr($variation_quantities_json); ?>" />
-                <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining" value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
-                <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name" value="<?php echo esc_attr($product->get_name()); ?>" />
+                <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity"
+                    value="<?php echo esc_attr($stock_quantity); ?>" />
+                <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities"
+                    value="<?php echo esc_attr($variation_quantities_json); ?>" />
+                <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining"
+                    value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
+                <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name"
+                    value="<?php echo esc_attr($product->get_name()); ?>" />
             </div>
             <?php
             return;
@@ -138,8 +150,10 @@ class IJWLP_Frontend_Product
 
         // Get admin settings for label
         $limit_label = IJWLP_Options::get_setting('limitlabel', __('Limited Edition Number', 'woolimited'));
-?>
-        <div class="woo-limit-product woo-limit-field-wrapper woo-limit-product-item-wrapper" data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>" data-product-id="<?php echo esc_attr($pro_id); ?>">
+        ?>
+        <div class="woo-limit-product woo-limit-field-wrapper woo-limit-product-item-wrapper"
+            data-start="<?php echo esc_attr($start); ?>" data-end="<?php echo esc_attr($end); ?>"
+            data-product-id="<?php echo esc_attr($pro_id); ?>">
             <p class="woo-limit-field-label">
                 <?php echo esc_html($limit_label); ?>
             </p>
@@ -148,30 +162,25 @@ class IJWLP_Frontend_Product
                 <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
             </span>
 
-            <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity" value="<?php echo esc_attr($stock_quantity); ?>" />
-            <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities" value="<?php echo esc_attr($variation_quantities_json); ?>" />
-            <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining" value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
-            <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name" value="<?php echo esc_attr($product->get_name()); ?>" />
+            <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity"
+                value="<?php echo esc_attr($stock_quantity); ?>" />
+            <input type="hidden" name="woo-limit-variation-quantities" class="woo-limit-variation-quantities"
+                value="<?php echo esc_attr($variation_quantities_json); ?>" />
+            <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining"
+                value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
+            <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name"
+                value="<?php echo esc_attr($product->get_name()); ?>" />
 
             <div class="woo-limit-input-group">
-                <input
-                    type="number"
-                    id="woo-limit"
-                    name="woo-limit"
-                    class="woo-limit"
-                    value=""
-                    min="<?php echo esc_attr($start); ?>"
-                    max="<?php echo esc_attr($end); ?>" />
+                <input type="number" id="woo-limit" name="woo-limit" class="woo-limit" value=""
+                    min="<?php echo esc_attr($start); ?>" max="<?php echo esc_attr($end); ?>" />
             </div>
 
-            <input
-                type="hidden"
-                name="woo-limit-available"
-                class="woo-limit-available-numbers"
+            <input type="hidden" name="woo-limit-available" class="woo-limit-available-numbers"
                 value="<?php echo esc_attr($available_numbers); ?>" />
             <div class="woo-limit-message" style="display: none;"></div>
         </div>
-<?php
+        <?php
     }
 
     /**
