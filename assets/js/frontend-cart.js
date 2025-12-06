@@ -13,6 +13,45 @@
         // debounce timer to avoid repeated cart updates when availability checks fire rapidly
         var cartAvailableTimer = null;
 
+        // Function to disable all interactive fields in the cart
+        function disableAllCartFields() {
+            // Disable quantity inputs
+            $("input.qty").prop("disabled", true);
+            // Disable plus/minus buttons
+            $(".quantity-btn").prop("disabled", true);
+            // Disable limited edition inputs
+            $(".woo-limit-cart-item input.woo-limit").prop("disabled", true);
+            // Disable update cart button
+            $("button[name='update_cart'], input[name='update_cart']").prop("disabled", true);
+            // Disable proceed to checkout button
+            $(".checkout-button").addClass("disabled").prop("disabled", true);
+            // Disable coupon button
+            $(".woo-coupon-btn").prop("disabled", true);
+        }
+
+        // Function to re-enable all interactive fields in the cart
+        function enableAllCartFields() {
+            // Enable quantity inputs
+            $("input.qty").prop("disabled", false);
+            // Enable plus/minus buttons - we need to be careful here and respect validation state
+            // We will re-enable them first, then let updateQtyButtonsState handle specific logic
+            $(".quantity-btn").prop("disabled", false);
+            // Enable limited edition inputs
+            $(".woo-limit-cart-item input.woo-limit").prop("disabled", false);
+            // Enable update cart button
+            $("button[name='update_cart'], input[name='update_cart']").prop("disabled", false);
+            // Enable proceed to checkout button
+            $(".checkout-button").removeClass("disabled").prop("disabled", false);
+            // Enable coupon button
+            $(".woo-coupon-btn").prop("disabled", false);
+
+            // Re-validate buttons state for each row
+            $(".cart_item").each(function () {
+                updateQtyButtonsState($(this));
+            });
+        }
+
+
         // Function to setup validation and event listeners for a single input
         function setupLimitInput($input) {
             var $wrapper = $input.closest(".woo-limit-field-wrapper");
@@ -33,6 +72,12 @@
                 },
                 getCartItemKey: function () {
                     return $input.data("cart-key");
+                },
+                onStart: function () {
+                    disableAllCartFields();
+                },
+                onEnd: function () {
+                    enableAllCartFields();
                 },
                 onComplete: function (data) {
                     // If server reports this number is available, update old-value and trigger cart update
@@ -913,37 +958,37 @@
                 return false;
             }
         });
-		 // Add backorder help icon functionality for cart page
-		function addBackorderHelpIconCart() {
-			// Find backorder notifications on cart page
-			var $backorderNotifications = jQuery("p.backorder_notification");
+        // Add backorder help icon functionality for cart page
+        function addBackorderHelpIconCart() {
+            // Find backorder notifications on cart page
+            var $backorderNotifications = jQuery("p.backorder_notification");
 
-			$backorderNotifications.each(function () {
-				var $notification = jQuery(this);
+            $backorderNotifications.each(function () {
+                var $notification = jQuery(this);
 
-				// Check if help icon already exists to avoid duplicates
-				if ($notification.find(".backorder-help-icon").length === 0) {
-					// Create the help icon
-					var helpIcon =
-						'<span class="backorder-help-icon help-icon" data-tooltip="Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).">?</span>';
+                // Check if help icon already exists to avoid duplicates
+                if ($notification.find(".backorder-help-icon").length === 0) {
+                    // Create the help icon
+                    var helpIcon =
+                        '<span class="backorder-help-icon help-icon" data-tooltip="Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).">?</span>';
 
-					// Add the help icon after the text
-					$notification.append(helpIcon);
-				}
-			});
-		}
-		addBackorderHelpIconCart();
+                    // Add the help icon after the text
+                    $notification.append(helpIcon);
+                }
+            });
+        }
+        addBackorderHelpIconCart();
 
-		jQuery(document.body).on("wc_fragments_refreshed added_to_cart updated_cart_item removed_from_cart ", function () {
-			setTimeout(function () {
-				addBackorderHelpIconCart();
-			}, 200);
-		});
+        jQuery(document.body).on("wc_fragments_refreshed added_to_cart updated_cart_item removed_from_cart ", function () {
+            setTimeout(function () {
+                addBackorderHelpIconCart();
+            }, 200);
+        });
 
-		jQuery(document).on("submit", ".woocommerce-cart-form", function () {
-			setTimeout(function () {
-				addBackorderHelpIconCart();
-			}, 500);
-		});
-	});
+        jQuery(document).on("submit", ".woocommerce-cart-form", function () {
+            setTimeout(function () {
+                addBackorderHelpIconCart();
+            }, 500);
+        });
+    });
 })(jQuery);

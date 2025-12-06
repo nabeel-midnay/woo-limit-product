@@ -268,6 +268,11 @@
                         return;
                     }
 
+                    // Call onEnd callback if provided
+                    if (options.onEnd) {
+                        options.onEnd();
+                    }
+
                     // Remove loading state
                     $input
                         .removeClass("woo-limit-loading")
@@ -496,6 +501,11 @@
                         return;
                     }
 
+                    // Call onEnd callback if provided
+                    if (options.onEnd) {
+                        options.onEnd();
+                    }
+
                     // Remove loading state
                     $input
                         .removeClass("woo-limit-loading")
@@ -526,6 +536,8 @@
          * @param {function} options.getVariationId - Function to get variation ID (optional)
          * @param {function} options.getCartItemKey - Function to get cart item key (optional)
          * @param {number} options.delay - Delay in milliseconds (default: 5000)
+         * @param {function} options.onStart - Callback when check starts (optional)
+         * @param {function} options.onEnd - Callback when check ends (before logic) (optional)
          */
         setupNumberValidation: function (options) {
             var self = this;
@@ -706,6 +718,8 @@
                         $input: $input,
                         $button: $button,
                         $errorDiv: $errorDiv,
+                        onStart: options.onStart,
+                        onEnd: options.onEnd,
                         onComplete: options.onComplete,
                     });
                 }
@@ -782,6 +796,8 @@
                         $input: $input,
                         $button: $button,
                         $errorDiv: $errorDiv,
+                        onStart: options.onStart,
+                        onEnd: options.onEnd,
                         onComplete: options.onComplete,
                     });
                     delete self.checkTimers[inputId];
