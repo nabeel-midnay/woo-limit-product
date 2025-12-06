@@ -130,9 +130,27 @@
         }
 
         /**
-         * Disable all variation swatches and selects
+         * Clear all swatch selections (reset to unselected state)
          */
-        function disableAllSwatches() {
+        function clearAllSwatchSelections() {
+            // Clear native select dropdowns
+            $(".variations select").val("").trigger("change");
+            // Clear RTWPVS swatches selection
+            $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("selected");
+            $(".rtwpvs-wc-select").val("").trigger("change");
+            // Clear variation ID
+            $('input[name="variation_id"]').val("");
+            variationSelected = false;
+        }
+
+        /**
+         * Disable all variation swatches and selects
+         * @param {boolean} clearSelections - Whether to also clear selections (default: false)
+         */
+        function disableAllSwatches(clearSelections) {
+            if (clearSelections) {
+                clearAllSwatchSelections();
+            }
             $(".variations select").prop("disabled", true);
             $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
         }
@@ -235,7 +253,7 @@
          */
         function handleUserLimitReached() {
             setOutOfStockState();
-            disableAllSwatches();
+            disableAllSwatches(true); // Clear selections when user limit reached
             $(".reset_variations").removeClass("show");
             showUserLimitReachedMessage();
         }
@@ -393,7 +411,7 @@
                         setOutOfStockState();
 
                         if (areAllVariationsOutOfStock()) {
-                            disableAllSwatches();
+                            disableAllSwatches(true); // Clear selections when all variations out of stock
                         } else {
                             disableVariationSwatch(variationId);
                         }
