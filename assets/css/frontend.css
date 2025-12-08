@@ -249,20 +249,22 @@
     font-weight: 500;
 }
 
-.woo-limit-selection-message{
-	position: relative;
+.woo-limit-selection-message {
+    position: relative;
 }
 
-.woo-limit-selection-message .woo-limit-variation-error{
-	position: absolute;
-	bottom: -5px;
+.woo-limit-selection-message .woo-limit-variation-error {
+    position: absolute;
+    bottom: -5px;
 }
-.woo-limit-selection-message.yes{
-	margin-top: 5px;
-	margin-bottom: 5px;
+
+.woo-limit-selection-message.yes {
+    margin-top: 5px;
+    margin-bottom: 5px;
 }
-.woo-limit-selection-message.yes .woo-limit-variation-error{
-	bottom: 0;
+
+.woo-limit-selection-message.yes .woo-limit-variation-error {
+    bottom: 0;
 }
 
 
@@ -1213,23 +1215,28 @@ input.qty {
     color: #333;
 }
 
-.woocommerce-checkout .limited-number-list{
-	display: flex;
-	gap: 10px;
-	flex-wrap: wrap;
+.woocommerce-checkout .limited-number-list {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
-.woocommerce-checkout span.limited-number{
-	width: 6.25rem;
-	height: 2.188rem;
-	border: 0.063rem solid var(--gray);
-	border-radius: 0;
-	font-size: 0.875rem;
-	line-height: 1.5rem;
-	font-weight: 400;
-	display: flex;
-	align-items: center;
-	justify-content: center;
+.woocommerce-checkout span.limited-number {
+    width: 6.25rem;
+    height: 2.188rem;
+    border: 0.063rem solid var(--gray);
+    border-radius: 0;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.autocomplete-suggestions {
+    top: 100%;
+    left: 0;
 }
 
 /* Responsive Design */
