@@ -53,6 +53,9 @@
         // Original max quantity setting (for error messages)
         var maxQuantitySetting = $(".woo-limit-max-quantity").val();
 
+        // Flag to prevent MutationObserver feedback loop when we're intentionally changing button state
+        var isSettingButtonState = false;
+
         // ========================================
         // Helper Functions - DRY Utilities
         // ========================================
@@ -61,20 +64,44 @@
          * Enable the add-to-cart button and remove all disabling attributes
          */
         function enableButton() {
+            isSettingButtonState = true;
             $addToCartButton
                 .prop("disabled", false)
                 .removeAttr("disabled")
                 .removeAttr("aria-disabled")
                 .removeClass("disabled wc-variation-selection-needed woo-outofstock");
+            isSettingButtonState = false;
         }
 
         /**
-         * Check if button should remain disabled (loading, out of stock, or just added)
+         * Check if product is fully unavailable (user limit reached, all variants OOS, or stock out)
+         * This is the central check for whether the product can be purchased at all.
+         * @returns {boolean}
+         */
+        function isProductFullyUnavailable() {
+            // User limit reached
+            if (userLimitRemaining <= 0) {
+                return true;
+            }
+            // Variable product: all variations out of stock
+            if (isVariableProduct && areAllVariationsOutOfStock()) {
+                return true;
+            }
+            // Simple product: stock out
+            if (!isVariableProduct && stockQuantityRemaining <= 0) {
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * Check if button should remain disabled (loading, unavailable, or just added)
          */
         function shouldButtonRemainDisabled() {
             return $addToCartButton.hasClass("woo-limit-loading") ||
                 $addToCartButton.hasClass("woo-outofstock") ||
-                $addToCartButton.hasClass("woo-limit-added");
+                $addToCartButton.hasClass("woo-limit-added") ||
+                isProductFullyUnavailable();
         }
 
         /**
@@ -90,6 +117,7 @@
          * Set button and input to out-of-stock state
          */
         function setOutOfStockState() {
+            isSettingButtonState = true;
             $addToCartButton
                 .prop("disabled", true)
                 .addClass("disabled woo-outofstock");
@@ -97,6 +125,7 @@
                 .prop("disabled", true)
                 .addClass("disabled woo-outofstock");
             $form.find('input[name="quantity"]').prop("disabled", true);
+            isSettingButtonState = false;
         }
 
         /**
@@ -258,9 +287,47 @@
          */
         function handleUserLimitReached() {
             setOutOfStockState();
-            disableAllSwatches(true); // Clear selections when user limit reached
-            $(".reset_variations").removeClass("show");
+            if (isVariableProduct) {
+                disableAllSwatches(true); // Clear selections when user limit reached
+                $(".reset_variations").removeClass("show");
+            }
             showUserLimitReachedMessage();
+        }
+
+        /**
+         * Handle all variants out of stock state (for variable products)
+         */
+        function handleAllVariantsOutOfStock() {
+            setOutOfStockState();
+            disableAllSwatches(true);
+            $(".reset_variations").removeClass("show");
+            window.IJWLP_Frontend_Common.showError(
+                "All variations are out of stock.", $errorDiv
+            );
+        }
+
+        /**
+         * Apply disabled state based on current product availability.
+         * This is the central handler for applying disabled states - use this instead of 
+         * calling individual handlers to ensure consistency.
+         * @returns {boolean} True if product is unavailable and state was applied
+         */
+        function applyFullyUnavailableState() {
+            if (userLimitRemaining <= 0) {
+                handleUserLimitReached();
+                return true;
+            }
+            if (isVariableProduct && areAllVariationsOutOfStock()) {
+                handleAllVariantsOutOfStock();
+                return true;
+            }
+            if (!isVariableProduct && stockQuantityRemaining <= 0) {
+                window.IJWLP_Frontend_Common.handleOutOfStock(
+                    false, $addToCartButton, $limitedNumberInput, $errorDiv
+                );
+                return true;
+            }
+            return false;
         }
 
         // ========================================
@@ -576,8 +643,8 @@
                     if (!wasSuccessful) {
                         clearButtonLoading(originalText);
 
-                        var isOutOfStock = $addToCartButton.hasClass("woo-outofstock");
-                        if (!isOutOfStock) {
+                        // Use unified check to cover all unavailable states
+                        if (!isProductFullyUnavailable() && !$addToCartButton.hasClass("woo-outofstock")) {
                             enableButton();
                             $addToCartButton.removeClass("woo-limit-loading disabled");
                             enableAllSwatches();
@@ -586,8 +653,14 @@
                             checkAddToCartState();
                         } else {
                             $addToCartButton.removeClass("woo-limit-loading");
-                            enableAllSwatches();
-                            initializeOutOfStockSwatches();
+                            // Explicitly ensure button stays disabled when product is fully unavailable
+                            if (isProductFullyUnavailable()) {
+                                $addToCartButton.prop("disabled", true).addClass("disabled");
+                            } else {
+                                // Only re-enable swatches for specific variant OOS case
+                                enableAllSwatches();
+                                initializeOutOfStockSwatches();
+                            }
                         }
                     }
                 }
@@ -627,9 +700,9 @@
             $addToCartButton.text("Added").addClass("woo-limit-added");
             setTimeout(function () {
                 $addToCartButton.text(originalText).removeClass("woo-limit-added");
-                // Re-enable button after text reverts (if not out of stock)
-                var isOutOfStock = $addToCartButton.hasClass("woo-outofstock");
-                if (!isOutOfStock) {
+                // Re-enable button after text reverts (if product is still available)
+                // Use the unified check to cover all unavailable states
+                if (!isProductFullyUnavailable() && !$addToCartButton.hasClass("woo-outofstock")) {
                     enableButton();
                     $addToCartButton.removeClass("woo-limit-loading disabled");
                     enableAllSwatches();
@@ -638,8 +711,14 @@
                     checkAddToCartState();
                 } else {
                     $addToCartButton.removeClass("woo-limit-loading");
-                    enableAllSwatches();
-                    initializeOutOfStockSwatches();
+                    // Explicitly ensure button stays disabled when product is fully unavailable
+                    if (isProductFullyUnavailable()) {
+                        $addToCartButton.prop("disabled", true).addClass("disabled");
+                    } else {
+                        // Only re-enable swatches for specific variant OOS case
+                        enableAllSwatches();
+                        initializeOutOfStockSwatches();
+                    }
                 }
             }, 2000);
 
@@ -743,24 +822,19 @@
             initializeOutOfStockSwatches();
         }, 100);
 
-        // Check initial stock and user limit for simple products on page load
-        if (!isVariableProduct) {
-            if (stockQuantityRemaining <= 0) {
-                // Simple product is out of stock
-                window.IJWLP_Frontend_Common.handleOutOfStock(
-                    false, $addToCartButton, $limitedNumberInput, $errorDiv
-                );
-            } else if (userLimitRemaining <= 0) {
-                // User has reached their purchase limit
-                handleUserLimitReached();
-            }
-        }
+        // Check initial stock and user limit on page load (handles both simple and variable products)
+        // Use the unified handler to apply disabled state if product is unavailable
+        applyFullyUnavailableState();
 
         // ========================================
         // Mutation Observer - Block third-party disabling
         // ========================================
 
         var buttonObserver = new MutationObserver(function (mutations) {
+            // Skip if we're intentionally changing button state to prevent feedback loop
+            if (isSettingButtonState) {
+                return;
+            }
             mutations.forEach(function (mutation) {
                 if (mutation.type === "attributes" ||
                     (mutation.type === "childList" && mutation.target === $addToCartButton[0])) {
@@ -790,11 +864,15 @@
 
         if (isVariableProduct) {
             $form.on("found_variation", function (event, variation) {
+                // If product is fully unavailable, don't allow interaction
+                if (isProductFullyUnavailable()) {
+                    return;
+                }
                 clearPendingTimer();
                 variationSelected = true;
                 checkVariationSelected();
                 updateFieldStates();
-                enableButton();
+                safeEnableButton();
                 $limitedNumberInput
                     .val("")
                     .prop("disabled", false)
@@ -808,13 +886,17 @@
             });
 
             $form.on("reset_data", function () {
+                // If product is fully unavailable, don't allow any interaction
+                if (isProductFullyUnavailable()) {
+                    return;
+                }
                 variationSelected = false;
                 $limitedNumberInput
                     .val("")
                     .prop("disabled", true)
                     .addClass("disabled")
                     .removeClass("woo-outofstock");
-                enableButton();
+                safeEnableButton();
                 window.IJWLP_Frontend_Common.hideError();
                 // Re-apply out-of-stock states after reset
                 setTimeout(function () {
