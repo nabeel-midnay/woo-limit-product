@@ -12,63 +12,29 @@
     $(document).ready(function () {
         var cartAvailableTimer = null;
 
-        // ==================== VALIDATION QUEUE ====================
-        // Tracks pending and validated field changes to prevent cart refresh
-        // until all edited fields are validated
-        var validationQueue = {
-            pending: {},      // Fields with changes waiting for validation
-            validated: {},    // Fields that have been validated
+        // ==================== VALIDATION TRACKER ====================
+        // Tracks the currently validating field to enable sequential validation
+        // Only one field can be edited and validated at a time
+        var validationTracker = {
+            currentlyValidating: null,
 
-            // Generate unique key for a field
-            getKey: function (cartKey, index) {
-                return cartKey + '_' + (index || 0);
-            },
-
-            // Mark a field as dirty (needing validation)
-            markDirty: function (cartKey, index, $input) {
-                var key = this.getKey(cartKey, index);
-                this.pending[key] = {
-                    $input: $input,
-                    value: $input.val().trim(),
-                    validated: false,
+            // Set a field as currently validating
+            setValidating: function (cartKey, index, $input) {
+                this.currentlyValidating = {
                     cartKey: cartKey,
-                    index: index
+                    index: index,
+                    $input: $input
                 };
-                delete this.validated[key];
             },
 
-            // Mark a field as validated
-            markValidated: function (cartKey, index) {
-                var key = this.getKey(cartKey, index);
-                if (this.pending[key]) {
-                    this.pending[key].validated = true;
-                    this.validated[key] = this.pending[key];
-                    delete this.pending[key];
-                }
+            // Clear the validating state
+            clearValidating: function () {
+                this.currentlyValidating = null;
             },
 
-            // Remove a field from tracking
-            remove: function (cartKey, index) {
-                var key = this.getKey(cartKey, index);
-                delete this.pending[key];
-                delete this.validated[key];
-            },
-
-            // Clear all tracking
-            clear: function () {
-                this.pending = {};
-                this.validated = {};
-                this.cartUpdatePending = false;
-            },
-
-            // Check if there are any pending (unvalidated) fields
-            hasPending: function () {
-                return Object.keys(this.pending).length > 0;
-            },
-
-            // Check if any field has been validated and cart update is needed
-            hasValidated: function () {
-                return Object.keys(this.validated).length > 0;
+            // Check if a field is currently being validated
+            isValidating: function () {
+                return this.currentlyValidating !== null;
             },
 
             // Check if there are any empty fields in the cart that should have values
@@ -81,30 +47,6 @@
                     }
                 });
                 return hasEmpty;
-            },
-
-            // Request cart update - only fires when all pending are validated
-            cartUpdatePending: false,
-            requestCartUpdate: function () {
-                this.cartUpdatePending = true;
-                this.maybeUpdateCart();
-            },
-
-            // Actually trigger cart update if conditions met
-            maybeUpdateCart: function () {
-                var self = this;
-                // Check if there are empty fields - if so, don't update cart yet
-                if (this.hasEmptyFields()) {
-                    return;
-                }
-                if (this.cartUpdatePending && !this.hasPending()) {
-                    this.cartUpdatePending = false;
-                    this.validated = {};
-                    // Small delay to allow any final UI updates
-                    setTimeout(function () {
-                        triggerCartUpdate();
-                    }, 200);
-                }
             }
         };
 
@@ -215,17 +157,32 @@
                 getProductId: function () { return productId; },
                 getVariationId: function () { return 0; },
                 getCartItemKey: function () { return $input.data("cart-key"); },
-                onStart: disableAllCartFields,
-                onEnd: enableAllCartFields,
+                onStart: function () {
+                    // Mark field as validating
+                    var index = $input.data("index") || 0;
+                    var cKey = $input.data("cart-key");
+                    validationTracker.setValidating(cKey, index, $input);
+
+                    // Disable all cart fields and other limit inputs
+                    disableAllCartFields();
+                    $(".woo-limit-cart-item input.woo-limit").not($input).prop("disabled", true);
+                },
+                onEnd: function () {
+                    // Clear validating state
+                    validationTracker.clearValidating();
+
+                    // Re-enable all cart fields
+                    enableAllCartFields();
+                    $(".woo-limit-cart-item input.woo-limit").prop("disabled", false);
+                },
                 onComplete: function (data) {
                     if (data && data.available) {
                         $input.data("old-value", $input.val().trim());
-                        // Mark this field as validated in the queue
-                        var index = $input.data("index") || 0;
-                        var cKey = $input.data("cart-key");
-                        validationQueue.markValidated(cKey, index);
-                        // Request cart update - will only fire when all pending are validated
-                        validationQueue.requestCartUpdate();
+
+                        // Immediately trigger cart update after successful validation
+                        setTimeout(function () {
+                            triggerCartUpdate();
+                        }, 300);
                     }
                 },
             });
@@ -245,25 +202,8 @@
 
         initializeAllLimitInputs();
         $(document.body).on("updated_cart_totals", function () {
-            validationQueue.clear();
+            validationTracker.clearValidating();
             initializeAllLimitInputs();
-        });
-
-        // Track field changes for validation queue
-        $(document).on("input", ".woo-limit-cart-item input.woo-limit", function () {
-            var $input = $(this);
-            var cartKey = $input.data("cart-key");
-            var index = $input.data("index") || 0;
-            var value = $input.val().trim();
-            var oldValue = $input.data("old-value") || "";
-
-            // If value changed from old value, mark as dirty
-            if (value !== oldValue && value !== "") {
-                validationQueue.markDirty(cartKey, index, $input);
-            } else if (value === "" || value === oldValue) {
-                // Remove from queue if cleared or reverted to old value
-                validationQueue.remove(cartKey, index);
-            }
         });
 
         // ==================== CART UPDATE TRIGGER ====================
@@ -554,7 +494,7 @@
 
                     // Check if remaining fields all have values
                     // If any remaining field is empty, don't trigger cart update yet
-                    var hasEmptyRemaining = validationQueue.hasEmptyFields();
+                    var hasEmptyRemaining = validationTracker.hasEmptyFields();
                     if (hasEmptyRemaining) {
                         return;
                     }
@@ -653,13 +593,30 @@
         // Disable all other inputs when one is focused
         $(document).on("focus", ".woo-limit-cart-item input.woo-limit", function () {
             var $focused = $(this);
+
+            // If another field is currently being validated, prevent focus
+            if (validationTracker.isValidating()) {
+                var validatingInput = validationTracker.currentlyValidating.$input;
+                if (!validatingInput.is($focused)) {
+                    $focused.blur();
+                    showClientNotice("Please wait for the current field to finish validating.");
+                    return;
+                }
+            }
+
+            // Disable all other fields
             $(".woo-limit-cart-item input.woo-limit").not($focused).prop("disabled", true);
             $(".quantity-btn").prop("disabled", true);
             $("input.qty").prop("disabled", true);
         });
 
-        // Re-enable all inputs when focus is lost
+        // Re-enable all inputs when focus is lost (only if not validating)
         $(document).on("blur", ".woo-limit-cart-item input.woo-limit", function () {
+            // Don't re-enable if validation is in progress
+            if (validationTracker.isValidating()) {
+                return;
+            }
+
             $(".woo-limit-cart-item input.woo-limit").prop("disabled", false);
             $(".cart_item").each(function () { updateQtyButtonsState($(this)); });
             $("input.qty").prop("disabled", false);
