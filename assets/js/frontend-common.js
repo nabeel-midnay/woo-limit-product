@@ -913,7 +913,16 @@
             var $customBox = $(
                 "<div class='woo-limit-autocomplete-box'></div>"
             );
-            $wrapper.append($customBox);
+            
+            // On cart page, append to the individual cart item container so the 
+            // suggestion box appears directly below the typed input, not below the last input
+            var $cartItem = $input.closest(".woo-limit-cart-item");
+            if ($cartItem.length) {
+                $cartItem.append($customBox);
+            } else {
+                // Product page: only one input, so append to wrapper
+                $wrapper.append($customBox);
+            }
 
             function refresh() {
                 self.refreshAutocomplete($input);
