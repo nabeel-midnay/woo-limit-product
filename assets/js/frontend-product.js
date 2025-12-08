@@ -70,8 +70,8 @@
          */
         function shouldButtonRemainDisabled() {
             return $addToCartButton.hasClass("woo-limit-loading") ||
-                   $addToCartButton.hasClass("woo-outofstock") ||
-                   $addToCartButton.hasClass("woo-limit-added");
+                $addToCartButton.hasClass("woo-outofstock") ||
+                $addToCartButton.hasClass("woo-limit-added");
         }
 
         /**
@@ -187,8 +187,8 @@
          */
         function clearPendingTimer() {
             var inputId = $limitedNumberInput.attr("id") || "default";
-            if (window.IJWLP_Frontend_Common && 
-                window.IJWLP_Frontend_Common.checkTimers && 
+            if (window.IJWLP_Frontend_Common &&
+                window.IJWLP_Frontend_Common.checkTimers &&
                 window.IJWLP_Frontend_Common.checkTimers[inputId]) {
                 clearTimeout(window.IJWLP_Frontend_Common.checkTimers[inputId]);
                 delete window.IJWLP_Frontend_Common.checkTimers[inputId];
@@ -202,7 +202,9 @@
         function getProductIds() {
             return {
                 productId: $form.find('input[name="add-to-cart"]').val() ||
-                           $form.find('input[name="product_id"]').val(),
+                    $form.find('input[name="product_id"]').val() ||
+                    $form.find('button[name="add-to-cart"]').val() ||
+                    $form.data('product_id'),
                 variationId: $form.find('input[name="variation_id"]').val() || 0
             };
         }
@@ -292,7 +294,7 @@
 
                 if (varAttrs && varAttrs[attrName] &&
                     (String(varAttrs[attrName]).toLowerCase() === String(attrValue).toLowerCase() ||
-                     varAttrs[attrName] === '')) {
+                        varAttrs[attrName] === '')) {
 
                     if (variation.variation_id != currentVariationId) {
                         var varStock = variationStockQuantities[variation.variation_id];
@@ -331,13 +333,13 @@
             var attrs = getVariationAttributes(variationId);
             if (!attrs) return;
 
-            $.each(attrs, function(attrName, attrValue) {
+            $.each(attrs, function (attrName, attrValue) {
                 if (!attrValue) return;
 
                 if (!isOnlyVariationForAttributeOutOfStock(attrName, attrValue, variationId)) return;
 
                 // Disable swatch
-                $('.rtwpvs-terms-wrapper .rtwpvs-term').each(function() {
+                $('.rtwpvs-terms-wrapper .rtwpvs-term').each(function () {
                     var $swatch = $(this);
                     var swatchValue = $swatch.data('value') || $swatch.data('term') || $swatch.attr('data-value');
                     if (swatchValue && String(swatchValue).toLowerCase() === String(attrValue).toLowerCase()) {
@@ -347,14 +349,14 @@
 
                 // Disable select option
                 var selectName = attrName.replace('attribute_', '');
-                $('.variations select').each(function() {
+                $('.variations select').each(function () {
                     var $select = $(this);
                     var selectAttrName = $select.attr('name') || $select.attr('id') || $select.data('attribute_name');
 
-                    if (selectAttrName && (selectAttrName === attrName || 
-                        selectAttrName === selectName || 
+                    if (selectAttrName && (selectAttrName === attrName ||
+                        selectAttrName === selectName ||
                         selectAttrName.indexOf(selectName) !== -1)) {
-                        $select.find('option').each(function() {
+                        $select.find('option').each(function () {
                             var $option = $(this);
                             if ($option.val() && String($option.val()).toLowerCase() === String(attrValue).toLowerCase()) {
                                 $option.remove();
@@ -448,7 +450,7 @@
          */
         function updateUserLimitAfterPurchase(quantity) {
             if (userLimitRemaining === Infinity) return false;
-			
+
             userLimitRemaining = Math.max(0, userLimitRemaining - quantity);
             $(".woo-limit-user-remaining").val(userLimitRemaining);
 
@@ -570,7 +572,7 @@
                     // Success case re-enabling is handled in the 2-second timeout
                     if (!wasSuccessful) {
                         clearButtonLoading(originalText);
-                        
+
                         var isOutOfStock = $addToCartButton.hasClass("woo-outofstock");
                         if (!isOutOfStock) {
                             enableButton();
@@ -784,7 +786,7 @@
                 clearInputClasses();
                 clearAllMessages();
                 // Re-apply out-of-stock states after variation change
-                setTimeout(function() {
+                setTimeout(function () {
                     initializeOutOfStockSwatches();
                 }, 50);
             });
@@ -799,7 +801,7 @@
                 enableButton();
                 window.IJWLP_Frontend_Common.hideError();
                 // Re-apply out-of-stock states after reset
-                setTimeout(function() {
+                setTimeout(function () {
                     initializeOutOfStockSwatches();
                 }, 50);
             });
