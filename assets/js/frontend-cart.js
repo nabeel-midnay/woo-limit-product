@@ -13,10 +13,94 @@
         var cartAvailableTimer = null;
 
         // ==================== VALIDATION TRACKER ====================
-        // Tracks the currently validating field to enable sequential validation
+        // Tracks the currently validating/editing field to enable sequential validation
         // Only one field can be edited and validated at a time
         var validationTracker = {
             currentlyValidating: null,
+            lockedField: null,  // Track the actively editing field (locked immediately on focus)
+            pendingNewField: null,  // Track newly added field that must be completed or removed
+
+            // Lock a field immediately when user starts editing
+            lockField: function (cartKey, index, $input) {
+                this.lockedField = {
+                    cartKey: cartKey,
+                    index: index,
+                    $input: $input
+                };
+                // Immediately disable all other fields and controls
+                $(".woo-limit-cart-item input.woo-limit").not($input).prop("disabled", true);
+                $(".quantity-btn").prop("disabled", true);
+                $("input.qty").prop("disabled", true);
+                $("button[name='update_cart'], input[name='update_cart']").prop("disabled", true);
+                $(".checkout-button").addClass("disabled").prop("disabled", true);
+            },
+
+            // Unlock only when validation succeeds OR cart updates
+            unlockField: function () {
+                this.lockedField = null;
+                // Re-enable all fields
+                $(".woo-limit-cart-item input.woo-limit").prop("disabled", false);
+                $("input.qty").prop("disabled", false);
+                $(".checkout-button").removeClass("disabled").prop("disabled", false);
+                // Restore button states based on current validation state
+                $(".cart_item").each(function () { updateQtyButtonsState($(this)); });
+            },
+
+            // Check if editing is locked
+            isLocked: function () {
+                return this.lockedField !== null;
+            },
+
+            // Check if this specific input is the locked one
+            isLockedInput: function ($input) {
+                return this.lockedField && this.lockedField.$input.is($input);
+            },
+
+            // Set a pending new field (must be completed or will be removed)
+            setPendingNewField: function (cartKey, $input, $wrapper, $qty) {
+                this.pendingNewField = {
+                    cartKey: cartKey,
+                    $input: $input,
+                    $wrapper: $wrapper,
+                    $qty: $qty
+                };
+            },
+
+            // Clear pending new field (called after successful validation)
+            clearPendingNewField: function () {
+                this.pendingNewField = null;
+            },
+
+            // Check if there's a pending new field
+            hasPendingNewField: function () {
+                return this.pendingNewField !== null;
+            },
+
+            // Check if this input is the pending new field
+            isPendingInput: function ($input) {
+                return this.pendingNewField && this.pendingNewField.$input.is($input);
+            },
+
+            // Remove the pending new field and revert quantity
+            removePendingNewField: function () {
+                if (!this.pendingNewField) return;
+
+                var pending = this.pendingNewField;
+                var $item = pending.$input.closest(".woo-limit-cart-item");
+                var $qty = pending.$qty;
+                var currentQty = safeInt($qty.val());
+
+                // Remove the field
+                $item.remove();
+
+                // Revert quantity
+                var newQty = Math.max(0, currentQty - 1);
+                $qty.val(newQty);
+                $qty.data("old-qty", newQty);
+
+                this.pendingNewField = null;
+                this.unlockField();
+            },
 
             // Set a field as currently validating
             setValidating: function (cartKey, index, $input) {
@@ -158,32 +242,37 @@
                 getVariationId: function () { return 0; },
                 getCartItemKey: function () { return $input.data("cart-key"); },
                 onStart: function () {
-                    // Mark field as validating
+                    // Mark field as validating (lock should already be in place from focus)
                     var index = $input.data("index") || 0;
                     var cKey = $input.data("cart-key");
                     validationTracker.setValidating(cKey, index, $input);
 
-                    // Disable all cart fields and other limit inputs
-                    disableAllCartFields();
-                    $(".woo-limit-cart-item input.woo-limit").not($input).prop("disabled", true);
+                    // Ensure lock is in place (in case focus didn't trigger it)
+                    if (!validationTracker.isLocked()) {
+                        validationTracker.lockField(cKey, index, $input);
+                    }
                 },
                 onEnd: function () {
-                    // Clear validating state
+                    // Clear validating state only - don't unlock yet
+                    // Unlock happens on successful validation or cart update
                     validationTracker.clearValidating();
-
-                    // Re-enable all cart fields
-                    enableAllCartFields();
-                    $(".woo-limit-cart-item input.woo-limit").prop("disabled", false);
                 },
                 onComplete: function (data) {
                     if (data && data.available) {
                         $input.data("old-value", $input.val().trim());
 
-                        // Immediately trigger cart update after successful validation
+                        // Clear pending new field status on successful validation
+                        if (validationTracker.isPendingInput($input)) {
+                            validationTracker.clearPendingNewField();
+                        }
+
+                        // Unlock and trigger cart update after successful validation
+                        validationTracker.unlockField();
                         setTimeout(function () {
                             triggerCartUpdate();
                         }, 300);
                     }
+                    // If validation fails, stay locked so user must fix the same field
                 },
             });
 
@@ -202,6 +291,8 @@
 
         initializeAllLimitInputs();
         $(document.body).on("updated_cart_totals", function () {
+            // Unlock and clear all states on cart update
+            validationTracker.unlockField();
             validationTracker.clearValidating();
             initializeAllLimitInputs();
         });
@@ -458,22 +549,31 @@
                     return;
                 }
 
-                for (var i = 0; i < toAdd; i++) {
-                    var index = currentCount + i;
-                    var $div = $('<div class="woo-limit-cart-item woo-input-single gt-2"></div>');
-                    var $inp = $('<input type="number" class="woo-limit woo-cart-items" name="woo_limit[' + cartKey + '][]" />');
-                    $inp.attr({ "data-cart-key": cartKey, "data-index": index, "data-old-value": "" });
-                    if ($wrapper.data("start")) $inp.attr("min", $wrapper.data("start"));
-                    if ($wrapper.data("end")) $inp.attr("max", $wrapper.data("end"));
-                    var $errDiv = $('<div class="woo-limit-message" style="display: none;"></div>');
-                    $div.append($inp).append($errDiv);
-                    var $avail = $wrapper.find(".woo-limit-available-numbers").first();
-                    if ($avail.length) $avail.before($div); else $wrapper.append($div);
-                    setupLimitInput($inp);
-                }
+                // Only add one field at a time for limited products
+                var index = currentCount;
+                var $div = $('<div class="woo-limit-cart-item woo-input-single gt-2"></div>');
+                var $inp = $('<input type="number" class="woo-limit woo-cart-items" name="woo_limit[' + cartKey + '][]" />');
+                $inp.attr({ "data-cart-key": cartKey, "data-index": index, "data-old-value": "" });
+                if ($wrapper.data("start")) $inp.attr("min", $wrapper.data("start"));
+                if ($wrapper.data("end")) $inp.attr("max", $wrapper.data("end"));
+                var $errDiv = $('<div class="woo-limit-message" style="display: none;"></div>');
+                $div.append($inp).append($errDiv);
+                var $avail = $wrapper.find(".woo-limit-available-numbers").first();
+                if ($avail.length) $avail.before($div); else $wrapper.append($div);
+                setupLimitInput($inp);
 
-                finalizeQty(newQty);
-                enforceAndUpdate($qty, false);
+                // Mark as pending new field - must be completed or will be removed
+                validationTracker.setPendingNewField(cartKey, $inp, $wrapper, $qty);
+
+                // Lock to this field and auto-focus it
+                validationTracker.lockField(cartKey, index, $inp);
+                setTimeout(function () {
+                    $inp.focus();
+                }, 100);
+
+                // Only increase qty by 1 (not toAdd)
+                $qty.val(currentCount + 1);
+                finalizeQty(currentCount + 1);
                 return;
             }
 
@@ -590,36 +690,37 @@
             updateQtyButtonsState($(this).closest(".cart_item"));
         });
 
-        // Disable all other inputs when one is focused
+        // Lock field immediately on focus - prevents switching to other fields
         $(document).on("focus", ".woo-limit-cart-item input.woo-limit", function () {
             var $focused = $(this);
 
-            // If another field is currently being validated, prevent focus
-            if (validationTracker.isValidating()) {
-                var validatingInput = validationTracker.currentlyValidating.$input;
-                if (!validatingInput.is($focused)) {
-                    $focused.blur();
-                    showClientNotice("Please wait for the current field to finish validating.");
-                    return;
-                }
+            // If there's a pending new field and user tries to focus a different field
+            if (validationTracker.hasPendingNewField() && !validationTracker.isPendingInput($focused)) {
+                // Remove the pending new field and revert quantity
+                validationTracker.removePendingNewField();
+                showClientNotice("New field removed - please complete one field at a time.");
+                // Focus will now proceed to the clicked field
             }
 
-            // Disable all other fields
-            $(".woo-limit-cart-item input.woo-limit").not($focused).prop("disabled", true);
-            $(".quantity-btn").prop("disabled", true);
-            $("input.qty").prop("disabled", true);
+            // If another field is locked (not pending), block focus completely
+            if (validationTracker.isLocked() && !validationTracker.isLockedInput($focused)) {
+                $focused.blur();
+                showClientNotice("Please complete the current field first.");
+                return false;
+            }
+
+            // Lock this field immediately
+            var cartKey = $focused.data("cart-key");
+            var index = $focused.data("index") || 0;
+            validationTracker.lockField(cartKey, index, $focused);
         });
 
-        // Re-enable all inputs when focus is lost (only if not validating)
+        // On blur: DON'T unlock - stay locked until validation succeeds or cart updates
         $(document).on("blur", ".woo-limit-cart-item input.woo-limit", function () {
-            // Don't re-enable if validation is in progress
-            if (validationTracker.isValidating()) {
-                return;
-            }
-
-            $(".woo-limit-cart-item input.woo-limit").prop("disabled", false);
-            $(".cart_item").each(function () { updateQtyButtonsState($(this)); });
-            $("input.qty").prop("disabled", false);
+            // Intentionally do nothing here - field stays locked
+            // Unlock only happens via:
+            // 1. Successful validation (onComplete with data.available)
+            // 2. Cart update (updated_cart_totals event)
         });
 
         // ==================== QUANTITY BUTTON HANDLERS ====================
