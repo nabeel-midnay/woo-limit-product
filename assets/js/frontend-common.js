@@ -931,7 +931,6 @@
                 containerClass:
                     "woo-limit-autocomplete autocomplete-suggestions",
                 onSelect: function (s) {
-                    console.log('Clicked suggestion value:', s.value);
                     $input.val(s.value).trigger("input").trigger("change");
                     // Trigger Enter keypress to check availability immediately (like pressing Enter)
                     // Use which, keyCode, and key for maximum browser compatibility
@@ -942,6 +941,42 @@
                         if (inst2) inst2.hide();
                     }, 100);
                 },
+            });
+
+            // Add touch event support for mobile/touchpad devices
+            // The Devbridge Autocomplete library doesn't handle touch events properly by default
+            $customBox.on("touchstart", ".autocomplete-suggestion", function (e) {
+                // Mark that we started a touch on this element
+                $(this).data("touch-started", true);
+            });
+
+            $customBox.on("touchend", ".autocomplete-suggestion", function (e) {
+                var $suggestion = $(this);
+                // Only proceed if touchstart was on the same element
+                if (!$suggestion.data("touch-started")) return;
+                $suggestion.removeData("touch-started");
+
+                // Prevent the default touch behavior and any ghost click
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Get the suggestion value and trigger selection
+                var suggestionValue = $suggestion.data("val");
+                if (suggestionValue !== undefined) {
+                    $input.val(suggestionValue).trigger("input").trigger("change");
+                    // Trigger Enter keypress to check availability immediately
+                    var enterEvent = $.Event("keypress", { which: 13, keyCode: 13, key: "Enter" });
+                    $input.trigger(enterEvent);
+                    setTimeout(function () {
+                        var inst2 = $input.data("autocomplete");
+                        if (inst2) inst2.hide();
+                    }, 100);
+                }
+            });
+
+            // Clear touch state if touch is cancelled or moves away
+            $customBox.on("touchcancel touchmove", ".autocomplete-suggestion", function () {
+                $(this).removeData("touch-started");
             });
 
             $input.on("input", refresh);
