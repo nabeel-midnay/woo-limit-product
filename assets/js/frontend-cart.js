@@ -12,6 +12,44 @@
     $(document).ready(function () {
         var cartAvailableTimer = null;
 
+        // ==================== SELECTORS (DRY) ====================
+        var SEL = {
+            limitInput: ".woo-limit-cart-item input.woo-limit",
+            limitItem: ".woo-limit-cart-item",
+            fieldWrapper: ".woo-limit-field-wrapper",
+            qtyBtn: ".quantity-btn",
+            qtyInput: "input.qty",
+            updateBtn: "button[name='update_cart'], input[name='update_cart']",
+            checkoutBtn: ".checkout-button",
+            cartItem: ".cart_item",
+            limitMessage: ".woo-limit-message",
+            quantityMessage: ".woo-limit-quantity-message"
+        };
+
+        // ==================== UTILITY FUNCTIONS ====================
+
+        // Parse integer with fallback
+        function safeInt(val, fallback) {
+            var parsed = parseInt(val || "", 10);
+            return isNaN(parsed) ? (fallback || 0) : parsed;
+        }
+
+        // Check if input is empty
+        function isInputEmpty($input) {
+            return String($input.val()).trim() === "";
+        }
+
+        // Get quantity value from input
+        function getQtyValue($qty) {
+            return safeInt($qty.val());
+        }
+
+        // Set quantity value and optionally update old-qty data
+        function setQtyData($qty, value, updateOld) {
+            $qty.val(value);
+            if (updateOld) $qty.data("old-qty", value);
+        }
+
         // ==================== VALIDATION TRACKER ====================
         // Tracks the currently validating/editing field to enable sequential validation
         // Only one field can be edited and validated at a time
@@ -28,22 +66,22 @@
                     $input: $input
                 };
                 // Immediately disable all other fields and controls
-                $(".woo-limit-cart-item input.woo-limit").not($input).prop("disabled", true);
-                $(".quantity-btn").prop("disabled", true);
-                $("input.qty").prop("disabled", true);
-                $("button[name='update_cart'], input[name='update_cart']").prop("disabled", true);
-                $(".checkout-button").addClass("disabled").prop("disabled", true);
+                $(SEL.limitInput).not($input).prop("disabled", true);
+                $(SEL.qtyBtn).prop("disabled", true);
+                $(SEL.qtyInput).prop("disabled", true);
+                $(SEL.updateBtn).prop("disabled", true);
+                $(SEL.checkoutBtn).addClass("disabled").prop("disabled", true);
             },
 
             // Unlock only when validation succeeds OR cart updates
             unlockField: function () {
                 this.lockedField = null;
                 // Re-enable all fields
-                $(".woo-limit-cart-item input.woo-limit").prop("disabled", false);
-                $("input.qty").prop("disabled", false);
-                $(".checkout-button").removeClass("disabled").prop("disabled", false);
+                $(SEL.limitInput).prop("disabled", false);
+                $(SEL.qtyInput).prop("disabled", false);
+                $(SEL.checkoutBtn).removeClass("disabled").prop("disabled", false);
                 // Restore button states based on current validation state
-                $(".cart_item").each(function () { updateQtyButtonsState($(this)); });
+                $(SEL.cartItem).each(function () { updateQtyButtonsState($(this)); });
             },
 
             // Check if editing is locked
@@ -86,17 +124,16 @@
                 if (!this.pendingNewField) return;
 
                 var pending = this.pendingNewField;
-                var $item = pending.$input.closest(".woo-limit-cart-item");
+                var $item = pending.$input.closest(SEL.limitItem);
                 var $qty = pending.$qty;
-                var currentQty = safeInt($qty.val());
+                var currentQty = getQtyValue($qty);
 
                 // Remove the field
                 $item.remove();
 
                 // Revert quantity
                 var newQty = Math.max(0, currentQty - 1);
-                $qty.val(newQty);
-                $qty.data("old-qty", newQty);
+                setQtyData($qty, newQty, true);
 
                 this.pendingNewField = null;
                 this.unlockField();
@@ -124,8 +161,8 @@
             // Check if there are any empty fields in the cart that should have values
             hasEmptyFields: function () {
                 var hasEmpty = false;
-                $(".woo-limit-cart-item input.woo-limit").each(function () {
-                    if ($(this).val().trim() === "") {
+                $(SEL.limitInput).each(function () {
+                    if (isInputEmpty($(this))) {
                         hasEmpty = true;
                         return false; // break
                     }
@@ -133,14 +170,6 @@
                 return hasEmpty;
             }
         };
-
-        // ==================== UTILITY FUNCTIONS ====================
-
-        // Parse integer with fallback
-        function safeInt(val, fallback) {
-            var parsed = parseInt(val || "", 10);
-            return isNaN(parsed) ? (fallback || 0) : parsed;
-        }
 
         // Get product name from various sources
         function getProductName($row, $wrapper) {
@@ -206,19 +235,19 @@
 
         function setCartFieldsState(disabled) {
             var state = !!disabled;
-            $("input.qty").prop("disabled", state);
-            $(".quantity-btn").prop("disabled", state);
-            $(".woo-limit-cart-item input.woo-limit").prop("disabled", state);
-            $("button[name='update_cart'], input[name='update_cart']").prop("disabled", state);
+            $(SEL.qtyInput).prop("disabled", state);
+            $(SEL.qtyBtn).prop("disabled", state);
+            $(SEL.limitInput).prop("disabled", state);
+            $(SEL.updateBtn).prop("disabled", state);
             $(".woo-coupon-btn").prop("disabled", state);
 
             if (state) {
-                $(".checkout-button").addClass("disabled").prop("disabled", true);
+                $(SEL.checkoutBtn).addClass("disabled").prop("disabled", true);
                 $(".quantity").css("pointer-events", "none");
             } else {
                 $(".quantity").css("pointer-events", "");
-                $(".checkout-button").removeClass("disabled").prop("disabled", false);
-                $(".cart_item").each(function () { updateQtyButtonsState($(this)); });
+                $(SEL.checkoutBtn).removeClass("disabled").prop("disabled", false);
+                $(SEL.cartItem).each(function () { updateQtyButtonsState($(this)); });
             }
         }
 
@@ -228,9 +257,9 @@
         // ==================== LIMIT INPUT SETUP ====================
 
         function setupLimitInput($input) {
-            var $wrapper = $input.closest(".woo-limit-field-wrapper");
-            var $cartItem = $input.closest(".woo-limit-cart-item");
-            var $errorDiv = $cartItem.find(".woo-limit-message");
+            var $wrapper = $input.closest(SEL.fieldWrapper);
+            var $cartItem = $input.closest(SEL.limitItem);
+            var $errorDiv = $cartItem.find(SEL.limitMessage);
             var productId = $wrapper.data("product-id");
 
             window.IJWLP_Frontend_Common.setupNumberValidation({
@@ -299,8 +328,19 @@
 
         // ==================== CART UPDATE TRIGGER ====================
 
+        // Hide all limit-related error messages
+        function hideAllLimitErrors() {
+            $(SEL.limitMessage).hide().removeClass("woo-limit-error");
+            $(SEL.quantityMessage).hide().removeClass("woo-limit-error");
+            $(".woo-limit.woo-limit-error").removeClass("woo-limit-error");
+            $(".woo-number-range.woo-limit-error").removeClass("woo-limit-error");
+        }
+
         function triggerCartUpdate() {
-            var $updateBtn = $("button[name='update_cart'], input[name='update_cart']").first();
+            // Hide all error messages when cart update starts
+            hideAllLimitErrors();
+
+            var $updateBtn = $(SEL.updateBtn).first();
             if ($updateBtn.length) {
                 setTimeout(function () { $updateBtn.trigger("click"); }, 150);
                 return;
@@ -320,7 +360,7 @@
 
         function collectGroups() {
             var groups = {};
-            $(".woo-limit-field-wrapper").each(function () {
+            $(SEL.fieldWrapper).each(function () {
                 var $w = $(this);
                 var parentId = String($w.data("product-id"));
                 var cartKey = $w.data("cart-item-key");
@@ -328,10 +368,10 @@
 
                 var $qty = $('input[name="cart[' + cartKey + '][qty]"]');
                 if (!$qty.length) {
-                    $qty = $w.closest(".cart_item").find("input.qty");
+                    $qty = $w.closest(SEL.cartItem).find(SEL.qtyInput);
                 }
 
-                var qtyVal = $qty.length ? safeInt($qty.val()) : 0;
+                var qtyVal = $qty.length ? getQtyValue($qty) : 0;
 
                 if (!groups[parentId]) groups[parentId] = { items: [], max: max };
                 groups[parentId].items.push({ cartKey: cartKey, $qty: $qty, qty: qtyVal, $wrapper: $w });
@@ -405,8 +445,8 @@
             }, true);
         }
 
-        $("input.qty").each(function () {
-            $(this).data("old-qty", safeInt($(this).val()));
+        $(SEL.qtyInput).each(function () {
+            $(this).data("old-qty", getQtyValue($(this)));
         });
 
         // ==================== REMOVAL MODAL ====================
@@ -442,7 +482,7 @@
 
         function revertQty() {
             if (pendingRemoval && pendingRemoval.wrapper) {
-                var $qty = pendingRemoval.wrapper.closest(".cart_item").find("input.qty");
+                var $qty = pendingRemoval.wrapper.closest(SEL.cartItem).find(SEL.qtyInput);
                 var oldQty = $qty.data("old-qty");
                 if (oldQty !== undefined) $qty.val(oldQty);
             }
@@ -457,8 +497,8 @@
             if (!pendingRemoval) return closeRemoveModal();
             var action = pendingRemoval;
             var $wrapper = action.wrapper;
-            var $qty = $wrapper.closest(".cart_item").find("input.qty");
-            var originalCount = action.currentCount || $wrapper.find(".woo-limit-cart-item input.woo-limit").length;
+            var $qty = $wrapper.closest(SEL.cartItem).find(SEL.qtyInput);
+            var originalCount = action.currentCount || $wrapper.find(SEL.limitInput).length;
             var $modal = $("#field-selection-modal");
             var $checked = $modal.find(".woo-limit-modal-select:checked");
 
@@ -467,9 +507,9 @@
                 var removed = 0;
                 $checked.each(function () {
                     var num = $(this).data("number");
-                    var $target = $wrapper.find(".woo-limit-cart-item input.woo-limit").filter(function () {
+                    var $target = $wrapper.find(SEL.limitInput).filter(function () {
                         return String($(this).val()) === String(num);
-                    }).closest(".woo-limit-cart-item");
+                    }).closest(SEL.limitItem);
                     if ($target.length) { $target.remove(); removed++; }
                 });
                 var newQty = Math.max(0, originalCount - removed);
@@ -477,7 +517,7 @@
                 $qty.data("old-qty", newQty);
                 performed = removed > 0;
             } else if (action.removeAll) {
-                $wrapper.find(".woo-limit-cart-item").remove();
+                $wrapper.find(SEL.limitItem).remove();
                 $qty.val(0).trigger("change");
                 $qty.data("old-qty", 0);
                 performed = true;
@@ -502,16 +542,16 @@
 
         // ==================== QUANTITY CHANGE HANDLER ====================
 
-        $(document).on("change", "input.qty", function () {
+        $(document).on("change", SEL.qtyInput, function () {
             var $qty = $(this);
             var name = $qty.attr("name") || "";
             var matches = name.match(/cart\[([^\]]+)\]\[qty\]/);
             var cartKey = matches ? matches[1] : null;
             var $wrapper = cartKey
-                ? $('.woo-limit-field-wrapper[data-cart-item-key="' + cartKey + '"]')
-                : $qty.closest(".cart_item").find(".woo-limit-field-wrapper");
+                ? $(SEL.fieldWrapper + '[data-cart-item-key="' + cartKey + '"]')
+                : $qty.closest(SEL.cartItem).find(SEL.fieldWrapper);
 
-            var newQty = safeInt($qty.val());
+            var newQty = getQtyValue($qty);
             var oldQty = safeInt($qty.data("old-qty"));
 
             function finalizeQty(q) { $qty.data("old-qty", q); }
@@ -530,7 +570,7 @@
             }
 
             var max = safeInt($wrapper.data("max-quantity"), null);
-            var $inputs = $wrapper.find(".woo-limit-cart-item input.woo-limit");
+            var $inputs = $wrapper.find(SEL.limitInput);
             var currentCount = $inputs.length;
 
             // Increase quantity
@@ -538,8 +578,8 @@
                 var toAdd = newQty - currentCount;
                 if (max !== null) toAdd = Math.min(toAdd, Math.max(0, max - currentCount));
 
-                var emptyCount = $wrapper.find(".woo-limit-cart-item input.woo-limit").filter(function () {
-                    return String($(this).val()).trim() === "";
+                var emptyCount = $wrapper.find(SEL.limitInput).filter(function () {
+                    return isInputEmpty($(this));
                 }).length;
 
                 if (emptyCount > 0) {
@@ -580,17 +620,17 @@
             // Decrease quantity
             if (newQty < currentCount) {
                 var removeCount = currentCount - newQty;
-                var $allInputs = $wrapper.find(".woo-limit-cart-item input.woo-limit");
+                var $allInputs = $wrapper.find(SEL.limitInput);
                 var $lastInputs = $allInputs.slice(-removeCount);
                 var lastEmpty = true;
                 $lastInputs.each(function () {
-                    if (String($(this).val()).trim() !== "") { lastEmpty = false; return false; }
+                    if (!isInputEmpty($(this))) { lastEmpty = false; return false; }
                 });
 
                 if (removeCount > 0 && lastEmpty) {
-                    $lastInputs.closest(".woo-limit-cart-item").remove();
-                    $qty.data("old-qty", newQty);
-                    $qty.val(newQty).trigger("change");
+                    $lastInputs.closest(SEL.limitItem).remove();
+                    setQtyData($qty, newQty, true);
+                    $qty.trigger("change");
 
                     // Check if remaining fields all have values
                     // If any remaining field is empty, don't trigger cart update yet
@@ -604,9 +644,9 @@
                 }
 
                 if (removeCount === 1 && currentCount === 1) {
-                    $allInputs.last().closest(".woo-limit-cart-item").remove();
-                    $qty.data("old-qty", newQty);
-                    $qty.val(newQty).trigger("change");
+                    $allInputs.last().closest(SEL.limitItem).remove();
+                    setQtyData($qty, newQty, true);
+                    $qty.trigger("change");
                     enforceAndUpdate($qty, true);
                     return;
                 }
@@ -671,27 +711,28 @@
         function wrapperHasEmptyFields($wrapper) {
             if (!$wrapper || !$wrapper.length) return false;
             var empty = false;
-            $wrapper.find(".woo-limit-cart-item input.woo-limit").each(function () {
-                if (String($(this).val()).trim() === "") { empty = true; return false; }
+            $wrapper.find(SEL.limitInput).each(function () {
+                if (isInputEmpty($(this))) { empty = true; return false; }
             });
             return empty;
         }
 
         function updateQtyButtonsState($row) {
-            var $wrapper = $row.find(".woo-limit-field-wrapper").first();
+            var $wrapper = $row.find(SEL.fieldWrapper).first();
             var invalid = wrapperHasErrors($wrapper) || wrapperHasEmptyFields($wrapper);
-            var $plus = $row.find('.quantity-btn.plus, .quantity-btn[data-action="plus"]').first();
-            var $minus = $row.find('.quantity-btn.minus, .quantity-btn[data-action="minus"]').first();
+            var $plus = $row.find(SEL.qtyBtn + '.plus, ' + SEL.qtyBtn + '[data-action="plus"]').first();
+            var $minus = $row.find(SEL.qtyBtn + '.minus, ' + SEL.qtyBtn + '[data-action="minus"]').first();
             if ($plus.length) $plus.prop("disabled", invalid);
             if ($minus.length) $minus.prop("disabled", wrapperHasErrors($wrapper, true));
         }
 
-        $(document).on("input change blur", ".woo-limit-cart-item input.woo-limit", function () {
-            updateQtyButtonsState($(this).closest(".cart_item"));
+        $(document).on("input change blur", SEL.limitInput, function () {
+            updateQtyButtonsState($(this).closest(SEL.cartItem));
         });
 
-        // Lock field immediately on focus - prevents switching to other fields
-        $(document).on("focus", ".woo-limit-cart-item input.woo-limit", function () {
+        // On focus: store initial value but DON'T lock yet
+        // Lock only happens when value actually changes
+        $(document).on("focus", SEL.limitInput, function () {
             var $focused = $(this);
 
             // If there's a pending new field and user tries to focus a different field
@@ -702,34 +743,60 @@
                 // Focus will now proceed to the clicked field
             }
 
-            // If another field is locked (not pending), block focus completely
+            // If another field is locked (value was changed), block focus completely
             if (validationTracker.isLocked() && !validationTracker.isLockedInput($focused)) {
                 $focused.blur();
                 showClientNotice("Please complete the current field first.");
                 return false;
             }
 
-            // Lock this field immediately
-            var cartKey = $focused.data("cart-key");
-            var index = $focused.data("index") || 0;
-            validationTracker.lockField(cartKey, index, $focused);
+            // Store initial value on focus (for comparison later)
+            if (!$focused.data("focus-value")) {
+                $focused.data("focus-value", $focused.val());
+            }
         });
 
-        // On blur: DON'T unlock - stay locked until validation succeeds or cart updates
-        $(document).on("blur", ".woo-limit-cart-item input.woo-limit", function () {
-            // Intentionally do nothing here - field stays locked
-            // Unlock only happens via:
-            // 1. Successful validation (onComplete with data.available)
-            // 2. Cart update (updated_cart_totals event)
+        // On input: lock only when value actually changes from the original
+        $(document).on("input", SEL.limitInput, function () {
+            var $input = $(this);
+            var focusValue = $input.data("focus-value") || $input.data("old-value") || "";
+            var currentValue = $input.val();
+
+            // Only lock if value has actually changed
+            if (currentValue !== focusValue && !validationTracker.isLockedInput($input)) {
+                var cartKey = $input.data("cart-key");
+                var index = $input.data("index") || 0;
+                validationTracker.lockField(cartKey, index, $input);
+            }
+        });
+
+        // On blur: unlock only if value hasn't changed (user just clicked and clicked away)
+        $(document).on("blur", SEL.limitInput, function () {
+            var $input = $(this);
+            var focusValue = $input.data("focus-value") || "";
+            var oldValue = $input.data("old-value") || "";
+            var currentValue = $input.val();
+
+            // Clear the focus value
+            $input.removeData("focus-value");
+
+            // If value hasn't changed from original, allow unlock
+            if (currentValue === oldValue || currentValue === focusValue) {
+                // Only unlock if this is the locked field and value didn't change
+                if (validationTracker.isLockedInput($input) && !validationTracker.isValidating()) {
+                    validationTracker.unlockField();
+                }
+            }
+            // If value changed, stay locked (validation in progress or pending)
         });
 
         // ==================== QUANTITY BUTTON HANDLERS ====================
 
         function handleQtyButtonClick($btn, isPlus) {
             if ($btn.is(":disabled")) return;
-            var $row = $btn.closest(".cart_item");
-            var $qty = $row.find("input.qty").first();
-            var $wrapper = $row.find(".woo-limit-field-wrapper").first();
+            var $row = $btn.closest(SEL.cartItem);
+            var $qty = $row.find(SEL.qtyInput).first();
+            var $wrapper = $row.find(SEL.fieldWrapper).first();
 
             var checkErrors = isPlus ? (wrapperHasErrors($wrapper) || wrapperHasEmptyFields($wrapper)) : wrapperHasErrors($wrapper, true);
             if (checkErrors) {
@@ -738,7 +805,7 @@
                 return;
             }
 
-            var current = safeInt($qty.val());
+            var current = getQtyValue($qty);
 
             if (isPlus) {
                 var max = safeInt($wrapper.data("max-quantity"), null);
@@ -762,7 +829,7 @@
                 if (triggeredMax) {
                     var prodName = getProductName($row, $wrapper);
                     var msg = "Max quantity for " + prodName + " reached (" + triggeredMax + ")";
-                    var $quantityErrorDiv = $wrapper.find(".woo-limit-quantity-message");
+                    var $quantityErrorDiv = $wrapper.find(SEL.quantityMessage);
                     showTimedError($quantityErrorDiv, msg, 5000, function () { updateQtyButtonsState($row); });
                     return;
                 }
@@ -775,26 +842,26 @@
             setTimeout(function () { updateQtyButtonsState($row); }, 50);
         }
 
-        $(document).on("click", '.quantity-btn.plus, .quantity-btn[data-action="plus"]', function () {
+        $(document).on("click", SEL.qtyBtn + '.plus, ' + SEL.qtyBtn + '[data-action="plus"]', function () {
             handleQtyButtonClick($(this), true);
         });
 
-        $(document).on("click", '.quantity-btn.minus, .quantity-btn[data-action="minus"]', function () {
+        $(document).on("click", SEL.qtyBtn + '.minus, ' + SEL.qtyBtn + '[data-action="minus"]', function () {
             handleQtyButtonClick($(this), false);
         });
 
         // ==================== CHECKOUT VALIDATION ====================
 
-        $(document.body).on("click", ".checkout-button", function (e) {
+        $(document.body).on("click", SEL.checkoutBtn, function (e) {
             var isValid = true;
             var $firstError = null;
 
-            $(".woo-limit-cart-item input.woo-limit").each(function () {
+            $(SEL.limitInput).each(function () {
                 var $input = $(this);
                 var val = $input.val();
-                var $msg = $input.siblings(".woo-limit-message");
+                var $msg = $input.siblings(SEL.limitMessage);
 
-                if (!val || val.trim() === "") {
+                if (isInputEmpty($input)) {
                     isValid = false;
                     $msg.text("Type your number").addClass("woo-limit-error").show();
                     $input.addClass("woo-limit-error");
