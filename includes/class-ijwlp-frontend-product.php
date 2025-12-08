@@ -87,7 +87,13 @@ class IJWLP_Frontend_Product
         }
 
         // Reduce quantities by anything already in the user's cart
+        // Ensure cart session is initialized (important for page caching scenarios)
         if (function_exists('WC') && WC()->cart) {
+            // Force cart to load from session if not already loaded
+            if (did_action('wp_loaded') && !WC()->cart->get_cart_contents_count() && WC()->session) {
+                WC()->cart->get_cart_from_session();
+            }
+            
             foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
                 $cart_product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
                 $cart_variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
@@ -107,7 +113,8 @@ class IJWLP_Frontend_Product
                     }
                 } else {
                     // Simple (non-variable) product: reduce stock when product matches
-                    if ($cart_product_id === $pro_id) {
+                    // Also verify this is not a variation (variation_id should be 0 for simple products)
+                    if (intval($cart_product_id) === intval($pro_id) && $cart_variation_id === 0) {
                         $cart_quantity_for_product += $cart_qty;
                         if ($stock_quantity !== null) {
                             $stock_quantity = max(0, $stock_quantity - $cart_qty);
