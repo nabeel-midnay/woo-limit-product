@@ -12,6 +12,102 @@
     $(document).ready(function () {
         var cartAvailableTimer = null;
 
+        // ==================== VALIDATION QUEUE ====================
+        // Tracks pending and validated field changes to prevent cart refresh
+        // until all edited fields are validated
+        var validationQueue = {
+            pending: {},      // Fields with changes waiting for validation
+            validated: {},    // Fields that have been validated
+
+            // Generate unique key for a field
+            getKey: function (cartKey, index) {
+                return cartKey + '_' + (index || 0);
+            },
+
+            // Mark a field as dirty (needing validation)
+            markDirty: function (cartKey, index, $input) {
+                var key = this.getKey(cartKey, index);
+                this.pending[key] = {
+                    $input: $input,
+                    value: $input.val().trim(),
+                    validated: false,
+                    cartKey: cartKey,
+                    index: index
+                };
+                delete this.validated[key];
+            },
+
+            // Mark a field as validated
+            markValidated: function (cartKey, index) {
+                var key = this.getKey(cartKey, index);
+                if (this.pending[key]) {
+                    this.pending[key].validated = true;
+                    this.validated[key] = this.pending[key];
+                    delete this.pending[key];
+                }
+            },
+
+            // Remove a field from tracking
+            remove: function (cartKey, index) {
+                var key = this.getKey(cartKey, index);
+                delete this.pending[key];
+                delete this.validated[key];
+            },
+
+            // Clear all tracking
+            clear: function () {
+                this.pending = {};
+                this.validated = {};
+                this.cartUpdatePending = false;
+            },
+
+            // Check if there are any pending (unvalidated) fields
+            hasPending: function () {
+                return Object.keys(this.pending).length > 0;
+            },
+
+            // Check if any field has been validated and cart update is needed
+            hasValidated: function () {
+                return Object.keys(this.validated).length > 0;
+            },
+
+            // Check if there are any empty fields in the cart that should have values
+            hasEmptyFields: function () {
+                var hasEmpty = false;
+                $(".woo-limit-cart-item input.woo-limit").each(function () {
+                    if ($(this).val().trim() === "") {
+                        hasEmpty = true;
+                        return false; // break
+                    }
+                });
+                return hasEmpty;
+            },
+
+            // Request cart update - only fires when all pending are validated
+            cartUpdatePending: false,
+            requestCartUpdate: function () {
+                this.cartUpdatePending = true;
+                this.maybeUpdateCart();
+            },
+
+            // Actually trigger cart update if conditions met
+            maybeUpdateCart: function () {
+                var self = this;
+                // Check if there are empty fields - if so, don't update cart yet
+                if (this.hasEmptyFields()) {
+                    return;
+                }
+                if (this.cartUpdatePending && !this.hasPending()) {
+                    this.cartUpdatePending = false;
+                    this.validated = {};
+                    // Small delay to allow any final UI updates
+                    setTimeout(function () {
+                        triggerCartUpdate();
+                    }, 200);
+                }
+            }
+        };
+
         // ==================== UTILITY FUNCTIONS ====================
 
         // Parse integer with fallback
@@ -38,7 +134,7 @@
         // Show timed error message in element
         function showTimedError($el, message, duration, onHide) {
             if (!$el || !$el.length) return false;
-            
+
             var timerId = $el.data("error-timer");
             if (timerId) {
                 clearTimeout(timerId);
@@ -89,7 +185,7 @@
             $(".woo-limit-cart-item input.woo-limit").prop("disabled", state);
             $("button[name='update_cart'], input[name='update_cart']").prop("disabled", state);
             $(".woo-coupon-btn").prop("disabled", state);
-            
+
             if (state) {
                 $(".checkout-button").addClass("disabled").prop("disabled", true);
                 $(".quantity").css("pointer-events", "none");
@@ -124,11 +220,12 @@
                 onComplete: function (data) {
                     if (data && data.available) {
                         $input.data("old-value", $input.val().trim());
-                        if (cartAvailableTimer) clearTimeout(cartAvailableTimer);
-                        cartAvailableTimer = setTimeout(function () {
-                            triggerCartUpdate();
-                            cartAvailableTimer = null;
-                        }, 200);
+                        // Mark this field as validated in the queue
+                        var index = $input.data("index") || 0;
+                        var cKey = $input.data("cart-key");
+                        validationQueue.markValidated(cKey, index);
+                        // Request cart update - will only fire when all pending are validated
+                        validationQueue.requestCartUpdate();
                     }
                 },
             });
@@ -147,7 +244,27 @@
         }
 
         initializeAllLimitInputs();
-        $(document.body).on("updated_cart_totals", initializeAllLimitInputs);
+        $(document.body).on("updated_cart_totals", function () {
+            validationQueue.clear();
+            initializeAllLimitInputs();
+        });
+
+        // Track field changes for validation queue
+        $(document).on("input", ".woo-limit-cart-item input.woo-limit", function () {
+            var $input = $(this);
+            var cartKey = $input.data("cart-key");
+            var index = $input.data("index") || 0;
+            var value = $input.val().trim();
+            var oldValue = $input.data("old-value") || "";
+
+            // If value changed from old value, mark as dirty
+            if (value !== oldValue && value !== "") {
+                validationQueue.markDirty(cartKey, index, $input);
+            } else if (value === "" || value === oldValue) {
+                // Remove from queue if cleared or reverted to old value
+                validationQueue.remove(cartKey, index);
+            }
+        });
 
         // ==================== CART UPDATE TRIGGER ====================
 
@@ -434,6 +551,14 @@
                     $lastInputs.closest(".woo-limit-cart-item").remove();
                     $qty.data("old-qty", newQty);
                     $qty.val(newQty).trigger("change");
+
+                    // Check if remaining fields all have values
+                    // If any remaining field is empty, don't trigger cart update yet
+                    var hasEmptyRemaining = validationQueue.hasEmptyFields();
+                    if (hasEmptyRemaining) {
+                        return;
+                    }
+
                     enforceAndUpdate($qty, true);
                     return;
                 }
@@ -475,8 +600,8 @@
 
         function wrapperHasErrors($wrapper, ignoreTypeYourNumber) {
             if (!$wrapper || !$wrapper.length) return false;
-            
-            var checkErrors = function($elements, getTextFn) {
+
+            var checkErrors = function ($elements, getTextFn) {
                 var hasErrors = false;
                 $elements.each(function () {
                     var text = getTextFn ? getTextFn($(this)) : $(this).text();
@@ -496,7 +621,7 @@
 
             var $invalidInputs = $wrapper.find(".woo-limit.woo-limit-error");
             if ($invalidInputs.length) {
-                return checkErrors($invalidInputs, function($inp) {
+                return checkErrors($invalidInputs, function ($inp) {
                     return $inp.siblings(".woo-limit-message").text();
                 });
             }
@@ -644,7 +769,7 @@
         addBackorderHelpIconCart();
 
         jQuery(document.body).on("wc_fragments_refreshed added_to_cart updated_cart_item removed_from_cart", function () {
-            setTimeout(addBackorderHelpIconCart, 200);
+            setTimeout(addBackorderHelpIconCart, 500);
         });
 
         jQuery(document).on("submit", ".woocommerce-cart-form", function () {
