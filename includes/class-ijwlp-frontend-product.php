@@ -37,10 +37,11 @@ class IJWLP_Frontend_Product
      * 
      * @param int|null $stock_quantity Stock quantity for simple products
      * @param string $variation_quantities_json JSON-encoded variation stock quantities
-     * @param string|int|null $max_limit Maximum quantity limit per user
+     * @param string|int|null $max_limit Maximum quantity limit per user (remaining)
+     * @param string|int|null $max_limit_setting Original max quantity setting
      * @param string $product_name Product name
      */
-    private function output_hidden_fields($stock_quantity, $variation_quantities_json, $max_limit, $product_name)
+    private function output_hidden_fields($stock_quantity, $variation_quantities_json, $max_limit, $max_limit_setting, $product_name)
     {
         ?>
         <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity"
@@ -49,6 +50,8 @@ class IJWLP_Frontend_Product
             value="<?php echo esc_attr($variation_quantities_json); ?>" />
         <input type="hidden" name="woo-limit-user-remaining" class="woo-limit-user-remaining"
             value="<?php echo esc_attr($max_limit !== null ? $max_limit : ''); ?>" />
+        <input type="hidden" name="woo-limit-max-quantity" class="woo-limit-max-quantity"
+            value="<?php echo esc_attr($max_limit_setting !== null && $max_limit_setting !== '' ? $max_limit_setting : ''); ?>" />
         <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name"
             value="<?php echo esc_attr($product_name); ?>" />
         <?php
@@ -194,7 +197,7 @@ class IJWLP_Frontend_Product
             ?>
             <div class="unlimited-produt-wrap">
                 <div class="woo-limit-message" style="display: none;"></div>
-                <?php $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $product->get_name()); ?>
+                <?php $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $max_limit_setting, $product->get_name()); ?>
             </div>
             <?php
             return;
@@ -224,7 +227,7 @@ class IJWLP_Frontend_Product
                 <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
             </span>
 
-            <?php $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $product->get_name()); ?>
+            <?php $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $max_limit_setting, $product->get_name()); ?>
 
             <div class="woo-limit-input-group">
                 <input type="number" id="woo-limit" name="woo-limit" class="woo-limit" value=""

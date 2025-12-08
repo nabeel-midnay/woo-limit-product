@@ -50,6 +50,9 @@
         var userLimitVal = $(".woo-limit-user-remaining").val();
         var userLimitRemaining = userLimitVal === "" ? Infinity : parseInt(userLimitVal);
 
+        // Original max quantity setting (for error messages)
+        var maxQuantitySetting = $(".woo-limit-max-quantity").val();
+
         // ========================================
         // Helper Functions - DRY Utilities
         // ========================================
@@ -245,7 +248,7 @@
         function showUserLimitReachedMessage() {
             var productName = $(".woo-limit-product-name").val() || "this product";
             window.IJWLP_Frontend_Common.showError(
-                "Max quantity for " + productName + " reached (" + userLimitVal + ")",
+                "Max quantity for " + productName + " reached (" + maxQuantitySetting + ")",
                 $errorDiv
             );
         }
@@ -739,6 +742,19 @@
         setTimeout(function () {
             initializeOutOfStockSwatches();
         }, 100);
+
+        // Check initial stock and user limit for simple products on page load
+        if (!isVariableProduct) {
+            if (stockQuantityRemaining <= 0) {
+                // Simple product is out of stock
+                window.IJWLP_Frontend_Common.handleOutOfStock(
+                    false, $addToCartButton, $limitedNumberInput, $errorDiv
+                );
+            } else if (userLimitRemaining <= 0) {
+                // User has reached their purchase limit
+                handleUserLimitReached();
+            }
+        }
 
         // ========================================
         // Mutation Observer - Block third-party disabling
