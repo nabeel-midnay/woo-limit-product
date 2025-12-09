@@ -148,7 +148,8 @@ class IJWLP_Frontend_Common
         // Prepare AJAX data for all scripts
         $ajax_data = array(
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('ijwlp_frontend_nonce')
+            'nonce' => wp_create_nonce('ijwlp_frontend_nonce'),
+            'has_limited_product' => $this->check_cart_for_limited_products()
         );
 
         // Localize script data to common script
@@ -346,6 +347,38 @@ class IJWLP_Frontend_Common
         }
 
         return array_values(array_unique($classes));
+    }
+
+
+    /**
+     * Check if current cart has any limited edition products
+     * @return boolean
+     */
+    public function check_cart_for_limited_products()
+    {
+        if (!function_exists('WC') || !WC()->cart) {
+            return false;
+        }
+
+        foreach (WC()->cart->get_cart() as $cart_item) {
+            $product_id = $cart_item['product_id'];
+            $variation_id = $cart_item['variation_id'];
+
+            // Resolve to parent if needed, mirroring existing logic
+            $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : ($variation_id > 0 ? $variation_id : $product_id);
+            $product = wc_get_product($actual_pro_id);
+            $parent_product_id = $actual_pro_id;
+
+            if ($product && $product->is_type('variation')) {
+                $parent_product_id = $product->get_parent_id();
+            }
+
+            $status = get_post_meta($parent_product_id, '_woo_limit_status', true);
+            if ($status === 'yes') {
+                return true;
+            }
+        }
+        return false;
     }
 
 }

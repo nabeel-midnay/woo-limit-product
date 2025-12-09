@@ -913,7 +913,7 @@
             var $customBox = $(
                 "<div class='woo-limit-autocomplete-box'></div>"
             );
-            
+
             // On cart page, append to the individual cart item container so the 
             // suggestion box appears directly below the typed input, not below the last input
             var $cartItem = $input.closest(".woo-limit-cart-item");
@@ -1032,4 +1032,29 @@
     $(document.body).on("updated_wc_div", function () {
         reinitAutocomplete();
     });
+
+    // Handle logout confirmation
+    $(document).ready(function () {
+        $('body').on('click', 'a[href*="customer-logout"], a[href*="action=logout"]', function (e) {
+            var $link = $(this);
+            var href = $link.attr('href');
+
+            // Prevent default navigation
+            e.preventDefault();
+
+            var message;
+            // Check if user has limited products in cart (injected via PHP)
+            if (window.ijwlp_frontend && window.ijwlp_frontend.has_limited_product) {
+                message = "You have limited products in your cart. they will be lost if you logout. Are you sure?";
+            } else {
+                message = "Are you sure you want to log out?";
+            }
+
+            // Show confirmation dialog
+            if (confirm(message)) {
+                window.location.href = href;
+            }
+        });
+    });
+
 })(jQuery);
