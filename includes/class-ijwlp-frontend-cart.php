@@ -43,7 +43,7 @@ class IJWLP_Frontend_Cart
         add_action('woocommerce_cart_item_removed', array($this, 'remove_limited_edition_from_database'), 10, 2);
 
         // Clear cart on logout if there are limited edition products in the cart
-        add_action('wp_logout', array($this, 'maybe_clear_cart_on_logout'), 10);
+        //add_action('wp_logout', array($this, 'maybe_clear_cart_on_logout'), 10);
 
         add_action('wp_footer', array($this, 'remove_modal'), 10);
     }
