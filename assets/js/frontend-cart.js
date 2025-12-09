@@ -349,6 +349,8 @@
             validationTracker.clearValidating();
             initializeAllLimitInputs();
             initializeQtyInputs();
+            // Re-add backorder help icons after cart updates
+            setTimeout(addBackorderHelpIconCart, 100);
         });
 
         // ==================== CART UPDATE TRIGGER ====================
