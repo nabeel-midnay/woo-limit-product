@@ -184,7 +184,7 @@ class IJWLP_Backend
         ob_start(); ?>
 
         <div id="woo_limit_product" class="panel woocommerce_options_panel">
-            <p class="form-field _woo_limit_status_field" style="font-size:1.3em; font-weight:700;padding: 0px 10px !important;margin: 1em 0 1.5em 0;">Woo Limit Product Options</h3>
+            <p class="form-field _woo_limit_status_field" style="font-size:1.3em; font-weight:700;padding: 0px 10px !important;margin: 1em 0 1.5em 0;">Woo Limit Product Options</p>
                 <?php
                 woocommerce_wp_text_input(array(
                     'id'            => '_woo_limit_max_quantity',
