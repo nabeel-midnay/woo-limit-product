@@ -26,11 +26,58 @@
             ACTIVE: "ijwlp_timer_active",
         },
 
+        // Debounce configuration for cart checks
+        CART_CHECK_DEBOUNCE: 500, // milliseconds
+        cartCheckDebounceTimer: null,
+
         // State variables
         intervalId: null,
         timerData: {
             expiry: null,
             isActive: false,
+        },
+
+        /**
+         * Safe localStorage getter with fallback
+         * Handles private browsing, storage quota, and security errors
+         * @param {string} key - Storage key
+         * @returns {string|null}
+         */
+        safeGetStorage: function (key) {
+            try {
+                return localStorage.getItem(key);
+            } catch (e) {
+                console.warn('IJWLP Timer: localStorage unavailable:', e.message);
+                return null;
+            }
+        },
+
+        /**
+         * Safe localStorage setter
+         * @param {string} key - Storage key
+         * @param {string} value - Value to store
+         * @returns {boolean} - Success status
+         */
+        safeSetStorage: function (key, value) {
+            try {
+                localStorage.setItem(key, value);
+                return true;
+            } catch (e) {
+                console.warn('IJWLP Timer: localStorage unavailable:', e.message);
+                return false;
+            }
+        },
+
+        /**
+         * Safe localStorage remover
+         * @param {string} key - Storage key
+         */
+        safeRemoveStorage: function (key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                // Ignore removal errors
+            }
         },
 
         /**
@@ -59,6 +106,11 @@
         removeProductsIfNoTimer: function () {
             const self = this;
 
+            // Don't remove if user is actively editing (race condition prevention)
+            if (window.ijwlpCartValidating || window.ijwlpPendingField) {
+                return;
+            }
+
             // Check if cart has limited products
             this.checkCartHasLimitedProducts(function (hasLimited) {
                 if (hasLimited) {
@@ -73,8 +125,8 @@
          * @returns {boolean}
          */
         hasActiveTimer: function () {
-            const expiry = localStorage.getItem(this.STORAGE_KEYS.EXPIRY);
-            const isActive = localStorage.getItem(this.STORAGE_KEYS.ACTIVE);
+            const expiry = this.safeGetStorage(this.STORAGE_KEYS.EXPIRY);
+            const isActive = this.safeGetStorage(this.STORAGE_KEYS.ACTIVE);
 
             if (!expiry || isActive !== "true") {
                 return false;
@@ -91,7 +143,7 @@
          * Resume an existing timer from localStorage
          */
         resumeTimer: function () {
-            const expiry = localStorage.getItem(this.STORAGE_KEYS.EXPIRY);
+            const expiry = this.safeGetStorage(this.STORAGE_KEYS.EXPIRY);
 
             if (!expiry) {
                 this.clearTimer();
@@ -118,9 +170,9 @@
             const limitTimeSeconds = limitTimeMinutes * 60;
             const expiry = currentTime + limitTimeSeconds;
 
-            // Store in localStorage
-            localStorage.setItem(this.STORAGE_KEYS.EXPIRY, expiry.toString());
-            localStorage.setItem(this.STORAGE_KEYS.ACTIVE, "true");
+            // Store in localStorage using safe methods
+            this.safeSetStorage(this.STORAGE_KEYS.EXPIRY, expiry.toString());
+            this.safeSetStorage(this.STORAGE_KEYS.ACTIVE, "true");
 
             this.timerData.expiry = expiry;
             this.timerData.isActive = true;
@@ -175,8 +227,14 @@
         clearTimer: function () {
             this.stopTimer();
 
-            localStorage.removeItem(this.STORAGE_KEYS.EXPIRY);
-            localStorage.removeItem(this.STORAGE_KEYS.ACTIVE);
+            // Clear debounce timer if exists
+            if (this.cartCheckDebounceTimer) {
+                clearTimeout(this.cartCheckDebounceTimer);
+                this.cartCheckDebounceTimer = null;
+            }
+
+            this.safeRemoveStorage(this.STORAGE_KEYS.EXPIRY);
+            this.safeRemoveStorage(this.STORAGE_KEYS.ACTIVE);
 
             this.timerData.expiry = null;
             this.timerData.isActive = false;
@@ -228,7 +286,7 @@
         updateDisplay: function () {
             const $timerDisplay = $("#woo-limit-timer");
             const $timerContainer = $(".timer-container");
-			
+
             if (!$timerDisplay.length) {
                 return;
             }
@@ -271,9 +329,9 @@
          */
         onTimerExpiry: function () {
             this.stopTimer();
-            
+
             // Use the helper method to remove products and reload
-            this.removeExpiredProducts(function() {
+            this.removeExpiredProducts(function () {
                 // Clear timer from localStorage
                 window.ijwlpTimer.clearTimer();
                 location.reload();
@@ -288,12 +346,26 @@
             const self = this;
 
             // Handler function to check cart and clear timer if needed
-            const handleCartCheck = function() {
-                self.checkCartHasLimitedProducts(function(hasLimited) {
-                    if (!hasLimited) {
-                        self.clearTimer();
+            // Uses debounce to prevent race conditions from rapid events
+            const handleCartCheck = function () {
+                // Clear any pending debounce timer
+                if (self.cartCheckDebounceTimer) {
+                    clearTimeout(self.cartCheckDebounceTimer);
+                }
+
+                // Debounce: wait before actually checking to let state settle
+                self.cartCheckDebounceTimer = setTimeout(function () {
+                    // Skip if cart.js is in the middle of validation (race condition prevention)
+                    if (window.ijwlpCartValidating || window.ijwlpPendingField) {
+                        return;
                     }
-                });
+
+                    self.checkCartHasLimitedProducts(function (hasLimited) {
+                        if (!hasLimited) {
+                            self.clearTimer();
+                        }
+                    });
+                }, self.CART_CHECK_DEBOUNCE);
             };
 
             // Listen for cart updated event (WooCommerce standard)
@@ -329,6 +401,11 @@
             if (!this._visibilityHandlerAdded) {
                 document.addEventListener("visibilitychange", function () {
                     if (document.visibilityState === "visible") {
+                        // Skip checks if user is actively editing (race condition prevention)
+                        if (window.ijwlpCartValidating || window.ijwlpPendingField) {
+                            return;
+                        }
+
                         // If no active timer exists, remove limited products from cart
                         if (!self.hasActiveTimer()) {
                             self.removeProductsIfNoTimer();
@@ -379,7 +456,7 @@
          * 
          * @param {function} callback - Optional callback on completion
          */
-        removeExpiredProducts: function(callback) {
+        removeExpiredProducts: function (callback) {
             // Check if nonce is available
             const nonce = ijwlp_frontend.nonce || "";
 
@@ -403,7 +480,7 @@
                     if (typeof $(document.body).trigger === "function") {
                         $(document.body).trigger("updated_cart_totals");
                     }
-                    
+
                     if (typeof callback === "function") {
                         callback();
                     }
@@ -413,7 +490,7 @@
                     if (typeof $(document.body).trigger === "function") {
                         $(document.body).trigger("updated_cart_totals");
                     }
-                    
+
                     if (typeof callback === "function") {
                         callback();
                     }

@@ -9,6 +9,10 @@
 (function ($) {
     "use strict";
 
+    // Global flags for timer.js coordination - prevents race conditions
+    window.ijwlpCartValidating = false;
+    window.ijwlpPendingField = false;
+
     $(document).ready(function () {
         var cartAvailableTimer = null;
 
@@ -67,6 +71,9 @@
 
             // Lock a field immediately when user starts editing
             lockField: function (cartKey, index, $input) {
+                // Set global flag for timer.js coordination
+                window.ijwlpCartValidating = true;
+
                 this.lockedField = {
                     cartKey: cartKey,
                     index: index,
@@ -82,6 +89,9 @@
 
             // Unlock only when validation succeeds OR cart updates
             unlockField: function () {
+                // Clear global flag for timer.js coordination
+                window.ijwlpCartValidating = false;
+
                 this.lockedField = null;
                 // Re-enable all fields
                 $(SEL.limitInput).prop("disabled", false);
@@ -103,6 +113,9 @@
 
             // Set a pending new field (must be completed or will be removed)
             setPendingNewField: function (cartKey, $input, $wrapper, $qty) {
+                // Set global flag for timer.js coordination
+                window.ijwlpPendingField = true;
+
                 this.pendingNewField = {
                     cartKey: cartKey,
                     $input: $input,
@@ -114,6 +127,8 @@
             // Clear pending new field (called after successful validation)
             clearPendingNewField: function () {
                 this.pendingNewField = null;
+                // Clear global flag for timer.js coordination
+                window.ijwlpPendingField = false;
             },
 
             // Check if there's a pending new field
@@ -143,6 +158,8 @@
                 setQtyData($qty, newQty, true);
 
                 this.pendingNewField = null;
+                // Clear global flag for timer.js coordination
+                window.ijwlpPendingField = false;
                 this.unlockField();
             },
 
