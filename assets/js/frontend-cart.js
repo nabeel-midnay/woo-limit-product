@@ -50,6 +50,13 @@
             if (updateOld) $qty.data("old-qty", value);
         }
 
+        // Initialize old-qty data for valid reversion
+        function initializeQtyInputs() {
+            $(SEL.qtyInput).each(function () {
+                $(this).data("old-qty", getQtyValue($(this)));
+            });
+        }
+
         // ==================== VALIDATION TRACKER ====================
         // Tracks the currently validating/editing field to enable sequential validation
         // Only one field can be edited and validated at a time
@@ -324,6 +331,7 @@
             validationTracker.unlockField();
             validationTracker.clearValidating();
             initializeAllLimitInputs();
+            initializeQtyInputs();
         });
 
         // ==================== CART UPDATE TRIGGER ====================
@@ -445,9 +453,7 @@
             }, true);
         }
 
-        $(SEL.qtyInput).each(function () {
-            $(this).data("old-qty", getQtyValue($(this)));
-        });
+        initializeQtyInputs();
 
         // ==================== REMOVAL MODAL ====================
 
