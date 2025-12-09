@@ -14,13 +14,13 @@
 if (!defined('ABSPATH'))
     exit;
 
-define( 'IJWLP_TOKEN', 'ijwlp');
-define( 'IJWLP_VERSION', '3.0.2');
-define( 'IJWLP_FILE', __FILE__);
-define( 'IJWLP_PATH', __DIR__ );
-define( 'IJWLP_PLUGIN_NAME', 'Woo Limited Products');
-define( 'IJWLP_PRODUCTS_TRANSIENT_KEY', 'ijwlp_key');
-define( 'IJWLP_WPV', get_bloginfo('version'));
+define('IJWLP_TOKEN', 'ijwlp');
+define('IJWLP_VERSION', '3.0.2');
+define('IJWLP_FILE', __FILE__);
+define('IJWLP_PATH', __DIR__);
+define('IJWLP_PLUGIN_NAME', 'Woo Limited Products');
+define('IJWLP_PRODUCTS_TRANSIENT_KEY', 'ijwlp_key');
+define('IJWLP_WPV', get_bloginfo('version'));
 
 if (!class_exists('Link_List_Table')) {
     require_once(ABSPATH . 'wp-admin/includes/class-wp-list-table.php');
@@ -39,7 +39,7 @@ if (!function_exists('ijwlp_autoloader')) {
 
 spl_autoload_register('ijwlp_autoloader');
 
-if (! function_exists('woo_limit_activate_plugin')) {
+if (!function_exists('woo_limit_activate_plugin')) {
     function woo_limit_activate_plugin()
     {
         global $table_prefix, $wpdb;
@@ -48,10 +48,12 @@ if (! function_exists('woo_limit_activate_plugin')) {
         $charset_collate = $wpdb->get_charset_collate();
 
         // Check if table exists
-        if ($wpdb->get_var($wpdb->prepare(
-            "SHOW TABLES LIKE %s",
-            $table_name
-        )) !== $table_name) {
+        if (
+            $wpdb->get_var($wpdb->prepare(
+                "SHOW TABLES LIKE %s",
+                $table_name
+            )) !== $table_name
+        ) {
 
             // SQL to create the table
             $sql = "CREATE TABLE `$table_name` (
@@ -88,6 +90,9 @@ if (!function_exists('IJWLP')) {
 new IJWLP_Options();
 
 new IJWLP_Api();
+
+// Load Custom Order Status (Partially Shipped)
+new IJWLP_Order_Status();
 
 // Load Timer Manager (common) in both admin and frontend
 new IJWLP_Timer_Manager();
