@@ -30,6 +30,12 @@ class IJWLP_Options
 	 */
 	public function __construct()
 	{
+		// Register custom order status for partial delivery
+		add_action('init', array($this, 'register_partial_complete_order_status'));
+		add_filter('wc_order_statuses', array($this, 'add_partial_complete_to_order_statuses'));
+		add_filter('bulk_actions-edit-shop_order', array($this, 'add_partial_complete_to_bulk_actions'));
+		add_filter('bulk_actions-woocommerce_page_wc-orders', array($this, 'add_partial_complete_to_bulk_actions'));
+
 		// Handle order status changes from admin or anywhere else
 		// This hook fires whenever order status changes, regardless of what status it changes to/from
 		add_action('woocommerce_order_status_changed', array($this, 'update_limited_edition_status_on_order_status'), 10, 4);
@@ -50,6 +56,67 @@ class IJWLP_Options
 		add_action('wp_ajax_ijwlp_check_number_availability', array($this, 'ajax_check_number_availability'));
 		add_action('wp_ajax_nopriv_ijwlp_check_number_availability', array($this, 'ajax_check_number_availability'));
 
+	}
+
+	/**
+	 * Register custom order status "Partially Completed" for partial delivery
+	 * 
+	 * This status is used when an order contains backordered items and the customer
+	 * chose partial delivery - some items have been shipped, others are pending.
+	 */
+	public function register_partial_complete_order_status()
+	{
+		register_post_status('wc-partial-complete', array(
+			'label'                     => _x('Partially Completed', 'Order status', 'woo-limit-product'),
+			'public'                    => true,
+			'exclude_from_search'       => false,
+			'show_in_admin_all_list'    => true,
+			'show_in_admin_status_list' => true,
+			'label_count'               => _n_noop(
+				'Partially Completed <span class="count">(%s)</span>',
+				'Partially Completed <span class="count">(%s)</span>',
+				'woo-limit-product'
+			),
+		));
+	}
+
+	/**
+	 * Add "Partially Completed" to WooCommerce order statuses dropdown
+	 * 
+	 * @param array $order_statuses Existing order statuses
+	 * @return array Modified order statuses
+	 */
+	public function add_partial_complete_to_order_statuses($order_statuses)
+	{
+		$new_order_statuses = array();
+
+		// Add after "Completed" status for logical ordering
+		foreach ($order_statuses as $key => $status) {
+			$new_order_statuses[$key] = $status;
+
+			if ($key === 'wc-completed') {
+				$new_order_statuses['wc-partial-complete'] = _x('Partially Completed', 'Order status', 'woo-limit-product');
+			}
+		}
+
+		// If "Completed" wasn't found, add at the end
+		if (!isset($new_order_statuses['wc-partial-complete'])) {
+			$new_order_statuses['wc-partial-complete'] = _x('Partially Completed', 'Order status', 'woo-limit-product');
+		}
+
+		return $new_order_statuses;
+	}
+
+	/**
+	 * Add "Partially Completed" to bulk actions dropdown
+	 * 
+	 * @param array $bulk_actions Existing bulk actions
+	 * @return array Modified bulk actions
+	 */
+	public function add_partial_complete_to_bulk_actions($bulk_actions)
+	{
+		$bulk_actions['mark_partial-complete'] = __('Change status to Partially Completed', 'woo-limit-product');
+		return $bulk_actions;
 	}
 
 	/**
