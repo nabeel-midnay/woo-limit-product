@@ -44,6 +44,13 @@ class IJWLP_Options
 		add_action('woocommerce_order_status_processing', array($this, 'update_limited_edition_status_on_order_status'), 10, 1);
 		add_action('woocommerce_order_status_completed', array($this, 'update_limited_edition_status_on_order_status'), 10, 1);
 
+		// Email functionality for Partially Completed status
+		// Register custom email class for Partially Completed orders
+		add_filter('woocommerce_email_classes', array($this, 'add_partial_complete_email_class'));
+		
+		// Trigger email when order status changes to partial-complete
+		add_action('woocommerce_order_status_partial-complete', array($this, 'trigger_partial_complete_email'), 10, 2);
+
 		// AJAX handlers - loaded in both admin and frontend contexts
 		add_action('wp_ajax_ijwlp_add_to_cart', array($this, 'ajax_add_to_cart'));
 		add_action('wp_ajax_nopriv_ijwlp_add_to_cart', array($this, 'ajax_add_to_cart'));
@@ -117,6 +124,53 @@ class IJWLP_Options
 	{
 		$bulk_actions['mark_partial-complete'] = __('Change status to Partially Completed', 'woo-limit-product');
 		return $bulk_actions;
+	}
+
+	/**
+	 * Register custom email class for Partially Completed orders
+	 * 
+	 * This adds the Partially Completed email to WooCommerce email settings
+	 * 
+	 * @param array $email_classes Existing email classes
+	 * @return array Modified email classes
+	 */
+	public function add_partial_complete_email_class($email_classes)
+	{
+		// Include the custom email class
+		require_once IJWLP_PATH . '/includes/class-ijwlp-email-partial-complete.php';
+		
+		// Add our custom email class to the list
+		$email_classes['IJWLP_Email_Partial_Complete'] = new IJWLP_Email_Partial_Complete();
+		
+		return $email_classes;
+	}
+
+	/**
+	 * Trigger email when order status changes to Partially Completed
+	 * 
+	 * This sends a customer notification email similar to the Completed order email
+	 * 
+	 * @param int $order_id Order ID
+	 * @param WC_Order $order Order object
+	 */
+	public function trigger_partial_complete_email($order_id, $order = null)
+	{
+		if (!$order) {
+			$order = wc_get_order($order_id);
+		}
+		
+		if (!$order) {
+			return;
+		}
+		
+		// Get WooCommerce mailer instance
+		$mailer = WC()->mailer();
+		$emails = $mailer->get_emails();
+		
+		// Trigger our custom Partially Completed email
+		if (isset($emails['IJWLP_Email_Partial_Complete'])) {
+			$emails['IJWLP_Email_Partial_Complete']->trigger($order_id, $order);
+		}
 	}
 
 	/**
