@@ -30,12 +30,6 @@ class IJWLP_Options
 	 */
 	public function __construct()
 	{
-		// Register custom order status for partial delivery
-		add_action('init', array($this, 'register_partial_complete_order_status'));
-		add_filter('wc_order_statuses', array($this, 'add_partial_complete_to_order_statuses'));
-		add_filter('bulk_actions-edit-shop_order', array($this, 'add_partial_complete_to_bulk_actions'));
-		add_filter('bulk_actions-woocommerce_page_wc-orders', array($this, 'add_partial_complete_to_bulk_actions'));
-
 		// Handle order status changes from admin or anywhere else
 		// This hook fires whenever order status changes, regardless of what status it changes to/from
 		add_action('woocommerce_order_status_changed', array($this, 'update_limited_edition_status_on_order_status'), 10, 4);
@@ -43,13 +37,6 @@ class IJWLP_Options
 		// Legacy hooks for backwards compatibility (in case order is created before payment)
 		add_action('woocommerce_order_status_processing', array($this, 'update_limited_edition_status_on_order_status'), 10, 1);
 		add_action('woocommerce_order_status_completed', array($this, 'update_limited_edition_status_on_order_status'), 10, 1);
-
-		// Email functionality for Partially Completed status
-		// Register custom email class for Partially Completed orders
-		add_filter('woocommerce_email_classes', array($this, 'add_partial_complete_email_class'));
-		
-		// Trigger email when order status changes to partial-complete
-		add_action('woocommerce_order_status_partial-complete', array($this, 'trigger_partial_complete_email'), 10, 2);
 
 		// AJAX handlers - loaded in both admin and frontend contexts
 		add_action('wp_ajax_ijwlp_add_to_cart', array($this, 'ajax_add_to_cart'));
@@ -63,114 +50,6 @@ class IJWLP_Options
 		add_action('wp_ajax_ijwlp_check_number_availability', array($this, 'ajax_check_number_availability'));
 		add_action('wp_ajax_nopriv_ijwlp_check_number_availability', array($this, 'ajax_check_number_availability'));
 
-	}
-
-	/**
-	 * Register custom order status "Partially Completed" for partial delivery
-	 * 
-	 * This status is used when an order contains backordered items and the customer
-	 * chose partial delivery - some items have been shipped, others are pending.
-	 */
-	public function register_partial_complete_order_status()
-	{
-		register_post_status('wc-partial-complete', array(
-			'label'                     => _x('Partially Completed', 'Order status', 'woo-limit-product'),
-			'public'                    => true,
-			'exclude_from_search'       => false,
-			'show_in_admin_all_list'    => true,
-			'show_in_admin_status_list' => true,
-			'label_count'               => _n_noop(
-				'Partially Completed <span class="count">(%s)</span>',
-				'Partially Completed <span class="count">(%s)</span>',
-				'woo-limit-product'
-			),
-		));
-	}
-
-	/**
-	 * Add "Partially Completed" to WooCommerce order statuses dropdown
-	 * 
-	 * @param array $order_statuses Existing order statuses
-	 * @return array Modified order statuses
-	 */
-	public function add_partial_complete_to_order_statuses($order_statuses)
-	{
-		$new_order_statuses = array();
-
-		// Add after "Completed" status for logical ordering
-		foreach ($order_statuses as $key => $status) {
-			$new_order_statuses[$key] = $status;
-
-			if ($key === 'wc-completed') {
-				$new_order_statuses['wc-partial-complete'] = _x('Partially Completed', 'Order status', 'woo-limit-product');
-			}
-		}
-
-		// If "Completed" wasn't found, add at the end
-		if (!isset($new_order_statuses['wc-partial-complete'])) {
-			$new_order_statuses['wc-partial-complete'] = _x('Partially Completed', 'Order status', 'woo-limit-product');
-		}
-
-		return $new_order_statuses;
-	}
-
-	/**
-	 * Add "Partially Completed" to bulk actions dropdown
-	 * 
-	 * @param array $bulk_actions Existing bulk actions
-	 * @return array Modified bulk actions
-	 */
-	public function add_partial_complete_to_bulk_actions($bulk_actions)
-	{
-		$bulk_actions['mark_partial-complete'] = __('Change status to Partially Completed', 'woo-limit-product');
-		return $bulk_actions;
-	}
-
-	/**
-	 * Register custom email class for Partially Completed orders
-	 * 
-	 * This adds the Partially Completed email to WooCommerce email settings
-	 * 
-	 * @param array $email_classes Existing email classes
-	 * @return array Modified email classes
-	 */
-	public function add_partial_complete_email_class($email_classes)
-	{
-		// Include the custom email class
-		require_once IJWLP_PATH . '/includes/class-ijwlp-email-partial-complete.php';
-		
-		// Add our custom email class to the list
-		$email_classes['IJWLP_Email_Partial_Complete'] = new IJWLP_Email_Partial_Complete();
-		
-		return $email_classes;
-	}
-
-	/**
-	 * Trigger email when order status changes to Partially Completed
-	 * 
-	 * This sends a customer notification email similar to the Completed order email
-	 * 
-	 * @param int $order_id Order ID
-	 * @param WC_Order $order Order object
-	 */
-	public function trigger_partial_complete_email($order_id, $order = null)
-	{
-		if (!$order) {
-			$order = wc_get_order($order_id);
-		}
-		
-		if (!$order) {
-			return;
-		}
-		
-		// Get WooCommerce mailer instance
-		$mailer = WC()->mailer();
-		$emails = $mailer->get_emails();
-		
-		// Trigger our custom Partially Completed email
-		if (isset($emails['IJWLP_Email_Partial_Complete'])) {
-			$emails['IJWLP_Email_Partial_Complete']->trigger($order_id, $order);
-		}
 	}
 
 	/**
@@ -218,15 +97,15 @@ class IJWLP_Options
 	public static function get_user_identifier()
 	{
 		$user_id = get_current_user_id();
-		
+
 		if ($user_id > 0) {
 			// Logged-in user - use their WordPress user ID
 			return (string) $user_id;
 		}
-		
+
 		// Guest user - use IP address as identifier
 		$ip = self::get_client_ip();
-		
+
 		// Create a consistent identifier from IP
 		// Using 'guest_' prefix to distinguish from user IDs
 		return 'guest_' . md5($ip . 'woo_limit_salt');
@@ -243,7 +122,7 @@ class IJWLP_Options
 	public static function get_client_ip()
 	{
 		$ip = '';
-		
+
 		// Check for forwarded IP (behind proxy/load balancer)
 		if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
 			$ip = sanitize_text_field($_SERVER['HTTP_CLIENT_IP']);
@@ -262,12 +141,12 @@ class IJWLP_Options
 		} elseif (!empty($_SERVER['REMOTE_ADDR'])) {
 			$ip = sanitize_text_field($_SERVER['REMOTE_ADDR']);
 		}
-		
+
 		// Validate IP address
 		if (!empty($ip) && filter_var($ip, FILTER_VALIDATE_IP)) {
 			return $ip;
 		}
-		
+
 		// Fallback to REMOTE_ADDR if validation fails
 		return isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '0.0.0.0';
 	}
@@ -289,10 +168,10 @@ class IJWLP_Options
 	{
 		global $wpdb, $table_prefix;
 		$table = $table_prefix . 'woo_limit';
-		
+
 		$user_id = self::get_user_identifier();
 		$cart = WC()->cart;
-		
+
 		// Get all current cart keys for this session
 		$current_cart_keys = array();
 		if ($cart) {
@@ -301,19 +180,19 @@ class IJWLP_Options
 				$current_cart_keys = array_keys($cart_items);
 			}
 		}
-		
+
 		// Build query to find blocked records for this user
 		$sql = $wpdb->prepare(
 			"SELECT id, cart_key FROM $table WHERE user_id = %s AND status = 'block'",
 			$user_id
 		);
-		
+
 		if ($product_id) {
 			$sql .= $wpdb->prepare(" AND parent_product_id = %s", $product_id);
 		}
-		
+
 		$blocked_records = $wpdb->get_results($sql);
-		
+
 		$cleaned_count = 0;
 		if ($blocked_records) {
 			foreach ($blocked_records as $record) {
@@ -328,7 +207,7 @@ class IJWLP_Options
 				}
 			}
 		}
-		
+
 		return $cleaned_count;
 	}
 
@@ -977,7 +856,7 @@ class IJWLP_Options
 					),
 					array('%d')
 				);
-				
+
 				// Number is now available (stale record cleaned up)
 				// Continue to range check below instead of returning here
 				$blocked = null;
@@ -1010,7 +889,7 @@ class IJWLP_Options
 		if (!empty($max_quantity)) {
 			// Get user identifier for limit tracking
 			$user_identifier = self::get_user_identifier();
-			
+
 			// Gather all existing numbers (blocked) and count them
 			// If cart_item_key is provided (editing from cart page), exclude that cart item's numbers
 			// to avoid false "max reached" when user is just changing their existing number
