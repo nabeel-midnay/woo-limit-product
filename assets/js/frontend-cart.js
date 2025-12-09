@@ -658,6 +658,11 @@
                     $allInputs.slice(-removeCount).each(function () { preChecked.push(String($(this).val())); });
                 }
 
+                // Revert quantity immediately before showing modal
+                // Quantity will only be updated when user confirms removal
+                $qty.val(oldQty);
+                $qty.data("old-qty", oldQty);
+
                 openRemoveModal({
                     wrapper: $wrapper,
                     numbers: allNumbers,
