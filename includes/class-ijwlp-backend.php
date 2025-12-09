@@ -85,6 +85,11 @@ class IJWLP_Backend
         add_filter('woocommerce_product_data_tabs', array($this, 'woo_limit_admin_tab'), 10, 1);
         add_action('woocommerce_product_data_panels', array($this, 'woo_limit_tab_fields'), 20, 0);
         add_action('woocommerce_process_product_meta', array($this, 'woo_limit_save_fields'), 30, 1);
+    
+		// Display delivery preference in admin order details
+		add_action('woocommerce_admin_order_data_after_billing_address', array($this, 'display_delivery_preference_in_admin'), 10, 1);
+		add_action('woocommerce_admin_order_data_after_shipping_address', array($this, 'display_delivery_preference_in_admin_shipping'), 10, 1);
+    
     }
 
     public static function instance($file = '', $version = '1.0.0')
@@ -258,4 +263,43 @@ class IJWLP_Backend
             delete_post_meta($post_id, '_woo_limit_end_value');
         }
     }
+
+	/**
+	 * Display delivery preference in admin order details (after billing address)
+	 * 
+	 * @param WC_Order $order
+	 */
+	public function display_delivery_preference_in_admin($order)
+	{
+		$delivery_preference = $order->get_meta('_delivery_preference');
+		
+		if (empty($delivery_preference)) {
+			return;
+		}
+
+		$preference_label = $delivery_preference === 'partial_delivery' 
+			? __('Partial Delivery (available items now, backordered later)', 'woo-limit-product')
+			: __('Complete Delivery (wait for all items)', 'woo-limit-product');
+
+		?>
+		<div class="delivery-preference-admin" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-left: 4px solid #2271b1;">
+			<p style="margin: 0;">
+				<strong><?php echo esc_html__('Delivery Preference:', 'woo-limit-product'); ?></strong><br>
+				<?php echo esc_html($preference_label); ?>
+			</p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Display delivery preference in admin order details (after shipping address)
+	 * This is an alternative location if you prefer it in the shipping section
+	 * 
+	 * @param WC_Order $order
+	 */
+	public function display_delivery_preference_in_admin_shipping($order)
+	{
+		// Uncomment the code below if you want to show it after shipping address instead
+		// $this->display_delivery_preference_in_admin($order);
+	}
 }

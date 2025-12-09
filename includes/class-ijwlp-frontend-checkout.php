@@ -30,7 +30,6 @@ class IJWLP_Frontend_Checkout
         add_action('woocommerce_after_checkout_shipping_form', array($this, 'add_delivery_preference_field'), 10, 1);
 		add_action('woocommerce_checkout_process', array($this, 'validate_delivery_preference_field'), 10, 1);
 		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_delivery_preference_field'), 10, 1);
-
     }
 
     /**
