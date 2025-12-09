@@ -12,6 +12,10 @@ if (!defined('ABSPATH')) {
 
 class IJWLP_Order_Status
 {
+    /**
+     * Flag to track when partially shipped email is being sent
+     */
+    private $is_partially_shipped_email = false;
 
     /**
      * Constructor - Hook into WooCommerce
@@ -26,6 +30,9 @@ class IJWLP_Order_Status
 
         // Send email when order status changes to partially-shipped
         add_action('woocommerce_order_status_partially-shipped', array($this, 'send_partially_shipped_email'), 20, 2);
+
+        // Filter email content to replace "completed" with "Partially Shipped"
+        add_filter('woocommerce_mail_content', array($this, 'modify_email_content'), 10, 1);
     }
 
     /**
@@ -69,7 +76,7 @@ class IJWLP_Order_Status
 
         // Custom email subject & heading
         $subject = __('Your Order Has Been Partially Shipped', 'woocommerce');
-        $heading = __('Partially Shipped Order', 'woocommerce');
+        $heading = __('Partially Shipped', 'woocommerce');
 
         // Load WC mailer
         $mailer = WC()->mailer()->get_emails();
@@ -82,8 +89,30 @@ class IJWLP_Order_Status
             $email->settings['subject'] = $subject;
             $email->settings['heading'] = $heading;
 
+            // Set flag to modify email content
+            $this->is_partially_shipped_email = true;
+
             // Trigger the email
             $email->trigger($order_id);
+
+            // Reset the flag
+            $this->is_partially_shipped_email = false;
         }
+    }
+
+    /**
+     * Modify email content to replace "completed" with "Partially Shipped"
+     */
+    public function modify_email_content($content)
+    {
+        if ($this->is_partially_shipped_email) {
+            // Replace variations of "completed" with "Partially Shipped"
+            $content = str_ireplace(
+                array('has been completed', 'is now complete', 'order complete', 'order completed', 'completed'),
+                array('has been Partially Shipped', 'is now Partially Shipped', 'Partially Shipped', 'Partially Shipped', 'Partially Shipped'),
+                $content
+            );
+        }
+        return $content;
     }
 }
