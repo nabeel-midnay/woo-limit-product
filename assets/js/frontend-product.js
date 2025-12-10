@@ -202,6 +202,7 @@
             $limitedNumberInput
                 .removeClass("woo-limit-error woo-limit-available woo-limit-error-highlight woo-limit-loading");
             $addToCartButton.removeClass("woo-limit-loading");
+            $(".woo-number-range").removeClass("woo-limit-error");
         }
 
         /**
@@ -896,6 +897,7 @@
                     .prop("disabled", true)
                     .addClass("disabled")
                     .removeClass("woo-outofstock");
+                $(".woo-number-range").removeClass("woo-limit-error");
                 safeEnableButton();
                 window.IJWLP_Frontend_Common.hideError();
                 // Re-apply out-of-stock states after reset
