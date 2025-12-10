@@ -982,27 +982,47 @@
         $form.on("submit", function (e) {
             e.preventDefault();
 
-            // Variable product validation
-            if (isVariableProduct && !variationSelected) {
-                var $unselected = null;
-                var labelText = "";
+            // Variable product validation - check if variation_id is set (only happens when ALL attributes selected)
+            if (isVariableProduct) {
+                var $variationIdInput = $('input[name="variation_id"]');
+                var variationIdValue = $variationIdInput.length ? $variationIdInput.val() : "";
 
-                $(".variations select").each(function () {
-                    if (!$(this).val() || $(this).val() === "") {
-                        $unselected = $(this);
-                        var $label = $(this).closest("tr").find("th label");
-                        labelText = $label.length ? $label.text().trim().toLowerCase() : "";
+                // If variation_id is not set or empty, check which attributes are missing
+                if (!variationIdValue || variationIdValue === "" || variationIdValue === "0") {
+                    var unselectedLabels = [];
+
+                    $(".variations select").each(function () {
+                        if (!$(this).val() || $(this).val() === "") {
+                            var $label = $(this).closest("tr").find("th label");
+                            var labelText = $label.length ? $label.text().trim().toLowerCase() : "";
+                            if (labelText) {
+                                unselectedLabels.push(labelText);
+                            }
+                        }
+                    });
+
+                    if (unselectedLabels.length > 0) {
+                        $selectionErrorDiv.find(".woo-limit-variation-error").remove();
+                        var errorMsg;
+                        if (unselectedLabels.length === 1) {
+                            errorMsg = "Please select " + unselectedLabels[0];
+                        } else {
+                            // Join all labels with commas and "and" for the last one
+                            var lastLabel = unselectedLabels.pop();
+                            errorMsg = "Please select " + unselectedLabels.join(", ") + " and " + lastLabel;
+                        }
+                        $selectionErrorDiv.append(
+                            '<div class="woo-limit-variation-error">' + errorMsg + "</div>"
+                        ).slideDown();
+                        return false;
+                    } else {
+                        // All selects have values but variation_id not set - invalid combination
+                        $selectionErrorDiv.find(".woo-limit-variation-error").remove();
+                        $selectionErrorDiv.append(
+                            '<div class="woo-limit-variation-error">Please select a valid variation combination</div>'
+                        ).slideDown();
                         return false;
                     }
-                });
-
-                if ($unselected) {
-                    $selectionErrorDiv.find(".woo-limit-variation-error").remove();
-                    var errorMsg = "Please select a " + (labelText || "a variation");
-                    $selectionErrorDiv.append(
-                        '<div class="woo-limit-variation-error">' + errorMsg + "</div>"
-                    ).slideDown();
-                    return false;
                 }
             }
 
