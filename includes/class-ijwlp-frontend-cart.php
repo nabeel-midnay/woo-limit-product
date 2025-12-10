@@ -908,13 +908,13 @@ class IJWLP_Frontend_Cart
         ?>
         <div id="field-selection-modal" class="field-selection-modal" style="display:none;">
             <div class="field-selection-modal-content">
-                <h3 style="margin-top: 0; color: #333;"></h3>
-                <p style="color: #666; margin-bottom: 20px;">Choose which number(s) you want to remove:</p>
+                <h3 class="field-selection-title" style="margin-top: 0; color: #333;"></h3>
+                <p class="field-selection-description" style="color: #666; margin-bottom: 20px;">Choose which number(s) you want to remove:</p>
 
-                <div id="field-selection-list" style="margin-bottom: 20px;">
+                <div id="field-selection-list" class="field-selection-list" style="margin-bottom: 20px;">
                     <!-- Field options will be populated here -->
                 </div>
-                <div style="text-align: right;">
+                <div class="field-selection-buttons" style="text-align: right;">
                     <button class="cancel-field-selection" id="cancel-field-selection">Cancel</button>
                     <button class="remove-selected-field" id="remove-selected-field">Remove Selected Field(s)</button>
                 </div>
