@@ -916,7 +916,7 @@ class IJWLP_Frontend_Cart
                 </div>
                 <div style="text-align: right;">
                     <button class="cancel-field-selection" id="cancel-field-selection">Cancel</button>
-                    <button class="remove-selected-field" id="remove-selected-field">Remove Selected Fields</button>
+                    <button class="remove-selected-field" id="remove-selected-field">Remove Selected Field(s)</button>
                 </div>
             </div>
         </div>
