@@ -22,6 +22,7 @@
             limitItem: ".woo-limit-cart-item",
             fieldWrapper: ".woo-limit-field-wrapper",
             qtyBtn: ".quantity-btn",
+            qtyDiv: ".quantity",
             qtyInput: "input.qty",
             updateBtn: "button[name='update_cart'], input[name='update_cart']",
             checkoutBtn: ".checkout-button",
@@ -267,9 +268,9 @@
 
             if (state) {
                 $(SEL.checkoutBtn).addClass("disabled").prop("disabled", true);
-                $(".quantity").css("pointer-events", "none");
+                $(SEL.qtyDiv).css("pointer-events", "none");
             } else {
-                $(".quantity").css("pointer-events", "");
+                $(SEL.qtyDiv).css("pointer-events", "");
                 $(SEL.checkoutBtn).removeClass("disabled").prop("disabled", false);
                 $(SEL.cartItem).each(function () { updateQtyButtonsState($(this)); });
             }
@@ -290,7 +291,7 @@
                 $input: $input,
                 $button: null,
                 $errorDiv: $errorDiv,
-                delay: 2000,
+                delay: 5000,
                 getProductId: function () { return productId; },
                 getVariationId: function () { return 0; },
                 getCartItemKey: function () { return $input.data("cart-key"); },
@@ -320,10 +321,12 @@
                         }
 
                         // Unlock and trigger cart update after successful validation
-                        validationTracker.unlockField();
+                        // Keep cart disabled during the wait period
+                        disableAllCartFields();
                         setTimeout(function () {
+                            enableAllCartFields();
                             triggerCartUpdate();
-                        }, 300);
+                        }, 2000);
                     }
                     // If validation fails, stay locked so user must fix the same field
                 },
