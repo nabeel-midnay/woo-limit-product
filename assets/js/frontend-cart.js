@@ -714,29 +714,28 @@
         function wrapperHasErrors($wrapper, ignoreTypeYourNumber) {
             if (!$wrapper || !$wrapper.length) return false;
 
-            var checkErrors = function ($elements, getTextFn) {
-                var hasErrors = false;
-                $elements.each(function () {
-                    var text = getTextFn ? getTextFn($(this)) : $(this).text();
-                    if (!ignoreTypeYourNumber || text !== "Type your number") {
-                        hasErrors = true;
-                        return false;
-                    }
-                });
-                return hasErrors;
-            };
-
+            // Check for visible error messages
             var $err = $wrapper.find(".woo-limit-message.woo-limit-error:visible");
-            if ($err.length && checkErrors($err)) return true;
+            if ($err.length) return true;
 
+            // Check for range error
             var $range = $wrapper.find(".woo-number-range.woo-limit-error");
             if ($range.length && !ignoreTypeYourNumber) return true;
 
             var $invalidInputs = $wrapper.find(".woo-limit.woo-limit-error");
             if ($invalidInputs.length) {
-                return checkErrors($invalidInputs, function ($inp) {
-                    return $inp.siblings(".woo-limit-message").text();
+                if (!ignoreTypeYourNumber) return true;
+
+                // If checking for empty fields primarily (ignoreTypeYourNumber=true),
+                // we treat actual values with errors as blocking, but empty inputs as passable.
+                var hasRealError = false;
+                $invalidInputs.each(function () {
+                    if (!isInputEmpty($(this))) {
+                        hasRealError = true;
+                        return false;
+                    }
                 });
+                if (hasRealError) return true;
             }
             return false;
         }
@@ -896,7 +895,11 @@
 
                 if (isInputEmpty($input)) {
                     isValid = false;
-                    $msg.text("Type your number").addClass("woo-limit-error").show();
+                    var $wrapper = $input.closest(SEL.fieldWrapper);
+                    var $rangeInfo = $wrapper.find(".woo-number-range");
+                    if ($rangeInfo.length) {
+                        $rangeInfo.addClass("woo-limit-error");
+                    }
                     $input.addClass("woo-limit-error");
                     if (!$firstError) $firstError = $input;
                 } else {
