@@ -45,6 +45,10 @@ class IJWLP_Frontend_Cart
         // Clear cart on logout if there are limited edition products in the cart
 
         add_action('wp_footer', array($this, 'remove_modal'), 10);
+
+        // Enforce quantity limits after cart merge on login
+        // This prevents bypassing max quantity limits when guest cart merges with user cart
+        add_action('woocommerce_cart_loaded_from_session', array($this, 'enforce_quantity_limits_on_cart_load'), 20);
     }
 
     /**
@@ -836,5 +840,131 @@ class IJWLP_Frontend_Cart
             </div>
         </div>
         <?php
+    }
+
+    /**
+     * Enforce quantity limits when cart is loaded from session
+     * This handles the cart merge scenario on login - prevents bypassing max quantity limits
+     * 
+     * @param WC_Cart $cart The cart object
+     */
+    public function enforce_quantity_limits_on_cart_load($cart)
+    {
+        if (!$cart) {
+            return;
+        }
+
+        $cart_contents = $cart->get_cart();
+        if (empty($cart_contents)) {
+            return;
+        }
+
+        // Build map of parent_product_id => total quantity and cart keys
+        $product_quantities = array();
+        $product_cart_keys = array();
+        $product_names = array();
+
+        foreach ($cart_contents as $cart_item_key => $cart_item) {
+            $product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
+            $variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
+            $actual_id = $variation_id > 0 ? $variation_id : $product_id;
+
+            $product = wc_get_product($actual_id);
+            if (!$product) {
+                continue;
+            }
+
+            $parent_id = $actual_id;
+            if ($product->is_type('variation')) {
+                $parent_id = $product->get_parent_id();
+            }
+
+            // Check if limited or has max quantity
+            $is_limited = get_post_meta($parent_id, '_woo_limit_status', true);
+            $max_qty = get_post_meta($parent_id, '_woo_limit_max_quantity', true);
+
+            // Skip if not limited and no max quantity set
+            if ($is_limited !== 'yes' && empty($max_qty)) {
+                continue;
+            }
+
+            // Skip if no max quantity set
+            if (empty($max_qty)) {
+                continue;
+            }
+
+            if (!isset($product_quantities[$parent_id])) {
+                $product_quantities[$parent_id] = 0;
+                $product_cart_keys[$parent_id] = array();
+                $parent_product = wc_get_product($parent_id);
+                $product_names[$parent_id] = $parent_product ? $parent_product->get_name() : __('Product', 'woolimited');
+            }
+
+            $product_quantities[$parent_id] += isset($cart_item['quantity']) ? intval($cart_item['quantity']) : 0;
+            $product_cart_keys[$parent_id][] = $cart_item_key;
+        }
+
+        // Enforce limits for each product
+        $adjusted = false;
+        $adjusted_products = array();
+
+        foreach ($product_quantities as $parent_id => $total_qty) {
+            $max_qty = get_post_meta($parent_id, '_woo_limit_max_quantity', true);
+            $max_qty_int = intval($max_qty);
+
+            if ($total_qty <= $max_qty_int) {
+                continue;
+            }
+
+            // Need to reduce quantities - start from last added (reversed)
+            $excess = $total_qty - $max_qty_int;
+            $cart_keys = array_reverse($product_cart_keys[$parent_id]);
+
+            foreach ($cart_keys as $key) {
+                if ($excess <= 0) {
+                    break;
+                }
+
+                if (!isset($cart->cart_contents[$key])) {
+                    continue;
+                }
+
+                $item_qty = isset($cart->cart_contents[$key]['quantity']) ? intval($cart->cart_contents[$key]['quantity']) : 0;
+                if ($item_qty <= 0) {
+                    continue;
+                }
+
+                $reduce = min($item_qty, $excess);
+                $new_qty = $item_qty - $reduce;
+
+                if ($new_qty <= 0) {
+                    // Remove the item entirely
+                    unset($cart->cart_contents[$key]);
+                } else {
+                    $cart->cart_contents[$key]['quantity'] = $new_qty;
+                }
+
+                $excess -= $reduce;
+                $adjusted = true;
+            }
+
+            // Track adjusted products for notice
+            $adjusted_products[] = sprintf(
+                __('"%s" (max: %d)', 'woolimited'),
+                $product_names[$parent_id],
+                $max_qty_int
+            );
+        }
+
+        // Add notice if quantities were adjusted
+        if ($adjusted && !empty($adjusted_products)) {
+            wc_add_notice(
+                sprintf(
+                    __('Cart quantities adjusted to respect maximum limits: %s', 'woolimited'),
+                    implode(', ', $adjusted_products)
+                ),
+                'notice'
+            );
+        }
     }
 }

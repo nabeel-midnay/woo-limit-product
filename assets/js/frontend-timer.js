@@ -82,22 +82,44 @@
 
         /**
          * Initialize timer on page load
-         * Check if timer exists and resume if active
+         * First fetch timer from backend (source of truth), then fallback to localStorage
+         * Only continue timer if cart actually has limited products
          */
         init: function () {
-            // Check if timer already exists in localStorage
-            if (this.hasActiveTimer()) {
-                this.resumeTimer();
-            } else {
-                // If no timer exists, check if cart has limited products and remove them
-                this.removeProductsIfNoTimer();
-            }
+            const self = this;
+
+            // Fetch timer from backend first (handles login/logout persistence)
+            this.fetchTimerFromBackend(function (timerData) {
+                const hasLimitedProducts = timerData && timerData.has_limited_products;
+
+                if (timerData && timerData.expiry > 0 && timerData.is_active && hasLimitedProducts) {
+                    // Backend has valid timer AND cart has limited products - resume timer
+                    self.safeSetStorage(self.STORAGE_KEYS.EXPIRY, timerData.expiry.toString());
+                    self.safeSetStorage(self.STORAGE_KEYS.ACTIVE, "true");
+                    self.timerData.expiry = timerData.expiry;
+                    self.timerData.isActive = true;
+                    self.startTimer();
+                } else if (self.hasActiveTimer() && hasLimitedProducts) {
+                    // Fallback: localStorage has valid timer AND cart has limited products
+                    const localExpiry = parseInt(self.safeGetStorage(self.STORAGE_KEYS.EXPIRY));
+                    self.saveTimerToBackend(localExpiry);
+                    self.resumeTimer();
+                } else if (hasLimitedProducts) {
+                    // Cart has limited products but no valid timer - remove them
+                    self.removeExpiredProducts();
+                } else {
+                    // No limited products in cart - clear any stale timer
+                    self.clearTimer();
+                }
+            });
 
             // Attach cart change listeners
             this.attachCartListeners();
             // Watch for visibility and perform an initial cart check
             this.setupVisibilityWatcher();
         },
+
+
 
         /**
          * Remove limited products from cart if no active timer exists
@@ -174,12 +196,16 @@
             this.safeSetStorage(this.STORAGE_KEYS.EXPIRY, expiry.toString());
             this.safeSetStorage(this.STORAGE_KEYS.ACTIVE, "true");
 
+            // Also save to backend (user meta or session) for login/logout persistence
+            this.saveTimerToBackend(expiry);
+
             this.timerData.expiry = expiry;
             this.timerData.isActive = true;
 
             // Start countdown
             this.startTimer();
         },
+
 
         /**
          * Begin countdown interval (1 second checks)
@@ -236,6 +262,9 @@
             this.safeRemoveStorage(this.STORAGE_KEYS.EXPIRY);
             this.safeRemoveStorage(this.STORAGE_KEYS.ACTIVE);
 
+            // Also clear from backend storage
+            this.clearTimerFromBackend();
+
             this.timerData.expiry = null;
             this.timerData.isActive = false;
 
@@ -245,6 +274,68 @@
                 $timerDisplay.hide();
             }
         },
+
+        /**
+         * Fetch timer data from backend (user meta or WC session)
+         * This is the source of truth for timer persistence across login/logout
+         * 
+         * @param {function} callback - Callback with timer data
+         */
+        fetchTimerFromBackend: function (callback) {
+            $.ajax({
+                url: ijwlp_frontend.ajax_url,
+                type: "POST",
+                data: {
+                    action: "ijwlp_get_timer_data",
+                    nonce: ijwlp_frontend.nonce
+                },
+                success: function (response) {
+                    if (response.success && response.data) {
+                        callback(response.data);
+                    } else {
+                        callback(null);
+                    }
+                },
+                error: function () {
+                    callback(null);
+                }
+            });
+        },
+
+        /**
+         * Save timer expiry to backend (user meta or WC session)
+         * 
+         * @param {number} expiry - Unix timestamp when timer expires
+         */
+        saveTimerToBackend: function (expiry) {
+            $.ajax({
+                url: ijwlp_frontend.ajax_url,
+                type: "POST",
+                data: {
+                    action: "ijwlp_set_timer_data",
+                    nonce: ijwlp_frontend.nonce,
+                    expiry: expiry
+                }
+                // Fire and forget - no need to wait for response
+            });
+        },
+
+        /**
+         * Clear timer from backend storage
+         */
+        clearTimerFromBackend: function () {
+            $.ajax({
+                url: ijwlp_frontend.ajax_url,
+                type: "POST",
+                data: {
+                    action: "ijwlp_set_timer_data",
+                    nonce: ijwlp_frontend.nonce,
+                    expiry: 0
+                }
+                // Fire and forget
+            });
+        },
+
 
         /**
          * Get remaining time in seconds

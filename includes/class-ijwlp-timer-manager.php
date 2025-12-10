@@ -35,6 +35,20 @@ class IJWLP_Timer_Manager
 
         // Hook into cart item removal to clear timer if no limited items remain
         add_action('woocommerce_cart_item_removed', array($this, 'check_and_clear_timer_if_needed'), 10, 2);
+
+        // AJAX handler to get timer data from backend (user meta or session)
+        add_action('wp_ajax_ijwlp_get_timer_data', array($this, 'ajax_get_timer_data'));
+        add_action('wp_ajax_nopriv_ijwlp_get_timer_data', array($this, 'ajax_get_timer_data'));
+
+        // AJAX handler to set timer data to backend (user meta or session)
+        add_action('wp_ajax_ijwlp_set_timer_data', array($this, 'ajax_set_timer_data'));
+        add_action('wp_ajax_nopriv_ijwlp_set_timer_data', array($this, 'ajax_set_timer_data'));
+
+        // Restore timer from user meta on login
+        add_action('wp_login', array($this, 'restore_timer_on_login'), 10, 2);
+
+        // Clear timer from user meta on logout (keep session for guest)
+        add_action('wp_logout', array($this, 'handle_logout_timer'), 10);
     }
 
     /**
@@ -215,10 +229,261 @@ class IJWLP_Timer_Manager
     public function check_and_clear_timer_if_needed($cart_item_key, $cart)
     {
         // If no more limited products in cart, timer should be cleared by frontend JS
-        // This is a backend marker for any additional processing needed
+        // Also clear from backend storage
         if (!self::cart_has_limited_products()) {
-            // Log: No limited products remain
-            // Frontend JS will clear localStorage
+            $this->clear_timer_storage();
+        }
+    }
+
+    /**
+     * AJAX: Get timer data from backend storage
+     * Returns timer expiry from user meta (logged-in) or WC session (guest)
+     */
+    public function ajax_get_timer_data()
+    {
+        $timer_data = $this->get_timer_from_storage();
+
+        wp_send_json_success(array(
+            'expiry' => $timer_data['expiry'],
+            'is_active' => $timer_data['is_active'],
+            'has_limited_products' => self::cart_has_limited_products()
+        ));
+    }
+
+    /**
+     * AJAX: Set timer data to backend storage
+     * Saves timer expiry to user meta (logged-in) or WC session (guest)
+     */
+    public function ajax_set_timer_data()
+    {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'ijwlp_frontend_nonce')) {
+            wp_send_json_error(array(
+                'message' => __('Security check failed', 'woolimited')
+            ));
+        }
+
+        $expiry = isset($_POST['expiry']) ? intval($_POST['expiry']) : 0;
+
+        if ($expiry <= 0) {
+            wp_send_json_error(array(
+                'message' => __('Invalid expiry time', 'woolimited')
+            ));
+        }
+
+        $this->save_timer_to_storage($expiry);
+
+        wp_send_json_success(array(
+            'message' => __('Timer saved', 'woolimited'),
+            'expiry' => $expiry
+        ));
+    }
+
+    /**
+     * Get timer data from storage (user meta or WC session)
+     * 
+     * @return array ['expiry' => int, 'is_active' => bool]
+     */
+    public function get_timer_from_storage()
+    {
+        $expiry = 0;
+        $is_active = false;
+        $current_time = time();
+
+        $user_id = get_current_user_id();
+
+        if ($user_id > 0) {
+            // Logged-in user: get from user meta
+            $expiry = get_user_meta($user_id, '_ijwlp_timer_expiry', true);
+            $expiry = $expiry ? intval($expiry) : 0;
+        } else {
+            // Guest: get from WC session
+            if (function_exists('WC') && WC()->session) {
+                $expiry = WC()->session->get('ijwlp_timer_expiry');
+                $expiry = $expiry ? intval($expiry) : 0;
+            }
+        }
+
+        // Check if timer is still valid (not expired)
+        if ($expiry > 0 && $expiry > $current_time) {
+            $is_active = true;
+        } else {
+            $expiry = 0;
+        }
+
+        return array(
+            'expiry' => $expiry,
+            'is_active' => $is_active
+        );
+    }
+
+    /**
+     * Save timer expiry to storage (user meta or WC session)
+     * 
+     * @param int $expiry Unix timestamp when timer expires
+     */
+    public function save_timer_to_storage($expiry)
+    {
+        $user_id = get_current_user_id();
+
+        if ($user_id > 0) {
+            // Logged-in user: save to user meta
+            update_user_meta($user_id, '_ijwlp_timer_expiry', $expiry);
+        }
+
+        // Always save to WC session (works for both guests and logged-in)
+        // This ensures continuity if user logs out
+        if (function_exists('WC') && WC()->session) {
+            WC()->session->set('ijwlp_timer_expiry', $expiry);
+        }
+    }
+
+    /**
+     * Clear timer from storage
+     */
+    public function clear_timer_storage()
+    {
+        $user_id = get_current_user_id();
+
+        if ($user_id > 0) {
+            delete_user_meta($user_id, '_ijwlp_timer_expiry');
+        }
+
+        if (function_exists('WC') && WC()->session) {
+            WC()->session->set('ijwlp_timer_expiry', null);
+        }
+    }
+
+    /**
+     * Restore timer from user meta on login
+     * Handles expired products removal and guest product transfer
+     * 
+     * @param string $user_login Username
+     * @param WP_User $user User object
+     */
+    public function restore_timer_on_login($user_login, $user)
+    {
+        if (!$user || !$user->ID) {
+            return;
+        }
+
+        global $wpdb, $table_prefix;
+        $table = $table_prefix . 'woo_limit';
+
+        $current_time = time();
+        $user_id = (string) $user->ID;
+
+        // Get timer from user meta (logged-in user's timer from before logout)
+        $user_expiry = get_user_meta($user->ID, '_ijwlp_timer_expiry', true);
+        $user_expiry = $user_expiry ? intval($user_expiry) : 0;
+
+        // Get timer from current session (guest session before login)
+        $session_expiry = 0;
+        if (function_exists('WC') && WC()->session) {
+            $session_expiry = WC()->session->get('ijwlp_timer_expiry');
+            $session_expiry = $session_expiry ? intval($session_expiry) : 0;
+        }
+
+        // Get guest identifier (the guest session before login)
+        $guest_identifier = IJWLP_Options::get_user_identifier();
+        // Note: At this point, get_current_user_id() returns 0 since login is in progress
+        // So guest_identifier would still be the guest hash
+
+        $user_valid = ($user_expiry > 0 && $user_expiry > $current_time);
+        $session_valid = ($session_expiry > 0 && $session_expiry > $current_time);
+
+        // If user's timer EXPIRED - remove their expired products
+        if ($user_expiry > 0 && !$user_valid) {
+            // User had a timer but it expired - remove their limited products
+            
+            // Get cart keys for user's blocked products
+            $user_blocked = $wpdb->get_col($wpdb->prepare(
+                "SELECT cart_key FROM $table WHERE user_id = %s AND status = 'block'",
+                $user_id
+            ));
+
+            // Delete from woo_limit table
+            $wpdb->delete(
+                $table,
+                array(
+                    'user_id' => $user_id,
+                    'status' => 'block'
+                ),
+                array('%s', '%s')
+            );
+
+            // Remove from persistent cart (user meta)
+            $persistent_cart = get_user_meta($user->ID, '_woocommerce_persistent_cart_' . get_current_blog_id(), true);
+            if (!empty($persistent_cart) && isset($persistent_cart['cart']) && !empty($user_blocked)) {
+                $cart_changed = false;
+                foreach ($user_blocked as $cart_key) {
+                    if (isset($persistent_cart['cart'][$cart_key])) {
+                        unset($persistent_cart['cart'][$cart_key]);
+                        $cart_changed = true;
+                    }
+                }
+                if ($cart_changed) {
+                    update_user_meta($user->ID, '_woocommerce_persistent_cart_' . get_current_blog_id(), $persistent_cart);
+                }
+            }
+
+            // Clear expired user timer
+            delete_user_meta($user->ID, '_ijwlp_timer_expiry');
+        }
+
+        // Transfer guest products to logged-in user (update user_id in table)
+        // Only if guest identifier is different from user ID (i.e., was actually a guest)
+        if (strpos($guest_identifier, 'guest_') === 0) {
+            $wpdb->update(
+                $table,
+                array('user_id' => $user_id),  // New user_id
+                array(
+                    'user_id' => $guest_identifier,
+                    'status' => 'block'
+                ),
+                array('%s'),
+                array('%s', '%s')
+            );
+        }
+
+        // Determine final timer
+        $final_expiry = 0;
+
+        if ($user_valid) {
+            // User timer still valid - use it
+            $final_expiry = $user_expiry;
+        } elseif ($session_valid) {
+            // User timer expired/missing, but guest timer valid - use guest timer
+            $final_expiry = $session_expiry;
+        }
+
+        // Save the final timer
+        if ($final_expiry > 0) {
+            update_user_meta($user->ID, '_ijwlp_timer_expiry', $final_expiry);
+            if (function_exists('WC') && WC()->session) {
+                WC()->session->set('ijwlp_timer_expiry', $final_expiry);
+            }
+        } else {
+            // No valid timer - clear both and products will be removed by frontend
+            delete_user_meta($user->ID, '_ijwlp_timer_expiry');
+            if (function_exists('WC') && WC()->session) {
+                WC()->session->set('ijwlp_timer_expiry', null);
+            }
+        }
+    }
+
+
+    /**
+     * Handle timer on logout
+     * Clear session timer so guest gets their own fresh timer when adding products
+     * User's timer remains in user meta for when they log back in
+     */
+    public function handle_logout_timer()
+    {
+        // Clear session timer - guest should get their own fresh timer
+        // User's timer stays in user meta and will be restored on next login
+        if (function_exists('WC') && WC()->session) {
+            WC()->session->set('ijwlp_timer_expiry', null);
         }
     }
 }
