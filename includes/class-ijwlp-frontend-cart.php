@@ -43,7 +43,6 @@ class IJWLP_Frontend_Cart
         add_action('woocommerce_cart_item_removed', array($this, 'remove_limited_edition_from_database'), 10, 2);
 
         // Clear cart on logout if there are limited edition products in the cart
-        //add_action('wp_logout', array($this, 'maybe_clear_cart_on_logout'), 10);
 
         add_action('wp_footer', array($this, 'remove_modal'), 10);
     }
@@ -818,90 +817,6 @@ class IJWLP_Frontend_Cart
      * 
      * @param int $user_id The user ID being logged out.
      */
-    /**
-     * Clear limited edition products from cart on logout.
-     * Removes associated blocked limited-number DB records.
-     * Also clears limited products from the persistent cart in user meta.
-     * 
-     * @param int $user_id The user ID being logged out.
-     */
-    public function maybe_clear_cart_on_logout($user_id)
-    {
-        // 1. Handle Session Cart (if loaded)
-        $cart = WC()->cart;
-        if ($cart) {
-            $cart_contents = $cart->get_cart();
-            if (!empty($cart_contents)) {
-                foreach ($cart_contents as $cart_item_key => $cart_item) {
-                    $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : (isset($cart_item['variation_id']) && $cart_item['variation_id'] > 0 ? $cart_item['variation_id'] : $cart_item['product_id']);
-                    
-                    $product = wc_get_product($actual_pro_id);
-                    $parent_product_id = $actual_pro_id;
-                    if ($product && $product->is_type('variation')) {
-                        $parent_product_id = $product->get_parent_id();
-                    }
-
-                    $is_limited = get_post_meta($parent_product_id, '_woo_limit_status', true);
-                    
-                    if ($is_limited === 'yes') {
-                        // Remove DB records for this specific item
-                        $this->remove_limited_edition_from_database($cart_item_key, $cart_item);
-                        
-                        // Remove from session cart
-                        $cart->remove_cart_item($cart_item_key);
-                    }
-                }
-                
-                // Recalculate totals after removals
-                $cart->calculate_totals();
-                if (method_exists($cart, 'maybe_set_cart_cookies')) {
-                    $cart->maybe_set_cart_cookies();
-                }
-            }
-        }
-
-        // 2. Handle Persistent Cart (User Meta)
-        $saved_cart_meta_key = '_woocommerce_persistent_cart_' . get_current_blog_id();
-        $saved_cart = get_user_meta($user_id, $saved_cart_meta_key, true);
-
-        if (isset($saved_cart['cart']) && is_array($saved_cart['cart'])) {
-            $persistent_cart_updated = false;
-            
-            foreach ($saved_cart['cart'] as $cart_item_key => $cart_item) {
-                $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : (isset($cart_item['variation_id']) && $cart_item['variation_id'] > 0 ? $cart_item['variation_id'] : $cart_item['product_id']);
-                
-                $product = wc_get_product($actual_pro_id);
-                // If product doesn't exist anymore, we might want to remove it, but let's stick to the limited logic
-                if (!$product) {
-                    continue; 
-                }
-
-                $parent_product_id = $actual_pro_id;
-                if ($product->is_type('variation')) {
-                    $parent_product_id = $product->get_parent_id();
-                }
-
-                $is_limited = get_post_meta($parent_product_id, '_woo_limit_status', true);
-
-                if ($is_limited === 'yes') {
-                    // Remove DB records (just in case they weren't caught by session cart loop)
-                    $this->remove_limited_edition_from_database($cart_item_key, $cart_item);
-
-                    // Remove from persistent cart array
-                    unset($saved_cart['cart'][$cart_item_key]);
-                    $persistent_cart_updated = true;
-                }
-            }
-
-            if ($persistent_cart_updated) {
-                if (empty($saved_cart['cart'])) {
-                    delete_user_meta($user_id, $saved_cart_meta_key);
-                } else {
-                    update_user_meta($user_id, $saved_cart_meta_key, $saved_cart);
-                }
-            }
-        }
-    }
 
     public function remove_modal()
     {

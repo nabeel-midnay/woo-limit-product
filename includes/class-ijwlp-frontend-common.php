@@ -65,6 +65,9 @@ class IJWLP_Frontend_Common
 
         // Add stock status classes to product list items in shop loop
         add_filter('post_class', array($this, 'woo_add_stock_status_post_class'), 20, 3);
+
+        // Render logout modal in footer
+        add_action('wp_footer', array($this, 'render_logout_modal'), 10);
     }
 
     /**
@@ -148,8 +151,7 @@ class IJWLP_Frontend_Common
         // Prepare AJAX data for all scripts
         $ajax_data = array(
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('ijwlp_frontend_nonce'),
-            'has_limited_product' => $this->check_cart_for_limited_products()
+            'nonce' => wp_create_nonce('ijwlp_frontend_nonce')
         );
 
         // Localize script data to common script
@@ -350,35 +352,23 @@ class IJWLP_Frontend_Common
     }
 
 
+
     /**
-     * Check if current cart has any limited edition products
-     * @return boolean
+     * Render logout confirmation modal
      */
-    public function check_cart_for_limited_products()
+    public function render_logout_modal()
     {
-        if (!function_exists('WC') || !WC()->cart) {
-            return false;
-        }
-
-        foreach (WC()->cart->get_cart() as $cart_item) {
-            $product_id = $cart_item['product_id'];
-            $variation_id = $cart_item['variation_id'];
-
-            // Resolve to parent if needed, mirroring existing logic
-            $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : ($variation_id > 0 ? $variation_id : $product_id);
-            $product = wc_get_product($actual_pro_id);
-            $parent_product_id = $actual_pro_id;
-
-            if ($product && $product->is_type('variation')) {
-                $parent_product_id = $product->get_parent_id();
-            }
-
-            $status = get_post_meta($parent_product_id, '_woo_limit_status', true);
-            if ($status === 'yes') {
-                return true;
-            }
-        }
-        return false;
+        ?>
+        <div id="woo-limit-logout-modal" class="field-selection-modal" style="display:none;">
+            <div class="field-selection-modal-content" style="max-width: 400px; text-align: center;">
+                <h3 class="field-selection-title" style="margin-top: 0; color: #333; margin-bottom: 20px;">Leaving so soon?</h3>
+                <div class="field-selection-buttons" style="display: flex; justify-content: center; gap: 10px;">
+                    <button class="remove-selected-field" id="woo-limit-logout-confirm" style="margin-right: 0;">Yes</button>
+                    <button class="cancel-field-selection" id="woo-limit-logout-cancel" style="margin-right: 0;">No</button>
+                </div>
+            </div>
+        </div>
+        <?php
     }
 
 }

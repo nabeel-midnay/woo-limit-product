@@ -1035,24 +1035,33 @@
 
     // Handle logout confirmation
     $(document).ready(function () {
+        var $logoutModal = $('#woo-limit-logout-modal');
+        var logoutUrl = '';
+
         $('body').on('click', 'a[href*="customer-logout"], a[href*="action=logout"]', function (e) {
-            var $link = $(this);
-            var href = $link.attr('href');
-
-            // Prevent default navigation
             e.preventDefault();
+            logoutUrl = $(this).attr('href');
+            $logoutModal.show();
+        });
 
-            var message;
-            // Check if user has limited products in cart (injected via PHP)
-            if (window.ijwlp_frontend && window.ijwlp_frontend.has_limited_product) {
-                message = "You have limited products in your cart. they will be lost if you logout. Are you sure?";
-            } else {
-                message = "Are you sure you want to log out?";
+        // Handle Yes click
+        $(document).on('click', '#woo-limit-logout-confirm', function () {
+            if (logoutUrl) {
+                window.location.href = logoutUrl;
             }
+        });
 
-            // Show confirmation dialog
-            if (confirm(message)) {
-                window.location.href = href;
+        // Handle No click
+        $(document).on('click', '#woo-limit-logout-cancel', function () {
+            $logoutModal.hide();
+            logoutUrl = '';
+        });
+
+        // Close on outside click is handled by the generic close handler below or we can add specific one
+        $logoutModal.on('click', function (e) {
+            if (e.target === this) {
+                $(this).hide();
+                logoutUrl = '';
             }
         });
     });
