@@ -392,7 +392,92 @@ class IJWLP_Timer_Manager
         $user_valid = ($user_expiry > 0 && $user_expiry > $current_time);
         $session_valid = ($session_expiry > 0 && $session_expiry > $current_time);
 
-        // If user's timer EXPIRED - remove their expired products
+        // Check if user has blocked products in woo_limit table
+        $user_has_products = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $table WHERE user_id = %s AND status = 'block'",
+            $user_id
+        ));
+        $user_has_products = intval($user_has_products) > 0;
+
+        // IMPORTANT: Sync persistent cart with woo_limit table
+        // This ensures the persistent cart's woo_limit field matches the actual DB state
+        $this->sync_persistent_cart_with_db($user->ID, $user_id);
+
+        // CASE 1: User has valid timer AND has products
+        // → Keep user products, DELETE guest products (don't transfer)
+        if ($user_valid && $user_has_products) {
+            // Get guest cart keys before deleting
+            $guest_cart_keys = array();
+            if (strpos($guest_identifier, 'guest_') === 0) {
+                $guest_cart_keys = $wpdb->get_col($wpdb->prepare(
+                    "SELECT cart_key FROM $table WHERE user_id = %s AND status = 'block'",
+                    $guest_identifier
+                ));
+
+                // Delete guest products from woo_limit table
+                $wpdb->delete(
+                    $table,
+                    array(
+                        'user_id' => $guest_identifier,
+                        'status' => 'block'
+                    ),
+                    array('%s', '%s')
+                );
+            }
+
+            // Remove guest products from WooCommerce cart (if cart exists)
+            if (!empty($guest_cart_keys) && function_exists('WC') && WC()->cart) {
+                foreach ($guest_cart_keys as $cart_key) {
+                    WC()->cart->remove_cart_item($cart_key);
+                }
+            }
+
+            // Also clear from session cart data directly
+            if (function_exists('WC') && WC()->session) {
+                $session_cart = WC()->session->get('cart', array());
+                if (!empty($session_cart) && !empty($guest_cart_keys)) {
+                    foreach ($guest_cart_keys as $cart_key) {
+                        if (isset($session_cart[$cart_key])) {
+                            unset($session_cart[$cart_key]);
+                        }
+                    }
+                    WC()->session->set('cart', $session_cart);
+                }
+
+                // Clear guest session timer
+                WC()->session->set('ijwlp_timer_expiry', null);
+            }
+
+            // Also remove from user's persistent cart (in case WooCommerce merged them)
+            if (!empty($guest_cart_keys)) {
+                $persistent_cart = get_user_meta($user->ID, '_woocommerce_persistent_cart_' . get_current_blog_id(), true);
+                if (!empty($persistent_cart) && isset($persistent_cart['cart'])) {
+                    $cart_changed = false;
+                    foreach ($guest_cart_keys as $cart_key) {
+                        if (isset($persistent_cart['cart'][$cart_key])) {
+                            unset($persistent_cart['cart'][$cart_key]);
+                            $cart_changed = true;
+                        }
+                    }
+                    if ($cart_changed) {
+                        update_user_meta($user->ID, '_woocommerce_persistent_cart_' . get_current_blog_id(), $persistent_cart);
+                    }
+                }
+            }
+
+            // Use user's timer
+            update_user_meta($user->ID, '_ijwlp_timer_expiry', $user_expiry);
+            if (function_exists('WC') && WC()->session) {
+                WC()->session->set('ijwlp_timer_expiry', $user_expiry);
+            }
+
+            return;
+        }
+
+
+
+        // CASE 2: User timer EXPIRED or no products
+        // → Remove expired user products, keep/use guest products
         if ($user_expiry > 0 && !$user_valid) {
             // User had a timer but it expired - remove their limited products
             
@@ -432,7 +517,7 @@ class IJWLP_Timer_Manager
         }
 
         // Transfer guest products to logged-in user (update user_id in table)
-        // Only if guest identifier is different from user ID (i.e., was actually a guest)
+        // Only happens when user has no valid products
         if (strpos($guest_identifier, 'guest_') === 0) {
             $wpdb->update(
                 $table,
@@ -446,14 +531,10 @@ class IJWLP_Timer_Manager
             );
         }
 
-        // Determine final timer
+        // Determine final timer (user expired, so use guest timer if valid)
         $final_expiry = 0;
 
-        if ($user_valid) {
-            // User timer still valid - use it
-            $final_expiry = $user_expiry;
-        } elseif ($session_valid) {
-            // User timer expired/missing, but guest timer valid - use guest timer
+        if ($session_valid) {
             $final_expiry = $session_expiry;
         }
 
@@ -473,6 +554,7 @@ class IJWLP_Timer_Manager
     }
 
 
+
     /**
      * Handle timer on logout
      * Clear session timer so guest gets their own fresh timer when adding products
@@ -484,6 +566,75 @@ class IJWLP_Timer_Manager
         // User's timer stays in user meta and will be restored on next login
         if (function_exists('WC') && WC()->session) {
             WC()->session->set('ijwlp_timer_expiry', null);
+        }
+    }
+
+    /**
+     * Sync persistent cart's woo_limit field with the actual data in woo_limit table
+     * This ensures the persistent cart doesn't have stale limited edition numbers
+     * 
+     * @param int $wp_user_id WordPress user ID
+     * @param string $user_id User identifier string
+     */
+    public function sync_persistent_cart_with_db($wp_user_id, $user_id)
+    {
+        global $wpdb, $table_prefix;
+        $table = $table_prefix . 'woo_limit';
+
+        // Get persistent cart
+        $persistent_cart = get_user_meta($wp_user_id, '_woocommerce_persistent_cart_' . get_current_blog_id(), true);
+        
+        if (empty($persistent_cart) || !isset($persistent_cart['cart']) || empty($persistent_cart['cart'])) {
+            return;
+        }
+
+        // Get all cart_key => limit_no mappings from woo_limit table for this user
+        $db_records = $wpdb->get_results($wpdb->prepare(
+            "SELECT cart_key, limit_no FROM $table WHERE user_id = %s AND status = 'block'",
+            $user_id
+        ), OBJECT_K);
+
+        $cart_changed = false;
+
+        foreach ($persistent_cart['cart'] as $cart_key => &$cart_item) {
+            // Check if this cart item has woo_limit data
+            if (!isset($cart_item['woo_limit'])) {
+                continue;
+            }
+
+            // Check if this cart_key exists in the DB
+            if (isset($db_records[$cart_key])) {
+                // Get the actual numbers from DB
+                $db_numbers = $db_records[$cart_key]->limit_no;
+                $db_numbers_array = array_map('trim', explode(',', $db_numbers));
+                $db_numbers_array = array_filter($db_numbers_array, 'strlen');
+
+                // Get current numbers in cart
+                $cart_numbers = is_array($cart_item['woo_limit']) 
+                    ? $cart_item['woo_limit'] 
+                    : array_map('trim', explode(',', $cart_item['woo_limit']));
+
+                // If they don't match, update cart to match DB (source of truth)
+                if ($cart_numbers != $db_numbers_array) {
+                    $cart_item['woo_limit'] = $db_numbers_array;
+                    
+                    // Also update quantity to match number of limited edition numbers
+                    $cart_item['quantity'] = count($db_numbers_array);
+                    
+                    $cart_changed = true;
+                }
+            } else {
+                // Cart item has woo_limit but no record in DB - remove the woo_limit
+                // This means the limited edition numbers were released
+                unset($cart_item['woo_limit']);
+                $cart_changed = true;
+            }
+        }
+        unset($cart_item); // Break reference
+
+        // Save updated persistent cart
+        if ($cart_changed) {
+            update_user_meta($wp_user_id, '_woocommerce_persistent_cart_' . get_current_blog_id(), $persistent_cart);
         }
     }
 }

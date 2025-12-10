@@ -632,7 +632,19 @@ class IJWLP_Frontend_Cart
                 );
             }
         }
+
+        // IMPORTANT: Also update persistent cart for logged-in users
+        $wp_user_id = get_current_user_id();
+        if ($wp_user_id > 0) {
+            $persistent_cart = get_user_meta($wp_user_id, '_woocommerce_persistent_cart_' . get_current_blog_id(), true);
+            if (!empty($persistent_cart) && isset($persistent_cart['cart'][$cart_item_key])) {
+                $persistent_cart['cart'][$cart_item_key]['woo_limit'] = $new_numbers;
+                $persistent_cart['cart'][$cart_item_key]['quantity'] = count($new_numbers);
+                update_user_meta($wp_user_id, '_woocommerce_persistent_cart_' . get_current_blog_id(), $persistent_cart);
+            }
+        }
     }
+
 
     /**
      * Merge limited edition numbers when adding to existing cart item
