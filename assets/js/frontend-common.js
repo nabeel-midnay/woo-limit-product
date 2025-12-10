@@ -1028,6 +1028,10 @@
                 logoutUrl = '';
             }
         });
+
+        $(document).on('mousedown', '.autocomplete-suggestion', e => {
+            $(e.target).click();
+        });
     });
 
 })(jQuery);
