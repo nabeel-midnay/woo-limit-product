@@ -654,9 +654,9 @@ class IJWLP_Options
 			$parent_product_id
 		));
 
-		// Calculate expiry time from settings
+		// Calculate expiry time from settings (use WordPress time for consistency)
 		$limit_minutes = self::get_setting('limittime', 15);
-		$expiry_time = date('Y-m-d H:i:s', time() + ($limit_minutes * 60));
+		$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
 
 		if ($existing_record) {
 			// Update existing record with new comma-separated numbers
@@ -1067,9 +1067,9 @@ class IJWLP_Options
 			$parent_product_id
 		));
 
-		// Calculate expiry time from settings
+		// Calculate expiry time from settings (use WordPress time for consistency)
 		$limit_minutes = self::get_setting('limittime', 15);
-		$expiry_time = date('Y-m-d H:i:s', time() + ($limit_minutes * 60));
+		$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
 
 		if ($existing_record) {
 			// Merge existing numbers with the new ones (avoid duplicates) and update

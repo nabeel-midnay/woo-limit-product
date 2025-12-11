@@ -654,12 +654,15 @@ class IJWLP_Timer_Manager
         $table = $table_prefix . 'woo_limit';
 
         // Delete expired blocked products where status is 'block' and expiry_time has passed
-        $deleted = $wpdb->query(
+        // Use WordPress current_time for consistent timezone handling
+        $current_wp_time = current_time('mysql');
+        $deleted = $wpdb->query($wpdb->prepare(
             "DELETE FROM $table 
              WHERE status = 'block' 
              AND expiry_time IS NOT NULL 
-             AND expiry_time < NOW()"
-        );
+             AND expiry_time < %s",
+            $current_wp_time
+        ));
     }
 
     /**
@@ -689,7 +692,9 @@ class IJWLP_Timer_Manager
             return;
         }
 
-        // Convert Unix timestamp to MySQL datetime format
+        // Convert Unix timestamp to MySQL datetime format using WordPress timezone
+        // The $expiry is a JavaScript timestamp (milliseconds), but already adjusted by frontend
+        // We use date() here as the $expiry comes from the frontend timer
         $expiry_datetime = date('Y-m-d H:i:s', $expiry);
 
         // Update expiry_time for all these cart items
