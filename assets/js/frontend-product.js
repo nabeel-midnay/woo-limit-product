@@ -569,7 +569,7 @@
 
             var $variationId = $('input[name="variation_id"]');
             if ($variationId.length && $variationId.val() && $variationId.val() !== "") {
-                $selectionErrorDiv.find(".woo-limit-variation-error").slideUp();
+                $selectionErrorDiv.find(".woo-limit-variation-error").hide();
                 $selectionErrorDiv.hide();
                 hasVariation = true;
 
@@ -1032,14 +1032,14 @@
                         }
                         $selectionErrorDiv.append(
                             '<div class="woo-limit-variation-error">' + errorMsg + "</div>"
-                        ).slideDown();
+                        ).show();
                         return false;
                     } else {
                         // All selects have values but variation_id not set - invalid combination
                         $selectionErrorDiv.find(".woo-limit-variation-error").remove();
                         $selectionErrorDiv.append(
                             '<div class="woo-limit-variation-error">Please select a valid variation combination</div>'
-                        ).slideDown();
+                        ).show();
                         return false;
                     }
                 }

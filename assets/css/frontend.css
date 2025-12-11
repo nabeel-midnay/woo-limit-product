@@ -499,7 +499,7 @@ body [name="update_cart"] {
 } */
 
 /* Ensure input field has proper styling when number is available */
-.woo-cart-items:not(.fieldError):not(.validateError) {
+.woo-cart-items:not(.fieldError):not(.woo-limit-error) {
     border: 1px solid #cccccc !important;
     border-color: #cccccc !important;
 }
@@ -512,7 +512,7 @@ body [name="update_cart"] {
 }
 
 /* Ensure cart page inputs have proper styling when not in error state */
-.woocommerce-cart .woo-cart-items:not(.fieldError):not(.validateError) {
+.woocommerce-cart .woo-cart-items:not(.woo-limit-error) {
     border: 1px solid #cccccc !important;
     border-color: #cccccc !important;
 }
@@ -695,6 +695,14 @@ body [name="update_cart"] {
 }
 
 .woo-cart-items.fieldError {
+    border-color: red !important;
+}
+
+/* Red border for empty input fields on checkout validation */
+input.woo-limit.woo-limit-error,
+.woo-limit-product input.woo-limit-error,
+.woocommerce-cart .woo-limit-cart-item input.woo-limit-error {
+    border: 1px solid red !important;
     border-color: red !important;
 }
 
