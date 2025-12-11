@@ -49,6 +49,9 @@ class IJWLP_Timer_Manager
 
         // Clear timer from user meta on logout (keep session for guest)
         add_action('wp_logout', array($this, 'handle_logout_timer'), 10);
+
+        // WP Cron callback for cleaning up expired blocks
+        add_action('ijwlp_cleanup_expired_blocks', array($this, 'cleanup_expired_blocks'));
     }
 
     /**
@@ -273,6 +276,9 @@ class IJWLP_Timer_Manager
 
         $this->save_timer_to_storage($expiry);
 
+        // Update expiry_time for all current cart products to keep them in sync
+        $this->update_cart_expiry_times($expiry);
+
         wp_send_json_success(array(
             'message' => __('Timer saved', 'woolimited'),
             'expiry' => $expiry
@@ -480,7 +486,7 @@ class IJWLP_Timer_Manager
         // → Remove expired user products, keep/use guest products
         if ($user_expiry > 0 && !$user_valid) {
             // User had a timer but it expired - remove their limited products
-            
+
             // Get cart keys for user's blocked products
             $user_blocked = $wpdb->get_col($wpdb->prepare(
                 "SELECT cart_key FROM $table WHERE user_id = %s AND status = 'block'",
@@ -583,7 +589,7 @@ class IJWLP_Timer_Manager
 
         // Get persistent cart
         $persistent_cart = get_user_meta($wp_user_id, '_woocommerce_persistent_cart_' . get_current_blog_id(), true);
-        
+
         if (empty($persistent_cart) || !isset($persistent_cart['cart']) || empty($persistent_cart['cart'])) {
             return;
         }
@@ -610,17 +616,17 @@ class IJWLP_Timer_Manager
                 $db_numbers_array = array_filter($db_numbers_array, 'strlen');
 
                 // Get current numbers in cart
-                $cart_numbers = is_array($cart_item['woo_limit']) 
-                    ? $cart_item['woo_limit'] 
+                $cart_numbers = is_array($cart_item['woo_limit'])
+                    ? $cart_item['woo_limit']
                     : array_map('trim', explode(',', $cart_item['woo_limit']));
 
                 // If they don't match, update cart to match DB (source of truth)
                 if ($cart_numbers != $db_numbers_array) {
                     $cart_item['woo_limit'] = $db_numbers_array;
-                    
+
                     // Also update quantity to match number of limited edition numbers
                     $cart_item['quantity'] = count($db_numbers_array);
-                    
+
                     $cart_changed = true;
                 }
             } else {
@@ -636,5 +642,66 @@ class IJWLP_Timer_Manager
         if ($cart_changed) {
             update_user_meta($wp_user_id, '_woocommerce_persistent_cart_' . get_current_blog_id(), $persistent_cart);
         }
+    }
+
+    /**
+     * WP Cron: Clean up expired blocks from the database
+     * This runs every 5 minutes to remove abandoned product reservations
+     */
+    public function cleanup_expired_blocks()
+    {
+        global $wpdb, $table_prefix;
+        $table = $table_prefix . 'woo_limit';
+
+        // Delete expired blocked products where status is 'block' and expiry_time has passed
+        $deleted = $wpdb->query(
+            "DELETE FROM $table 
+             WHERE status = 'block' 
+             AND expiry_time IS NOT NULL 
+             AND expiry_time < NOW()"
+        );
+    }
+
+    /**
+     * Update expiry_time for all current cart products when timer is reset
+     * This ensures all products in cart share the same expiry timestamp
+     * 
+     * @param int $expiry Unix timestamp when timer expires
+     */
+    public function update_cart_expiry_times($expiry)
+    {
+        if (!function_exists('WC') || !WC()->cart) {
+            return;
+        }
+
+        global $wpdb, $table_prefix;
+        $table = $table_prefix . 'woo_limit';
+
+        // Get all cart item keys from current cart
+        $cart_keys = array();
+        foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+            if (self::is_limited_product($cart_item)) {
+                $cart_keys[] = $cart_item_key;
+            }
+        }
+
+        if (empty($cart_keys)) {
+            return;
+        }
+
+        // Convert Unix timestamp to MySQL datetime format
+        $expiry_datetime = date('Y-m-d H:i:s', $expiry);
+
+        // Update expiry_time for all these cart items
+        $placeholders = implode(',', array_fill(0, count($cart_keys), '%s'));
+        $query = $wpdb->prepare(
+            "UPDATE $table 
+             SET expiry_time = %s 
+             WHERE cart_key IN ($placeholders) 
+             AND status = 'block'",
+            array_merge(array($expiry_datetime), $cart_keys)
+        );
+
+        $wpdb->query($query);
     }
 }

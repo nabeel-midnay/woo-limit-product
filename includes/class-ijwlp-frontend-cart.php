@@ -315,12 +315,10 @@ class IJWLP_Frontend_Cart
         <div class="woo-limit-product woo-limit-cart woo-limit-field-wrapper woo-limit-cart-item-wrapper"
             data-cart-item-key="<?php echo esc_attr($cart_item_key); ?>"
             data-product-id="<?php echo esc_attr($parent_product_id); ?>" data-start="<?php echo esc_attr($start); ?>"
-            data-end="<?php echo esc_attr($end); ?>" 
-            data-is-limited="<?php echo esc_attr($is_limited); ?>"
-            <?php if (!empty($max_qty)) {
-                   echo ' data-max-quantity="' . esc_attr($max_qty) . '"';
-               } ?>>
-            
+            data-end="<?php echo esc_attr($end); ?>" data-is-limited="<?php echo esc_attr($is_limited); ?>" <?php if (!empty($max_qty)) {
+                      echo ' data-max-quantity="' . esc_attr($max_qty) . '"';
+                  } ?>>
+
             <?php if ($is_limited === 'yes'): ?>
                 <p class="woo-limit-field-label">
                     <?php echo esc_html($limit_label_cart); ?>
@@ -331,7 +329,7 @@ class IJWLP_Frontend_Cart
                         <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
                     </span>
                 <?php endif; ?>
-    
+
                 <?php foreach ($limited_numbers as $index => $limited_number): ?>
                     <div class="woo-limit-cart-item woo-input-single gt-2">
                         <input type="number" id="woo-limit-cart-<?php echo esc_attr($cart_item_key); ?>-<?php echo esc_attr($index); ?>"
@@ -744,6 +742,10 @@ class IJWLP_Frontend_Cart
             $parent_product_id
         ));
 
+        // Calculate expiry time from settings
+        $limit_minutes = IJWLP_Options::get_setting('limittime', 15);
+        $expiry_time = date('Y-m-d H:i:s', time() + ($limit_minutes * 60));
+
         if ($existing_record) {
             // Update existing record with all numbers (comma-separated)
             $wpdb->update(
@@ -751,11 +753,12 @@ class IJWLP_Frontend_Cart
                 array(
                     'limit_no' => $limit_no_string,
                     'time' => current_time('mysql'),
+                    'expiry_time' => $expiry_time,
                 ),
                 array(
                     'id' => $existing_record->id
                 ),
-                array('%s', '%s'),
+                array('%s', '%s', '%s'),
                 array('%d')
             );
         } else {
@@ -795,8 +798,9 @@ class IJWLP_Frontend_Cart
                         'limit_no' => $limit_no_string,
                         'status' => 'block',
                         'time' => current_time('mysql'),
+                        'expiry_time' => $expiry_time,
                     ),
-                    array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+                    array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
                 );
             }
         }
@@ -840,7 +844,8 @@ class IJWLP_Frontend_Cart
         <div id="field-selection-modal" class="field-selection-modal" style="display:none;">
             <div class="field-selection-modal-content">
                 <h3 class="field-selection-title" style="margin-top: 0; color: #333;"></h3>
-                <p class="field-selection-description" style="color: #666; margin-bottom: 20px;">Choose which number(s) you want to remove:</p>
+                <p class="field-selection-description" style="color: #666; margin-bottom: 20px;">Choose which number(s) you want
+                    to remove:</p>
 
                 <div id="field-selection-list" class="field-selection-list" style="margin-bottom: 20px;">
                     <!-- Field options will be populated here -->

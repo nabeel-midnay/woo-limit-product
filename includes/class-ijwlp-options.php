@@ -1061,6 +1061,10 @@ class IJWLP_Options
 			$parent_product_id
 		));
 
+		// Calculate expiry time from settings
+		$limit_minutes = self::get_setting('limittime', 15);
+		$expiry_time = date('Y-m-d H:i:s', time() + ($limit_minutes * 60));
+
 		if ($existing_record) {
 			// Merge existing numbers with the new ones (avoid duplicates) and update
 			$existing_limit_no = trim($existing_record->limit_no);
@@ -1078,11 +1082,12 @@ class IJWLP_Options
 				array(
 					'limit_no' => $merged_limit_no_string,
 					'time' => current_time('mysql'),
+					'expiry_time' => $expiry_time,
 				),
 				array(
 					'id' => $existing_record->id
 				),
-				array('%s', '%s'),
+				array('%s', '%s', '%s'),
 				array('%d')
 			);
 		} else {
@@ -1121,8 +1126,9 @@ class IJWLP_Options
 						'status' => 'block',
 						'order_id' => 'block',
 						'time' => current_time('mysql'),
+						'expiry_time' => $expiry_time,
 					),
-					array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+					array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
 				);
 			}
 		}
