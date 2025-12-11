@@ -188,11 +188,28 @@
         }
 
         /**
-         * Enable all variation swatches and selects
+         * Enable all variation swatches and selects (removes disabled class only)
          */
         function enableAllSwatches() {
             $(".variations select").prop("disabled", false);
             $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("disabled");
+        }
+
+        /**
+         * Set swatches to non-selectable state during AJAX operations
+         * This is different from disabled - used for temporary loading states
+         */
+        function setSwatchesNonSelectable() {
+            $(".variations select").prop("disabled", true);
+            $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("non-selectable");
+        }
+
+        /**
+         * Clear non-selectable state from swatches after AJAX operations complete
+         */
+        function clearSwatchesNonSelectable() {
+            $(".variations select").prop("disabled", false);
+            $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("non-selectable");
         }
 
         /**
@@ -602,8 +619,8 @@
             var originalText = setButtonLoading("Adding...");
             var wasSuccessful = false;
 
-            // Disable swatches during submission
-            disableAllSwatches();
+            // Set swatches non-selectable during AJAX submission
+            setSwatchesNonSelectable();
 
             var ajaxData = {
                 action: "ijwlp_add_to_cart",
@@ -648,7 +665,7 @@
                         if (!isProductFullyUnavailable() && !$addToCartButton.hasClass("woo-outofstock")) {
                             enableButton();
                             $addToCartButton.removeClass("woo-limit-loading disabled");
-                            enableAllSwatches();
+                            clearSwatchesNonSelectable();
                             initializeOutOfStockSwatches();
                             $form.find('input[name="quantity"]').prop("disabled", false);
                             checkAddToCartState();
@@ -659,7 +676,7 @@
                                 $addToCartButton.prop("disabled", true).addClass("disabled");
                             } else {
                                 // Only re-enable swatches for specific variant OOS case
-                                enableAllSwatches();
+                                clearSwatchesNonSelectable();
                                 initializeOutOfStockSwatches();
                             }
                         }
@@ -706,7 +723,7 @@
                 if (!isProductFullyUnavailable() && !$addToCartButton.hasClass("woo-outofstock")) {
                     enableButton();
                     $addToCartButton.removeClass("woo-limit-loading disabled");
-                    enableAllSwatches();
+                    clearSwatchesNonSelectable();
                     initializeOutOfStockSwatches();
                     $form.find('input[name="quantity"]').prop("disabled", false);
                     checkAddToCartState();
@@ -717,7 +734,7 @@
                         $addToCartButton.prop("disabled", true).addClass("disabled");
                     } else {
                         // Only re-enable swatches for specific variant OOS case
-                        enableAllSwatches();
+                        clearSwatchesNonSelectable();
                         initializeOutOfStockSwatches();
                     }
                 }
@@ -1076,10 +1093,10 @@
                     $errorDiv: $errorDiv,
                     onStart: function () {
                         $addToCartButton.addClass("woo-limit-checking").removeClass("woo-limit-available");
-                        $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
+                        setSwatchesNonSelectable();
                     },
                     onComplete: function (data) {
-                        $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("disabled");
+                        clearSwatchesNonSelectable();
                         if (data.available) {
                             $addToCartButton.addClass("woo-limit-available").removeClass("woo-limit-checking");
                             window.IJWLP_Frontend_Common.hideError($errorDiv);

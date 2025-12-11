@@ -1304,3 +1304,10 @@ input.qty {
         position: relative;
     }
 }
+
+.rtwpvs-terms-wrapper .rtwpvs-term.non-selectable {
+    opacity: 0.5;
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+    filter: grayscale(50%);
+}
