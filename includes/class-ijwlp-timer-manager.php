@@ -647,15 +647,75 @@ class IJWLP_Timer_Manager
     /**
      * WP Cron: Clean up expired blocks from the database
      * This runs every 5 minutes to remove abandoned product reservations
+     * Also cleans up user persistent carts to keep them in sync
      */
     public function cleanup_expired_blocks()
     {
         global $wpdb, $table_prefix;
         $table = $table_prefix . 'woo_limit';
 
-        // Delete expired blocked products where status is 'block' and expiry_time has passed
         // Use WordPress current_time for consistent timezone handling
         $current_wp_time = current_time('mysql');
+
+        // First, get all expired blocks with their user_id and cart_key
+        // so we can clean up persistent carts before deleting
+        $expired_blocks = $wpdb->get_results($wpdb->prepare(
+            "SELECT user_id, cart_key FROM $table 
+             WHERE status = 'block' 
+             AND expiry_time IS NOT NULL 
+             AND expiry_time < %s",
+            $current_wp_time
+        ));
+
+        // Group expired cart_keys by user_id for efficient persistent cart cleanup
+        $user_cart_keys = array();
+        foreach ($expired_blocks as $block) {
+            // Only process logged-in users (numeric user_id, not guest_*)
+            if (is_numeric($block->user_id) && intval($block->user_id) > 0) {
+                $user_id = intval($block->user_id);
+                if (!isset($user_cart_keys[$user_id])) {
+                    $user_cart_keys[$user_id] = array();
+                }
+                $user_cart_keys[$user_id][] = $block->cart_key;
+            }
+        }
+
+        // Clean up each user's persistent cart
+        $blog_id = get_current_blog_id();
+        foreach ($user_cart_keys as $user_id => $cart_keys) {
+            $persistent_cart = get_user_meta($user_id, '_woocommerce_persistent_cart_' . $blog_id, true);
+
+            if (!empty($persistent_cart) && isset($persistent_cart['cart']) && is_array($persistent_cart['cart'])) {
+                $cart_changed = false;
+
+                foreach ($cart_keys as $cart_key) {
+                    if (isset($persistent_cart['cart'][$cart_key])) {
+                        unset($persistent_cart['cart'][$cart_key]);
+                        $cart_changed = true;
+                    }
+                }
+
+                if ($cart_changed) {
+                    update_user_meta($user_id, '_woocommerce_persistent_cart_' . $blog_id, $persistent_cart);
+                }
+            }
+
+            // Also clear the user's timer if they have no more blocked products after cleanup
+            $remaining = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $table 
+                 WHERE user_id = %s 
+                 AND status = 'block' 
+                 AND (expiry_time IS NULL OR expiry_time >= %s)",
+                (string) $user_id,
+                $current_wp_time
+            ));
+
+            if (intval($remaining) === 0) {
+                delete_user_meta($user_id, '_ijwlp_timer_expiry');
+            }
+        }
+
+        // Now delete expired blocked products from database
         $deleted = $wpdb->query($wpdb->prepare(
             "DELETE FROM $table 
              WHERE status = 'block' 
