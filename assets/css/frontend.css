@@ -700,7 +700,7 @@ body [name="update_cart"] {
 }
 
 /* Red border for empty input fields on checkout validation */
-.woocommerce-cart .woo-limit-cart-item input.woo-limit-error {
+.woocommerce-cart .woo-limit-cart-item input.woo-limit-empty-error {
     border: 1px solid red !important;
     border-color: red !important;
 }

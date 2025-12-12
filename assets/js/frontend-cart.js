@@ -372,6 +372,7 @@
             $(SEL.limitMessage).hide().removeClass("woo-limit-error");
             $(SEL.quantityMessage).hide().removeClass("woo-limit-error");
             $(".woo-limit.woo-limit-error").removeClass("woo-limit-error");
+            $(".woo-limit.woo-limit-empty-error").removeClass("woo-limit-empty-error");
             $(".woo-number-range.woo-limit-error").removeClass("woo-limit-error");
         }
 
@@ -800,6 +801,7 @@
         // On input: lock only when value actually changes from the original
         $(document).on("input", SEL.limitInput, function () {
             var $input = $(this);
+            $input.removeClass("woo-limit-empty-error");
             var focusValue = $input.data("focus-value") || $input.data("old-value") || "";
             var currentValue = $input.val();
 
@@ -936,11 +938,11 @@
                     if ($rangeInfo.length) {
                         $rangeInfo.addClass("woo-limit-error");
                     }
-                    $input.addClass("woo-limit-error");
+                    $input.addClass("woo-limit-empty-error");
                     if (!$firstError) $firstError = $input;
                 } else {
                     $msg.hide();
-                    $input.removeClass("woo-limit-error");
+                    $input.removeClass("woo-limit-error").removeClass("woo-limit-empty-error");
                 }
             });
 
