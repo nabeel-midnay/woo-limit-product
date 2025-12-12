@@ -889,33 +889,35 @@
         // Mutation Observer - Block third-party disabling
         // ========================================
 
-        var buttonObserver = new MutationObserver(function (mutations) {
-            // Skip if we're intentionally changing button state to prevent feedback loop
-            if (isSettingButtonState) {
-                return;
-            }
-            mutations.forEach(function (mutation) {
-                if (mutation.type === "attributes" ||
-                    (mutation.type === "childList" && mutation.target === $addToCartButton[0])) {
-
-                    var hasProblematicState =
-                        $addToCartButton.hasClass("disabled") ||
-                        $addToCartButton.hasClass("wc-variation-selection-needed") ||
-                        $addToCartButton.prop("disabled") ||
-                        $addToCartButton.attr("aria-disabled");
-
-                    if (!shouldButtonRemainDisabled() && hasProblematicState) {
-                        enableButton();
-                    }
+        if ($addToCartButton.length) {
+            var buttonObserver = new MutationObserver(function (mutations) {
+                // Skip if we're intentionally changing button state to prevent feedback loop
+                if (isSettingButtonState) {
+                    return;
                 }
-            });
-        });
+                mutations.forEach(function (mutation) {
+                    if (mutation.type === "attributes" ||
+                        (mutation.type === "childList" && mutation.target === $addToCartButton[0])) {
 
-        buttonObserver.observe($addToCartButton[0], {
-            attributes: true,
-            attributeFilter: ["disabled", "aria-disabled", "class"],
-            subtree: false
-        });
+                        var hasProblematicState =
+                            $addToCartButton.hasClass("disabled") ||
+                            $addToCartButton.hasClass("wc-variation-selection-needed") ||
+                            $addToCartButton.prop("disabled") ||
+                            $addToCartButton.attr("aria-disabled");
+
+                        if (!shouldButtonRemainDisabled() && hasProblematicState) {
+                            enableButton();
+                        }
+                    }
+                });
+            });
+
+            buttonObserver.observe($addToCartButton[0], {
+                attributes: true,
+                attributeFilter: ["disabled", "aria-disabled", "class"],
+                subtree: false
+            });
+        }
 
         // ========================================
         // Event Handlers - Variable Products
