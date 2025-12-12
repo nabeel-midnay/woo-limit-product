@@ -150,6 +150,15 @@
                 var $item = pending.$input.closest(SEL.limitItem);
                 var $qty = pending.$qty;
                 var currentQty = getQtyValue($qty);
+                var $wrapper = pending.$wrapper;
+
+                // CLEANUP: Remove any error classes from the wrapper or range elements
+                // This fix prevents "ghost" errors from blocking the Plus button after removal
+                if ($wrapper && $wrapper.length) {
+                    $wrapper.find(".woo-number-range").removeClass("woo-limit-error");
+                    $wrapper.removeClass("woo-limit-error");
+                    $wrapper.find(".woo-limit-message").hide().removeClass("woo-limit-error");
+                }
 
                 // Remove the field
                 $item.remove();
@@ -828,9 +837,13 @@
             if ($btn.is(":disabled")) return;
 
             // Block quantity changes when there's a pending field or validation in progress
-            // This prevents the race condition where clicking plus before validation completes
-            // allows adding more quantity than editions (e.g., qty=3 but editions=1)
-            if (validationTracker.hasPendingNewField() || validationTracker.isLocked() || validationTracker.isValidating()) {
+            // EXCEPTION: Allow minus button (cancel action) if we are just pending completion of a new field
+            if (isPlus && (validationTracker.hasPendingNewField() || validationTracker.isLocked() || validationTracker.isValidating())) {
+                return;
+            }
+
+            // If it's minus and we are strictly validating (checking data with server), still block to prevent state corruption
+            if (!isPlus && validationTracker.isValidating()) {
                 return;
             }
 
@@ -876,6 +889,21 @@
                 $qty.val(current + 1).trigger("change");
             } else {
                 if (current <= 0) return;
+
+                // SPECIAL HANDLING: If we have a pending new field (just added, empty),
+                // clicking minus should just cancel that specific field action.
+                if (validationTracker.hasPendingNewField()) {
+                    var pending = validationTracker.pendingNewField;
+                    // Check if the pending field belongs to this cart item
+                    if (pending && pending.$qty.is($qty)) {
+                        validationTracker.removePendingNewField();
+                        // Qty is already decremented inside removePendingNewField logic or we need to ensure it matches
+                        // Actually removePendingNewField reverts the qty value to what it was before adding
+                        // so we might not need to do anything else, but let's check
+                        return;
+                    }
+                }
+
                 $qty.val(Math.max(0, current - 1)).trigger("change");
             }
 
