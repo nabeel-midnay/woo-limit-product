@@ -1250,8 +1250,8 @@ for ($i = 5; $i >= 0; $i--) {
                                     </div>
                                 </td>
                                 <td><?php echo $range; ?></td>
-                                <td><?php echo number_format($total_count); ?></td>
-                                <td>
+                                <td data-order="<?php echo esc_attr($total_count); ?>"><?php echo number_format($total_count); ?></td>
+                                <td data-order="<?php echo esc_attr($available_count); ?>">
                                     <div class="woo-limit-numbers-display">
                                         <div class="woo-limit-numbers-toggle"
                                             onclick="toggleNumbers(this, 'available-<?php echo $product_id; ?>')">
@@ -1263,7 +1263,7 @@ for ($i = 5; $i >= 0; $i--) {
                                         </div>
                                     </div>
                                 </td>
-                                <td>
+                                <td data-order="<?php echo esc_attr($sold_count); ?>">
                                     <div class="woo-limit-numbers-display">
                                         <div class="woo-limit-numbers-toggle"
                                             onclick="toggleNumbers(this, 'sold-<?php echo $product_id; ?>')">
@@ -1294,7 +1294,7 @@ for ($i = 5; $i >= 0; $i--) {
                                         </div>
                                     </div>
                                 </td>
-                                <td>
+                                <td data-order="<?php echo esc_attr($sold_percentage); ?>">
                                     <div class="woo-limit-progress">
                                         <div class="woo-limit-progress-bar sold" style="width: <?php echo $sold_percentage; ?>%">
                                         </div>
@@ -1620,66 +1620,66 @@ for ($i = 5; $i >= 0; $i--) {
             $('#woo-limit-reports-table').DataTable().search(this.value).draw();
         });
 
-        $('#category-filter').on('change', function () {
-            const filter = $(this).val();
-            const table = $('#woo-limit-reports-table').DataTable();
+        // Custom filtering - Unified Filter Function
+        $.fn.dataTable.ext.search.push(
+            function(settings, data, dataIndex) {
+                // 1. Get Filter Values
+                const categoryFilter = $('#category-filter').val();
+                const availabilityFilter = $('#availability-filter').val();
+                const productTypeFilter = $('#product-type-filter').val();
 
-            if (filter === '') {
-                table.draw();
-            } else {
-                $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+                // 2. Check Category
+                let categoryMatch = true;
+                if (categoryFilter && categoryFilter !== '') {
                     const row = $(settings.aoData[dataIndex].nTr);
                     const categorySlugs = row.attr('data-category-slugs');
-
                     if (categorySlugs) {
                         const slugs = categorySlugs.split(',');
-                        return slugs.includes(filter);
+                        if (!slugs.includes(categoryFilter)) {
+                            categoryMatch = false;
+                        }
+                    } else {
+                        categoryMatch = false;
                     }
-                    return false;
-                });
-                table.draw();
-                $.fn.dataTable.ext.search.pop();
-            }
-        });
+                }
 
-        $('#availability-filter').on('change', function () {
-            const filter = $(this).val();
-            const table = $('#woo-limit-reports-table').DataTable();
+                // 3. Check Availability
+                let availabilityMatch = true;
+                if (availabilityFilter && availabilityFilter !== '') {
+                    // Use data-order attribute for accurate numbers
+                    const row = $(settings.aoData[dataIndex].nTr);
+                    const availableCount = parseInt(row.find('td:eq(3)').attr('data-order') || 0);
+                    const soldCount = parseInt(row.find('td:eq(4)').attr('data-order') || 0);
 
-            if (filter === '') {
-                table.draw();
-            } else {
-                $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
-                    const availableText = data[3];
-                    const soldText = data[4];
-                    const availableCount = parseInt(availableText.match(/([\d,]+)/)?.[1].replace(',', '') || '0');
-                    const soldCount = parseInt(soldText.match(/([\d,]+)/)?.[1].replace(',', '') || '0');
+                    if (availabilityFilter === 'available') {
+                         if (availableCount <= 0) availabilityMatch = false;
+                    } else if (availabilityFilter === 'sold') {
+                        // Sold Out: Sold > 0 AND Available == 0
+                        if (soldCount <= 0 || availableCount !== 0) availabilityMatch = false;
+                    } else if (availabilityFilter === 'partial') {
+                         // Partially Sold: Sold > 0 AND Available > 0
+                        if (soldCount <= 0 || availableCount <= 0) availabilityMatch = false;
+                    }
+                }
 
-                    if (filter === 'available' && availableCount > 0) return true;
-                    if (filter === 'sold' && soldCount > 0 && availableCount === 0) return true;
-                    if (filter === 'partial' && soldCount > 0 && availableCount > 0) return true;
-                    return false;
-                });
-                table.draw();
-                $.fn.dataTable.ext.search.pop();
-            }
-        });
-
-        $('#product-type-filter').on('change', function () {
-            const filter = $(this).val();
-            const table = $('#woo-limit-reports-table').DataTable();
-
-            if (filter === '') {
-                table.draw();
-            } else {
-                $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+                // 4. Check Product Type
+                let typeMatch = true;
+                if (productTypeFilter && productTypeFilter !== '') {
                     const row = $(settings.aoData[dataIndex].nTr);
                     const type = row.attr('data-type');
-                    return type === filter;
-                });
-                table.draw();
-                $.fn.dataTable.ext.search.pop();
+                    if (type !== productTypeFilter) {
+                        typeMatch = false;
+                    }
+                }
+
+                // Return true only if ALL active filters match
+                return categoryMatch && availabilityMatch && typeMatch;
             }
+        );
+
+        // Event Listeners for Filters
+        $('#category-filter, #availability-filter, #product-type-filter').on('change', function() {
+            $('#woo-limit-reports-table').DataTable().draw();
         });
 
         $('#sort-by').on('change', function () {
@@ -1697,8 +1697,7 @@ for ($i = 5; $i >= 0; $i--) {
                     table.order([4, 'desc']).draw();
                     break;
                 case 'percentage':
-                    // Custom sorting for percentage would need more complex logic
-                    table.order([0, 'asc']).draw();
+                    table.order([5, 'desc']).draw();
                     break;
                 case 'sku':
                     // Sort by SKU (would need to extract from data attributes)
