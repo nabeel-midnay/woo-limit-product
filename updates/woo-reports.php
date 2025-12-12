@@ -1389,16 +1389,35 @@ for ($i = 5; $i >= 0; $i--) {
         const table = document.getElementById('woo-limit-reports-table');
         const rows = table.querySelectorAll('tbody tr');
 
-        let csv = 'Product Name,SKU,Category,Product Type,Number Range,Total Numbers,Available Count,Sold Count,Sold Percentage\n';
+        let csv = 'Product Name,Category,Product Type,Number Range,Total Numbers,Available Count,Available Numbers,Sold Count,Sold Numbers,Sold Percentage\n';
 
         rows.forEach(row => {
             const cells = row.querySelectorAll('td');
             if (cells.length >= 6) {
                 const productName = cells[0].querySelector('.woo-limit-product-name').textContent.trim();
                 const productMeta = cells[0].querySelector('.woo-limit-product-meta');
-                const sku = productMeta ? productMeta.querySelector('span:first-child')?.textContent.replace('SKU:', '').trim() || '' : '';
-                const category = productMeta ? productMeta.querySelector('span:nth-child(2)')?.textContent.replace('Category:', '').trim() || '' : '';
-                const type = productMeta ? productMeta.querySelector('span:last-child')?.textContent.replace('Type:', '').trim() || '' : '';
+                
+                // Get category - look for the span containing category info
+                let category = '';
+                if (productMeta) {
+                    const spans = productMeta.querySelectorAll('span');
+                    spans.forEach(span => {
+                        if (span.textContent.includes('Category:')) {
+                            category = span.textContent.replace('Category:', '').trim();
+                        }
+                    });
+                }
+                
+                // Get product type
+                let type = '';
+                if (productMeta) {
+                    const spans = productMeta.querySelectorAll('span');
+                    spans.forEach(span => {
+                        if (span.textContent.includes('Type:')) {
+                            type = span.textContent.replace('Type:', '').trim();
+                        }
+                    });
+                }
 
                 const range = cells[1].textContent.trim();
                 const totalNumbers = cells[2].textContent.trim();
@@ -1406,12 +1425,30 @@ for ($i = 5; $i >= 0; $i--) {
                 const soldText = cells[4].textContent.trim();
                 const progressText = cells[5].textContent.trim();
 
-                // Extract numbers from text
+                // Extract count numbers from text
                 const availableCount = availableText.match(/([\d,]+)/)?.[1] || '0';
                 const soldCount = soldText.match(/([\d,]+)/)?.[1] || '0';
                 const soldPercentage = progressText.match(/(\d+\.?\d*)%/)?.[1] || '0';
+                
+                // Get available numbers list
+                const availableNumbersList = cells[3].querySelector('.woo-limit-numbers-list');
+                const availableNumbers = availableNumbersList ? availableNumbersList.textContent.trim().replace(/\s+/g, ' ') : '';
+                
+                // Get sold numbers list
+                const soldNumbersList = cells[4].querySelector('.woo-limit-numbers-list');
+                let soldNumbers = '';
+                if (soldNumbersList) {
+                    const numberItems = soldNumbersList.querySelectorAll('.number-item strong');
+                    if (numberItems.length > 0) {
+                        const nums = [];
+                        numberItems.forEach(item => nums.push(item.textContent.trim()));
+                        soldNumbers = nums.join(', ');
+                    } else {
+                        soldNumbers = soldNumbersList.textContent.trim().replace(/\s+/g, ' ');
+                    }
+                }
 
-                csv += `"${productName}","${sku}","${category}","${type}","${range}","${totalNumbers}","${availableCount}","${soldCount}","${soldPercentage}%"\n`;
+                csv += `"${productName}","${category}","${type}","${range}","${totalNumbers}","${availableCount}","${availableNumbers}","${soldCount}","${soldNumbers}","${soldPercentage}%"\n`;
             }
         });
 
@@ -1450,9 +1487,9 @@ for ($i = 5; $i >= 0; $i--) {
         const table = document.getElementById('woo-limit-reports-table');
         const rows = table.querySelectorAll('tbody tr');
 
-        // Prepare data for Excel - only export counts, not the full list of numbers
+        // Prepare data for Excel with full number lists
         const excelData = [
-            ['Product Name', 'SKU', 'Category', 'Product Type', 'Number Range', 'Total Numbers', 'Available Count', 'Sold Count', 'Sold Percentage']
+            ['Product Name', 'Category', 'Product Type', 'Number Range', 'Total Numbers', 'Available Count', 'Available Numbers', 'Sold Count', 'Sold Numbers', 'Sold Percentage']
         ];
 
         rows.forEach(row => {
@@ -1460,9 +1497,28 @@ for ($i = 5; $i >= 0; $i--) {
             if (cells.length >= 6) {
                 const productName = cells[0].querySelector('.woo-limit-product-name').textContent.trim();
                 const productMeta = cells[0].querySelector('.woo-limit-product-meta');
-                const sku = productMeta ? productMeta.querySelector('span:first-child')?.textContent.replace('SKU:', '').trim() || '' : '';
-                const category = productMeta ? productMeta.querySelector('span:nth-child(2)')?.textContent.replace('Category:', '').trim() || '' : '';
-                const type = productMeta ? productMeta.querySelector('span:last-child')?.textContent.replace('Type:', '').trim() || '' : '';
+                
+                // Get category - look for the span containing category info
+                let category = '';
+                if (productMeta) {
+                    const spans = productMeta.querySelectorAll('span');
+                    spans.forEach(span => {
+                        if (span.textContent.includes('Category:')) {
+                            category = span.textContent.replace('Category:', '').trim();
+                        }
+                    });
+                }
+                
+                // Get product type
+                let type = '';
+                if (productMeta) {
+                    const spans = productMeta.querySelectorAll('span');
+                    spans.forEach(span => {
+                        if (span.textContent.includes('Type:')) {
+                            type = span.textContent.replace('Type:', '').trim();
+                        }
+                    });
+                }
 
                 const range = cells[1].textContent.trim();
                 const totalNumbers = cells[2].textContent.trim();
@@ -1470,13 +1526,31 @@ for ($i = 5; $i >= 0; $i--) {
                 const soldText = cells[4].textContent.trim();
                 const progressText = cells[5].textContent.trim();
 
-                // Extract numbers from text
+                // Extract count numbers from text
                 const availableCount = availableText.match(/([\d,]+)/)?.[1] || '0';
                 const soldCount = soldText.match(/([\d,]+)/)?.[1] || '0';
                 const soldPercentage = progressText.match(/(\d+\.?\d*)%/)?.[1] || '0';
+                
+                // Get available numbers list
+                const availableNumbersList = cells[3].querySelector('.woo-limit-numbers-list');
+                const availableNumbers = availableNumbersList ? availableNumbersList.textContent.trim().replace(/\s+/g, ' ') : '';
+                
+                // Get sold numbers list
+                const soldNumbersList = cells[4].querySelector('.woo-limit-numbers-list');
+                let soldNumbers = '';
+                if (soldNumbersList) {
+                    const numberItems = soldNumbersList.querySelectorAll('.number-item strong');
+                    if (numberItems.length > 0) {
+                        const nums = [];
+                        numberItems.forEach(item => nums.push(item.textContent.trim()));
+                        soldNumbers = nums.join(', ');
+                    } else {
+                        soldNumbers = soldNumbersList.textContent.trim().replace(/\s+/g, ' ');
+                    }
+                }
 
                 excelData.push([
-                    productName, sku, category, type, range, totalNumbers, availableCount, soldCount, soldPercentage + '%'
+                    productName, category, type, range, totalNumbers, availableCount, availableNumbers, soldCount, soldNumbers, soldPercentage + '%'
                 ]);
             }
         });
@@ -1488,13 +1562,14 @@ for ($i = 5; $i >= 0; $i--) {
         // Set column widths
         const colWidths = [
             { wch: 30 }, // Product Name
-            { wch: 15 }, // SKU
             { wch: 20 }, // Category
             { wch: 12 }, // Product Type
             { wch: 15 }, // Number Range
             { wch: 12 }, // Total Numbers
             { wch: 15 }, // Available Count
+            { wch: 40 }, // Available Numbers
             { wch: 12 }, // Sold Count
+            { wch: 40 }, // Sold Numbers
             { wch: 15 }  // Sold Percentage
         ];
         ws['!cols'] = colWidths;
