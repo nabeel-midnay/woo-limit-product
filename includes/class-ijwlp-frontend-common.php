@@ -284,8 +284,48 @@ class IJWLP_Frontend_Common
     {
         global $product;
 
-        // Check if product is out of stock
-        if (!$product->is_in_stock()) {
+        // Initial check using standard WooCommerce method
+        $is_out_of_stock = !$product->is_in_stock();
+
+        // Additional check: if management is enabled and quantity is 0 or less
+        // This covers cases where is_in_stock() might be true but qty is 0 (though rare in standard WC, explicit check requested)
+        if (!$is_out_of_stock && $product->managing_stock() && $product->get_stock_quantity() <= 0) {
+            $is_out_of_stock = true;
+        }
+
+        // Special handling for Variable Products
+        if ($product->is_type('variable')) {
+            // Assume out of stock until we find a valid variation
+            // However, we only override if the parent wasn't already hard-set to out of stock by WC
+            // If parent says "in stock", we verified children really are
+            if (!$is_out_of_stock) {
+                 $variations = $product->get_children();
+                 if (!empty($variations)) {
+                     $all_children_out = true;
+                     foreach ($variations as $variation_id) {
+                         $variation = wc_get_product($variation_id);
+                         if ($variation) {
+                             $child_in_stock = $variation->is_in_stock();
+                             $child_managed = $variation->managing_stock();
+                             $child_qty = $variation->get_stock_quantity();
+ 
+                             // A variation is "available" if:
+                             // 1. It is technically in stock AND
+                             // 2. EITHER it's not managed OR (it is managed AND qty > 0)
+                             if ($child_in_stock && (!$child_managed || $child_qty > 0)) {
+                                 $all_children_out = false;
+                                 break; // Found one available, so parent is NOT out of stock
+                             }
+                         }
+                     }
+                     if ($all_children_out) {
+                         $is_out_of_stock = true;
+                     }
+                 }
+            }
+        }
+
+        if ($is_out_of_stock) {
             echo '<div class="outofstock_wrapper shop-loop-outofstock"><span class="outofstock-label">' . esc_html__('Out of Stock', 'woolimit') . '</span></div>';
         }
     }
