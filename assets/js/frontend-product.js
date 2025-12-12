@@ -163,13 +163,22 @@
 
         /**
          * Clear all swatch selections (reset to unselected state)
+         * @param {boolean} silent - If true, do not trigger change events
          */
-        function clearAllSwatchSelections() {
+        function clearAllSwatchSelections(silent) {
             // Clear native select dropdowns
-            $(".variations select").val("").trigger("change");
+            var $selects = $(".variations select").val("");
+            if (!silent) {
+                $selects.trigger("change");
+            }
+
             // Clear RTWPVS swatches selection
             $(".rtwpvs-terms-wrapper .rtwpvs-term").removeClass("selected");
-            $(".rtwpvs-wc-select").val("").trigger("change");
+            var $rtwpvsSelects = $(".rtwpvs-wc-select").val("");
+            if (!silent) {
+                $rtwpvsSelects.trigger("change");
+            }
+
             // Clear variation ID
             $('input[name="variation_id"]').val("");
             variationSelected = false;
@@ -178,10 +187,11 @@
         /**
          * Disable all variation swatches and selects
          * @param {boolean} clearSelections - Whether to also clear selections (default: false)
+         * @param {boolean} silent - If true, do not trigger change events when clearing
          */
-        function disableAllSwatches(clearSelections) {
+        function disableAllSwatches(clearSelections, silent) {
             if (clearSelections) {
-                clearAllSwatchSelections();
+                clearAllSwatchSelections(silent);
             }
             $(".variations select").prop("disabled", true);
             $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("disabled");
@@ -308,8 +318,9 @@
             setOutOfStockState();
             if (isVariableProduct) {
                 // Clear selections and disable selects, but don't add 'disabled' class to swatches
-                clearAllSwatchSelections();
+                clearAllSwatchSelections(true); // Silent mode to prevent recursion
                 $(".variations select").prop("disabled", true);
+                $(".rtwpvs-terms-wrapper .rtwpvs-term").addClass("non-selectable");
                 $(".reset_variations").removeClass("show");
             }
             showUserLimitReachedMessage();
@@ -320,7 +331,7 @@
          */
         function handleAllVariantsOutOfStock() {
             setOutOfStockState();
-            disableAllSwatches(true);
+            disableAllSwatches(true, true); // Silent mode to prevent recursion
             $(".reset_variations").removeClass("show");
             window.IJWLP_Frontend_Common.showError(
                 "All variations are out of stock.", $errorDiv
@@ -460,11 +471,21 @@
 
         /**
          * Initialize out-of-stock swatches on page load
+         * Note: Only disables swatches for stock issues, NOT for user limit reached.
+         * User limit reached should NOT add 'disabled' class to swatches (per design).
          */
         function initializeOutOfStockSwatches() {
             if (!isVariableProduct) return;
 
-            if (userLimitRemaining <= 0 || areAllVariationsOutOfStock()) {
+            // If user limit is reached, do NOT disable swatches - just return
+            // The handleUserLimitReached() function handles this case separately
+            // and intentionally does not add 'disabled' class to swatches
+            if (userLimitRemaining <= 0) {
+                return;
+            }
+
+            // Only disable all swatches if ALL variations are out of stock
+            if (areAllVariationsOutOfStock()) {
                 disableAllSwatches();
                 return;
             }
@@ -504,7 +525,7 @@
                         setOutOfStockState();
 
                         if (areAllVariationsOutOfStock()) {
-                            disableAllSwatches(true); // Clear selections when all variations out of stock
+                            disableAllSwatches(true, true); // Clear selections silently when all variations out of stock
                         } else {
                             disableVariationSwatch(variationId);
                         }
@@ -588,6 +609,11 @@
         }
 
         function updateFieldStates() {
+            // Don't modify field states if product is fully unavailable
+            if (isProductFullyUnavailable()) {
+                return;
+            }
+
             if (!isVariableProduct || variationSelected) {
                 $limitedNumberInput
                     .prop("disabled", false)
@@ -600,6 +626,9 @@
 
         function checkAddToCartState() {
             if (!$limitedNumberInput.length) return;
+            // Don't hide error if product is fully unavailable
+            if (isProductFullyUnavailable()) return;
+
             if ($limitedNumberInput.hasClass("woo-limit-available")) {
                 window.IJWLP_Frontend_Common.hideError();
             }
@@ -824,7 +853,7 @@
         // Initialization
         // ========================================
 
-        // Initial button state - force enable after delay
+        // Initial button state - force enable after delay (only if product is available)
         setTimeout(function () {
             safeEnableButton();
         }, 500);
@@ -838,14 +867,23 @@
         // Check initial variation state
         checkVariationSelected();
 
-        // Initialize out-of-stock swatches
+        // Check initial stock and user limit on page load (handles both simple and variable products)
+        // Use the unified handler to apply disabled state if product is unavailable
+        // This is called BEFORE the timeout below to set state early
+        applyFullyUnavailableState();
+
+        // Initialize out-of-stock swatches (for specific variations only, not for user limit reached)
         setTimeout(function () {
             initializeOutOfStockSwatches();
         }, 100);
 
-        // Check initial stock and user limit on page load (handles both simple and variable products)
-        // Use the unified handler to apply disabled state if product is unavailable
-        applyFullyUnavailableState();
+        // Final safeguard: Re-apply unavailable state after WooCommerce events may have fired
+        // This catches any WooCommerce variation reset or similar events that might clear the state
+        setTimeout(function () {
+            if (isProductFullyUnavailable()) {
+                applyFullyUnavailableState();
+            }
+        }, 200);
 
         // ========================================
         // Mutation Observer - Block third-party disabling
@@ -885,8 +923,10 @@
 
         if (isVariableProduct) {
             $form.on("found_variation", function (event, variation) {
-                // If product is fully unavailable, don't allow interaction
+                // If product is fully unavailable, re-apply the state and don't allow interaction
                 if (isProductFullyUnavailable()) {
+                    // Re-apply the unavailable state to ensure message is shown
+                    applyFullyUnavailableState();
                     return;
                 }
                 clearPendingTimer();
@@ -907,8 +947,10 @@
             });
 
             $form.on("reset_data", function () {
-                // If product is fully unavailable, don't allow any interaction
+                // If product is fully unavailable, re-apply the state and don't allow any interaction
                 if (isProductFullyUnavailable()) {
+                    // Re-apply the unavailable state to ensure message is shown
+                    applyFullyUnavailableState();
                     return;
                 }
                 variationSelected = false;
@@ -927,6 +969,12 @@
             });
 
             $(".variations select").on("change", function () {
+                // If product is fully unavailable, re-apply state and block changes
+                if (isProductFullyUnavailable()) {
+                    applyFullyUnavailableState();
+                    return;
+                }
+
                 clearPendingTimer();
                 $limitedNumberInput.val("");
                 clearInputClasses();
