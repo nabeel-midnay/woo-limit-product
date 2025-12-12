@@ -826,6 +826,14 @@
 
         function handleQtyButtonClick($btn, isPlus) {
             if ($btn.is(":disabled")) return;
+
+            // Block quantity changes when there's a pending field or validation in progress
+            // This prevents the race condition where clicking plus before validation completes
+            // allows adding more quantity than editions (e.g., qty=3 but editions=1)
+            if (validationTracker.hasPendingNewField() || validationTracker.isLocked() || validationTracker.isValidating()) {
+                return;
+            }
+
             var $row = $btn.closest(SEL.cartItem);
             var $qty = $row.find(SEL.qtyInput).first();
             var $wrapper = $row.find(SEL.fieldWrapper).first();
