@@ -302,11 +302,14 @@
 
         /**
          * Handle user limit reached state
+         * Note: Does NOT add 'disabled' class to swatches - that's reserved for out-of-stock only
          */
         function handleUserLimitReached() {
             setOutOfStockState();
             if (isVariableProduct) {
-                disableAllSwatches(true); // Clear selections when user limit reached
+                // Clear selections and disable selects, but don't add 'disabled' class to swatches
+                clearAllSwatchSelections();
+                $(".variations select").prop("disabled", true);
                 $(".reset_variations").removeClass("show");
             }
             showUserLimitReachedMessage();
