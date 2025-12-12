@@ -672,6 +672,7 @@ body [name="update_cart"] {
 
 .single .woo-limit-product {
     margin-top: 5px;
+    position: relative;
 }
 
 .woocommerce-checkout #woo-limit-timer {
