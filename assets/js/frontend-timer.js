@@ -147,7 +147,9 @@
                     // Cart has limited products but no valid timer - remove them
                     // Note: We don't unmask here immediately; we let the product removal (AJAX)
                     // and likely subsequent page update/reload handle the UI state.
-                    self.removeExpiredProducts();
+                    self.removeExpiredProducts(function () {
+                        location.reload();
+                    });
                 } else {
                     // No limited products in cart - clear any stale timer
                     unmaskUI();
