@@ -88,12 +88,50 @@
         init: function () {
             const self = this;
 
+            // Check local storage first for immediate expiration handling using visual masking
+            // This prevents "flash" of active state while waiting for backend validation
+            const localExpiry = this.safeGetStorage(this.STORAGE_KEYS.EXPIRY);
+            const localActive = this.safeGetStorage(this.STORAGE_KEYS.ACTIVE);
+
+            if (localExpiry && localActive === "true") {
+                const expiryTime = parseInt(localExpiry);
+                const currentTime = Math.floor(Date.now() / 1000);
+
+                if (expiryTime <= currentTime) {
+                    // Timer expired locally!
+                    // Apply visual mask immediately but WAIT for backend to confirm
+                    $('.woocommerce-cart-form, .cart-collaterals').css({
+                        'opacity': '0.3',
+                        'pointer-events': 'none'
+                    });
+
+                    // Add local loader to indicate processing
+                    if ($('#woo-limit-local-loader').length === 0) {
+                        $('body').append(
+                            '<div id="woo-limit-local-loader">' +
+                            '<div class="woo-spinner"></div>' +
+                            '</div>'
+                        );
+                    }
+                }
+            }
+
             // Fetch timer from backend first (handles login/logout persistence)
             this.fetchTimerFromBackend(function (timerData) {
                 const hasLimitedProducts = timerData && timerData.has_limited_products;
 
+                // Helper to remove mask
+                const unmaskUI = function () {
+                    $('.woocommerce-cart-form, .cart-collaterals').css({
+                        'opacity': '',
+                        'pointer-events': ''
+                    });
+                    $('#woo-limit-local-loader').remove();
+                };
+
                 if (timerData && timerData.expiry > 0 && timerData.is_active && hasLimitedProducts) {
                     // Backend has valid timer AND cart has limited products - resume timer
+                    unmaskUI();
                     self.safeSetStorage(self.STORAGE_KEYS.EXPIRY, timerData.expiry.toString());
                     self.safeSetStorage(self.STORAGE_KEYS.ACTIVE, "true");
                     self.timerData.expiry = timerData.expiry;
@@ -101,14 +139,18 @@
                     self.startTimer();
                 } else if (self.hasActiveTimer() && hasLimitedProducts) {
                     // Fallback: localStorage has valid timer AND cart has limited products
+                    unmaskUI();
                     const localExpiry = parseInt(self.safeGetStorage(self.STORAGE_KEYS.EXPIRY));
                     self.saveTimerToBackend(localExpiry);
                     self.resumeTimer();
                 } else if (hasLimitedProducts) {
                     // Cart has limited products but no valid timer - remove them
+                    // Note: We don't unmask here immediately; we let the product removal (AJAX)
+                    // and likely subsequent page update/reload handle the UI state.
                     self.removeExpiredProducts();
                 } else {
                     // No limited products in cart - clear any stale timer
+                    unmaskUI();
                     self.clearTimer();
                 }
             });
