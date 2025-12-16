@@ -242,6 +242,11 @@
 
             // Show loading state (suppress visible messages when silent)
             $input.addClass("woo-limit-loading").prop("disabled", true);
+
+            // Clean up previous states
+            $input.removeClass("woo-limit-error woo-limit-available");
+            $errorDiv.removeClass("woo-limit-error woo-limit-info");
+
             if ($button && $button.length) {
                 $button.addClass("woo-limit-loading").prop("disabled", true);
             }
@@ -1052,8 +1057,8 @@
             }
         });
 
-        $(document).on('mousedown', '.autocomplete-suggestion', e => {
-            $(e.target).click();
+        $(document).on('mousedown', '.autocomplete-suggestion', function (e) {
+            e.preventDefault();
         });
     });
 
