@@ -302,7 +302,7 @@ class IJWLP_Options
 			}
 
 			// Also update records that might not have cart_key - only update 'block' status records or records already linked to this order
-			$wpdb->query($wpdb->prepare(
+			$updated_rows = $wpdb->query($wpdb->prepare(
 				"UPDATE $table 
 				SET order_id = %s, order_item_id = %s, status = 'ordered', order_status = %s 
 				WHERE parent_product_id = %s 
@@ -315,6 +315,83 @@ class IJWLP_Options
 				(string) $limited_number,
 				(string) $order_id
 			));
+
+			// If no rows were updated and status is NOT cancelled/failed, it means the record might be missing (deleted)
+			// This happens when order was cancelled (record deleted) and then reinstated
+			if ($updated_rows === 0 && $order_status !== 'cancelled' && $order_status !== 'failed') {
+				
+				// Check if these numbers are available or taken by another order
+				$limit_numbers_array = explode(',', $limited_number);
+				$taken_numbers = array();
+				
+				foreach ($limit_numbers_array as $num) {
+					$num = trim($num);
+					if (empty($num)) continue;
+					
+					// Check if this number is already used by ANOTHER order
+					$existing = $wpdb->get_row($wpdb->prepare(
+						"SELECT order_id FROM $table 
+						WHERE parent_product_id = %s 
+						AND (status = 'block' OR status = 'ordered')
+						AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)
+						AND order_id != %s",
+						$parent_product_id,
+						$num,
+						$num . ',%',
+						'%,' . $num,
+						'%,' . $num . ',%',
+						(string) $order_id
+					));
+					
+					if ($existing) {
+						$taken_numbers[] = $num;
+					}
+				}
+				
+				if (empty($taken_numbers)) {
+					// All numbers are available! Re-insert the record to restore reservation
+					$user_id = $order->get_user_id() ? (string) $order->get_user_id() : 'guest';
+					
+					// Use 15 minutes expiry as fallback, though for ordered status it doesn't matter much
+					$limit_minutes = self::get_setting('limittime', 15);
+					$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
+					
+					$product_obj = wc_get_product($actual_product_id);
+					$product_type = $product_obj ? $product_obj->get_type() : 'simple';
+					
+					$wpdb->insert(
+						$table,
+						array(
+							'cart_key' => $cart_item_key ? $cart_item_key : 'reinstated_' . uniqid(),
+							'user_id' => $user_id,
+							'parent_product_id' => $parent_product_id,
+							'product_id' => $actual_product_id,
+							'product_type' => $product_type,
+							'limit_no' => $limited_number,
+							'status' => 'ordered',
+							'time' => current_time('mysql'),
+							'expiry_time' => $expiry_time,
+							'order_id' => (string) $order_id,
+							'order_item_id' => (string) $item_id,
+							'order_status' => $order_status
+						),
+						array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+					);
+					
+					// Log this restoration
+					error_log("Woo Limit: Re-reserved numbers [$limited_number] for reinstated order #$order_id");
+					
+				} else {
+					// Conflict detected! Some numbers were taken.
+					$taken_str = implode(', ', $taken_numbers);
+					$note = sprintf(
+						__('WARNING: Failed to re-reserve Limited Edition Number(s): %s. They were taken by another order while this order was cancelled/failed.', 'woolimited'),
+						$taken_str
+					);
+					$order->add_order_note($note);
+					error_log("Woo Limit: Conflict detected for reinstated order #$order_id. Numbers taken: $taken_str");
+				}
+			}
 		}
 
 		// Also update order status for any records already linked to this order (for backwards compatibility)
