@@ -88,6 +88,13 @@
         init: function () {
             const self = this;
 
+            // Setup cross-tab reload listener
+            window.addEventListener('storage', function (e) {
+                if (e.key === 'ijwlp_reload_tabs_signal') {
+                    location.reload();
+                }
+            });
+
             // Check local storage first for immediate expiration handling using visual masking
             // This prevents "flash" of active state while waiting for backend validation
             const localExpiry = this.safeGetStorage(this.STORAGE_KEYS.EXPIRY);
@@ -514,6 +521,11 @@
 
             // Listen for product removed from cart event
             $(document).on("woocommerce_cart_item_removed", handleCartCheck);
+
+            // Listen for product added to cart event to trigger reload in other tabs
+            $(document.body).on("added_to_cart", function () {
+                self.safeSetStorage('ijwlp_reload_tabs_signal', Date.now());
+            });
         },
 
         /**
