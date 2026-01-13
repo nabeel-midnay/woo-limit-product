@@ -632,13 +632,20 @@
                 if ($availableCountInput.length) {
                     var availableCountVal = $availableCountInput.val();
                     var availableCount = availableCountVal === "" ? Infinity : parseInt(availableCountVal);
-                    
+
                     // Check if we have enough available limited edition numbers
                     // We need at least (newQty - currentCount) available numbers
                     var neededCount = newQty - currentCount;
                     if (availableCount < neededCount) {
                         var productName = getProductName(null, $wrapper);
-                        var msg = "Cannot increase quantity. Only " + availableCount + " limited edition number(s) available for " + productName + ".";
+                        var msg;
+
+                        if (availableCount === 0) {
+                            msg = "Cannot increase quantity. No more limited edition numbers available for " + productName + ".";
+                        } else {
+                            msg = "Cannot increase quantity. Only " + availableCount + " more limited edition number(s) available for " + productName + ".";
+                        }
+
                         var $rowErr = $wrapper.find(".woo-limit-quantity-message").first();
                         showTimedError($rowErr, msg, 5000);
                         $qty.val(oldQty);
