@@ -627,6 +627,26 @@
                     return;
                 }
 
+                // Check available count for limited edition products
+                var $availableCountInput = $wrapper.find(".woo-limit-available-count").first();
+                if ($availableCountInput.length) {
+                    var availableCountVal = $availableCountInput.val();
+                    var availableCount = availableCountVal === "" ? Infinity : parseInt(availableCountVal);
+                    
+                    // Check if we have enough available limited edition numbers
+                    // We need at least (newQty - currentCount) available numbers
+                    var neededCount = newQty - currentCount;
+                    if (availableCount < neededCount) {
+                        var productName = getProductName(null, $wrapper);
+                        var msg = "Cannot increase quantity. Only " + availableCount + " limited edition number(s) available for " + productName + ".";
+                        var $rowErr = $wrapper.find(".woo-limit-quantity-message").first();
+                        showTimedError($rowErr, msg, 5000);
+                        $qty.val(oldQty);
+                        finalizeQty(oldQty);
+                        return;
+                    }
+                }
+
                 // Only add one field at a time for limited products
                 var index = currentCount;
                 var $div = $('<div class="woo-limit-cart-item woo-input-single gt-2"></div>');

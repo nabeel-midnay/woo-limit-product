@@ -352,6 +352,12 @@ class IJWLP_Frontend_Cart
                 class="woo-limit-variation-stock-quantity" value="<?php echo esc_attr($variation_stock_quantity); ?>" />
             <input type="hidden" name="woo-limit-available[<?php echo esc_attr($cart_item_key); ?>]"
                 class="woo-limit-available-numbers" value="<?php echo esc_attr($available_numbers); ?>" />
+            <?php 
+            // Add available count field for limit validation (similar to product page)
+            $limitedNosAvailableCount = limitedNosAvailableCount($parent_product_id);
+            ?>
+            <input type="hidden" name="woo-limit-available-count[<?php echo esc_attr($cart_item_key); ?>]"
+                class="woo-limit-available-count" value="<?php echo esc_attr($limitedNosAvailableCount); ?>" />
 
         </div>
         <?php
