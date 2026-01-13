@@ -729,9 +729,21 @@
          * Handle successful add-to-cart response
          */
         function handleSuccessResponse(response, originalText, isLimited, wooLimit, variationId, quantity) {
+            // Track if available count reached zero
+            var availableCountReachedZero = false;
+
             // Update limited product available numbers
             if (isLimited && wooLimit) {
                 updateAvailableNumbersList(wooLimit);
+
+                // Check if count reached zero after update
+                var $availableCountInput = $(".woo-limit-available-count");
+                if ($availableCountInput.length) {
+                    var newCount = parseInt($availableCountInput.val());
+                    if (newCount <= 0) {
+                        availableCountReachedZero = true;
+                    }
+                }
             }
 
             // Update cart fragments
@@ -755,6 +767,16 @@
 
             // Clear messages and show success
             clearAllMessages();
+
+            // Show available count message if it reached zero
+            if (availableCountReachedZero) {
+                var productName = $(".woo-limit-product-name").val() || "this product";
+                window.IJWLP_Frontend_Common.showError(
+                    "Available count for " + productName + " reached (0)",
+                    $errorDiv
+                );
+            }
+
             $addToCartButton.text("Added").addClass("woo-limit-added");
             setTimeout(function () {
                 $addToCartButton.text(originalText).removeClass("woo-limit-added");
@@ -825,12 +847,10 @@
                     var newCount = newAvailable.length;
                     $availableCountInput.val(newCount);
 
-                    // If count reaches zero, show sold out message
+                    // If count reaches zero, set out of stock state
+                    // Message will be shown in handleSuccessResponse
                     if (newCount <= 0) {
                         setOutOfStockState();
-                        window.IJWLP_Frontend_Common.showError(
-                            "All limited edition numbers are now sold out.", $errorDiv
-                        );
                     }
                 }
             }
