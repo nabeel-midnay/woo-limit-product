@@ -40,8 +40,9 @@ class IJWLP_Frontend_Product
      * @param string|int|null $max_limit Maximum quantity limit per user (remaining)
      * @param string|int|null $max_limit_setting Original max quantity setting
      * @param string $product_name Product name
+     * @param int $available_count Number of available limited edition numbers
      */
-    private function output_hidden_fields($stock_quantity, $variation_quantities_json, $max_limit, $max_limit_setting, $product_name)
+    private function output_hidden_fields($stock_quantity, $variation_quantities_json, $max_limit, $max_limit_setting, $product_name, $available_count = 0)
     {
         ?>
         <input type="hidden" name="woo-limit-stock-quantity" class="woo-limit-stock-quantity"
@@ -54,6 +55,8 @@ class IJWLP_Frontend_Product
             value="<?php echo esc_attr($max_limit_setting !== null && $max_limit_setting !== '' ? $max_limit_setting : ''); ?>" />
         <input type="hidden" name="woo-limit-product-name" class="woo-limit-product-name"
             value="<?php echo esc_attr($product_name); ?>" />
+        <input type="hidden" name="woo-limit-available-count" class="woo-limit-available-count"
+            value="<?php echo esc_attr($available_count); ?>" />
         <?php
     }
 
@@ -197,7 +200,7 @@ class IJWLP_Frontend_Product
             ?>
             <div class="unlimited-produt-wrap">
                 <div class="woo-limit-message" style="display: none;"></div>
-                <?php $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $max_limit_setting, $product->get_name()); ?>
+                <?php $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $max_limit_setting, $product->get_name(), 0); ?>
             </div>
             <?php
             return;
@@ -227,7 +230,10 @@ class IJWLP_Frontend_Product
                 <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
             </span>
 
-            <?php $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $max_limit_setting, $product->get_name()); ?>
+            <?php 
+            $limitedNosAvailableCount = limitedNosAvailableCount($pro_id);
+            $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $max_limit_setting, $product->get_name(), $limitedNosAvailableCount); 
+            ?>
 
             <div class="woo-limit-input-group">
                 <input type="number" id="woo-limit" name="woo-limit" class="woo-limit" value=""

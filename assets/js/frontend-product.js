@@ -74,7 +74,7 @@
         }
 
         /**
-         * Check if product is fully unavailable (user limit reached, all variants OOS, or stock out)
+         * Check if product is fully unavailable (user limit reached, all variants OOS, stock out, or no available numbers)
          * This is the central check for whether the product can be purchased at all.
          * @returns {boolean}
          */
@@ -82,6 +82,14 @@
             // User limit reached
             if (userLimitRemaining <= 0) {
                 return true;
+            }
+            // Limited product: check if available count is zero (all numbers sold out)
+            if (isLimitedProduct) {
+                var availableCountVal = $(".woo-limit-available-count").val();
+                var availableCount = availableCountVal === "" ? Infinity : parseInt(availableCountVal);
+                if (availableCount <= 0) {
+                    return true;
+                }
             }
             // Variable product: all variations out of stock
             if (isVariableProduct && areAllVariationsOutOfStock()) {
@@ -810,6 +818,21 @@
                 });
                 $availableInput.val(JSON.stringify(newAvailable));
                 window.IJWLP_Frontend_Common.refreshAutocomplete($limitedNumberInput);
+
+                // Update available count
+                var $availableCountInput = $(".woo-limit-available-count");
+                if ($availableCountInput.length) {
+                    var newCount = newAvailable.length;
+                    $availableCountInput.val(newCount);
+
+                    // If count reaches zero, show sold out message
+                    if (newCount <= 0) {
+                        setOutOfStockState();
+                        window.IJWLP_Frontend_Common.showError(
+                            "All limited edition numbers are now sold out.", $errorDiv
+                        );
+                    }
+                }
             }
         }
 

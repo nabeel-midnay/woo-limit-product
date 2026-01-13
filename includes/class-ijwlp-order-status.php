@@ -106,10 +106,9 @@ class IJWLP_Order_Status
     public function modify_email_content($content)
     {
         if ($this->is_partially_shipped_email) {
-            // Replace variations of "completed" with "Partially Shipped"
             $content = str_ireplace(
                     'Coffee break done and order completed!',
-                    "Driver on the way, the items in stock have been shipped.\nFor the ones marked as backordered, they will take the next bus and you will be notified.",
+                    "Driver on the way, the items in stock have been shipped.<br>For the ones marked as backordered, they will take the next bus and you will be notified.",
                 $content
             );
         }

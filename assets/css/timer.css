@@ -67,7 +67,6 @@
 
 /* Pulsing animation for danger state */
 @keyframes ijwlp-pulse-danger {
-
     0%,
     100% {
         opacity: 1;

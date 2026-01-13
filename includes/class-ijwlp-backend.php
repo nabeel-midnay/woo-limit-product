@@ -87,7 +87,6 @@ class IJWLP_Backend
         add_action('woocommerce_process_product_meta', array($this, 'woo_limit_save_fields'), 30, 1);
     
 		// Display delivery preference in admin order details
-		add_action('woocommerce_admin_order_data_after_billing_address', array($this, 'display_delivery_preference_in_admin'), 10, 1);
 		add_action('woocommerce_admin_order_data_after_shipping_address', array($this, 'display_delivery_preference_in_admin_shipping'), 10, 1);
     
     }
@@ -269,7 +268,7 @@ class IJWLP_Backend
 	 * 
 	 * @param WC_Order $order
 	 */
-	public function display_delivery_preference_in_admin($order)
+	public function display_delivery_preference_in_admin_shipping($order)
 	{
 		$delivery_preference = $order->get_meta('_delivery_preference');
 		
@@ -289,17 +288,5 @@ class IJWLP_Backend
 			</p>
 		</div>
 		<?php
-	}
-
-	/**
-	 * Display delivery preference in admin order details (after shipping address)
-	 * This is an alternative location if you prefer it in the shipping section
-	 * 
-	 * @param WC_Order $order
-	 */
-	public function display_delivery_preference_in_admin_shipping($order)
-	{
-		// Uncomment the code below if you want to show it after shipping address instead
-		// $this->display_delivery_preference_in_admin($order);
 	}
 }
