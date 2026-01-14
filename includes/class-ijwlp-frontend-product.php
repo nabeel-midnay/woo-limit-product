@@ -171,6 +171,12 @@ class IJWLP_Frontend_Product
 
         // Get max quantity limit per user from product meta
         $max_limit_setting = get_post_meta($pro_id, '_woo_limit_max_quantity', true);
+        $is_soldout = get_post_meta($pro_id, '_woo_limit_soldout', true);
+
+        if ($is_soldout == 'yes') {
+            echo '<div class="soldout_wrapper"><span class="soldout-label">' . esc_html__('Sold Out', 'sarcom') . '</span></div>';
+            return;
+        }
 
         if ($is_limited == 'yes') {
             $limitedNosAvailableCount = limitedNosAvailableCount($pro_id);
@@ -180,6 +186,7 @@ class IJWLP_Frontend_Product
             }
         }
 
+      
         ?>
         <div class="woo-limit-selection-message <?php echo esc_attr($is_limited); ?>" style="display:none"></div>
         <?php
