@@ -768,13 +768,12 @@
             // Clear messages and show success
             clearAllMessages();
 
-            // Show available count message if it reached zero
+            // Show sold out div if available count reached zero
             if (availableCountReachedZero) {
-                var productName = $(".woo-limit-product-name").val() || "this product";
-                window.IJWLP_Frontend_Common.showError(
-                    "Available count for " + productName + " reached (0)",
-                    $errorDiv
-                );
+                // Empty the form
+                $form.empty();
+                // Show sold out div
+                $form.append('<div class="soldout_wrapper"><span class="soldout-label">Sold Out</span></div>');
             }
 
             $addToCartButton.text("Added").addClass("woo-limit-added");
