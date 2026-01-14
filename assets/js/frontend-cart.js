@@ -638,13 +638,8 @@
                     var neededCount = newQty - currentCount;
                     if (availableCount < neededCount) {
                         var productName = getProductName(null, $wrapper);
-                        var msg;
+                        const msg = "All numbers currently taken";
 
-                        if (availableCount === 0) {
-                            msg = "Cannot increase quantity. No more limited edition numbers available for " + productName + ".";
-                        } else {
-                            msg = "Cannot increase quantity. Only " + availableCount + " more limited edition number(s) available for " + productName + ".";
-                        }
 
                         var $rowErr = $wrapper.find(".woo-limit-quantity-message").first();
                         // Add custom class for limit count errors
