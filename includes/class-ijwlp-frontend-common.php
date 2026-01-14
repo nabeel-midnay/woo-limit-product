@@ -334,6 +334,11 @@ class IJWLP_Frontend_Common
             return $classes;
         }
 
+        $soldout = get_post_meta($post_id, '_woo_limit_soldout', true);
+        if ($soldout === 'yes') {
+            $classes[] = 'product-soldout';
+        }
+
         // Limited edition sold-out (custom logic in this plugin)
         $status = get_post_meta($post_id, '_woo_limit_status', true);
         if ($status === 'yes') {
