@@ -270,12 +270,19 @@ class IJWLP_Frontend_Common
 
         // Check if this product has limited edition feature enabled
         $status = get_post_meta($product_id, '_woo_limit_status', true);
+        $soldout = get_post_meta($product_id, '_woo_limit_soldout', true);
+
+        if($soldout == 'yes') {
+            echo '<div class="soldout_wrapper shop-loop-soldout"><span class="soldout-label">' . esc_html__('Sold Out', 'woolimit') . '</span></div>';
+            return;
+        }
 
         // Only check for limited edition availability if the product has limited edition enabled
         if ($status == 'yes') {
             $limitedNosAvailableCount = limitedNosAvailableCount($product_id);
             if ($limitedNosAvailableCount == 0) {
                 echo '<div class="soldout_wrapper shop-loop-soldout"><span class="soldout-label">' . esc_html__('Sold Out', 'woolimit') . '</span></div>';
+                return;
             }
         }
     }
