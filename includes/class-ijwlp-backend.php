@@ -195,6 +195,12 @@ class IJWLP_Backend
                 ));
 
                 woocommerce_wp_checkbox(array(
+                    'id'            => '_woo_limit_soldout',
+                    'label'         => esc_html__('Soldout', 'woolimited'),
+                    'description'     => esc_html__('Product is soldout', 'woolimited'),
+                ));
+
+                woocommerce_wp_checkbox(array(
                     'id'            => '_woo_limit_status',
                     'label'         => esc_html__('Status', 'woolimited'),
                     'description'   => esc_html__('Enable / disable limited number options', 'woolimited'),
