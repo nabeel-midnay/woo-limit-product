@@ -60,82 +60,6 @@ class IJWLP_Frontend_Product
         <?php
     }
 
-    /**
-     * Calculate stock quantities and cart deductions
-     * 
-     * @param WC_Product $product The product object
-     * @param int $pro_id Product ID
-     * @return array Array with 'stock_quantity', 'variation_quantities', 'cart_quantity_for_product'
-     */
-    private function calculate_stock_and_cart_quantities($product, $pro_id)
-    {
-        $variation_quantities = [];
-        $stock_quantity = null;
-        $cart_quantity_for_product = 0;
-
-        // Get stock quantity for the main product (simple products)
-        if (!$product->is_type('variable') && $product->get_manage_stock() && $product->get_backorders() === 'no') {
-            $stock_quantity = intval($product->get_stock_quantity());
-        }
-
-        // Get stock quantities for variations (if product is variable)
-        if ($product->is_type('variable')) {
-            foreach ($product->get_children() as $variation_id) {
-                $variation = wc_get_product($variation_id);
-                if ($variation) {
-                    if ($variation->get_manage_stock() && $variation->get_backorders() === 'no') {
-                        $variation_quantities[$variation_id] = intval($variation->get_stock_quantity());
-                    } else {
-                        $variation_quantities[$variation_id] = null;
-                    }
-                }
-            }
-        }
-
-        // Reduce quantities by anything already in the user's cart
-        // Ensure cart session is initialized (important for page caching scenarios)
-        if (function_exists('WC') && WC()->cart) {
-            // Force cart to load from session if not already loaded
-            if (did_action('wp_loaded') && !WC()->cart->get_cart_contents_count() && WC()->session) {
-                WC()->cart->get_cart_from_session();
-            }
-            
-            foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
-                $cart_product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
-                $cart_variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
-                $cart_qty = isset($cart_item['quantity']) ? intval($cart_item['quantity']) : 0;
-
-                if ($product->is_type('variable')) {
-                    // If this cart item is a variation of the current parent product, reduce that variation's stock
-                    if ($cart_variation_id > 0) {
-                        $cart_variation_product = wc_get_product($cart_variation_id);
-                        $parent_id = $cart_variation_product ? intval($cart_variation_product->get_parent_id()) : 0;
-                        if ($parent_id === $pro_id) {
-                            $cart_quantity_for_product += $cart_qty;
-                            if (isset($variation_quantities[$cart_variation_id]) && $variation_quantities[$cart_variation_id] !== null) {
-                                $variation_quantities[$cart_variation_id] = max(0, $variation_quantities[$cart_variation_id] - $cart_qty);
-                            }
-                        }
-                    }
-                } else {
-                    // Simple (non-variable) product: reduce stock when product matches
-                    // Also verify this is not a variation (variation_id should be 0 for simple products)
-                    if (intval($cart_product_id) === intval($pro_id) && $cart_variation_id === 0) {
-                        $cart_quantity_for_product += $cart_qty;
-                        if ($stock_quantity !== null) {
-                            $stock_quantity = max(0, $stock_quantity - $cart_qty);
-                        }
-                    }
-                }
-            }
-        }
-
-        return [
-            'stock_quantity' => $stock_quantity,
-            'variation_quantities' => $variation_quantities,
-            'cart_quantity_for_product' => $cart_quantity_for_product,
-        ];
-    }
 
     /**
      * Calculate effective max limit considering user limit and cart contents
@@ -192,7 +116,7 @@ class IJWLP_Frontend_Product
         <?php
 
         // Calculate stock quantities and cart deductions
-        $stock_data = $this->calculate_stock_and_cart_quantities($product, $pro_id);
+        $stock_data = IJWLP_Frontend_Common::calculate_stock_and_cart_quantities($product, $pro_id);
         $stock_quantity = $stock_data['stock_quantity'];
         $variation_quantities = $stock_data['variation_quantities'];
         $cart_quantity_for_product = $stock_data['cart_quantity_for_product'];

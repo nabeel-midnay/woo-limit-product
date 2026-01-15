@@ -123,6 +123,89 @@ class IJWLP_Frontend_Common
     }
 
     /**
+     * Calculate stock quantities and cart deductions
+     *
+     * @param WC_Product $product The product object
+     * @param int $pro_id Product ID
+     * @return array Array with 'stock_quantity', 'variation_quantities', 'cart_quantity_for_product'
+     */
+    public static function calculate_stock_and_cart_quantities($product, $pro_id)
+    {
+        $variation_quantities = [];
+        $stock_quantity = null;
+        $cart_quantity_for_product = 0;
+
+        // Get stock quantity for the main product (simple products)
+        if (!$product->is_type('variable') && $product->get_manage_stock() && $product->get_backorders() === 'no') {
+            $stock_quantity = intval($product->get_stock_quantity());
+        }
+
+        // Get stock quantities for variations (if product is variable)
+        if ($product->is_type('variable')) {
+            foreach ($product->get_children() as $variation_id) {
+                $variation = wc_get_product($variation_id);
+                if ($variation) {
+                    // Check if variation is purchasable (has price, etc.)
+                    if (!$variation->is_purchasable() || $variation->get_price() === '') {
+                        $variation_quantities[$variation_id] = 0; // Treat as out of stock
+                        continue;
+                    }
+
+                    if ($variation->get_manage_stock() && $variation->get_backorders() === 'no') {
+                        $variation_quantities[$variation_id] = intval($variation->get_stock_quantity());
+                    } else {
+                        $variation_quantities[$variation_id] = null;
+                    }
+                }
+            }
+        }
+
+        // Reduce quantities by anything already in the user's cart
+        // Ensure cart session is initialized (important for page caching scenarios)
+        if (function_exists('WC') && WC()->cart) {
+            // Force cart to load from session if not already loaded
+            if (did_action('wp_loaded') && !WC()->cart->get_cart_contents_count() && WC()->session) {
+                WC()->cart->get_cart_from_session();
+            }
+
+            foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
+                $cart_product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
+                $cart_variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
+                $cart_qty = isset($cart_item['quantity']) ? intval($cart_item['quantity']) : 0;
+
+                if ($product->is_type('variable')) {
+                    // If this cart item is a variation of the current parent product, reduce that variation's stock
+                    if ($cart_variation_id > 0) {
+                        $cart_variation_product = wc_get_product($cart_variation_id);
+                        $parent_id = $cart_variation_product ? intval($cart_variation_product->get_parent_id()) : 0;
+                        if ($parent_id === $pro_id) {
+                            $cart_quantity_for_product += $cart_qty;
+                            if (isset($variation_quantities[$cart_variation_id]) && $variation_quantities[$cart_variation_id] !== null) {
+                                $variation_quantities[$cart_variation_id] = max(0, $variation_quantities[$cart_variation_id] - $cart_qty);
+                            }
+                        }
+                    }
+                } else {
+                    // Simple (non-variable) product: reduce stock when product matches
+                    // Also verify this is not a variation (variation_id should be 0 for simple products)
+                    if (intval($cart_product_id) === intval($pro_id) && $cart_variation_id === 0) {
+                        $cart_quantity_for_product += $cart_qty;
+                        if ($stock_quantity !== null) {
+                            $stock_quantity = max(0, $stock_quantity - $cart_qty);
+                        }
+                    }
+                }
+            }
+        }
+
+        return [
+            'stock_quantity' => $stock_quantity,
+            'variation_quantities' => $variation_quantities,
+            'cart_quantity_for_product' => $cart_quantity_for_product,
+        ];
+    }
+
+    /**
      * Enqueue frontend scripts
      */
     public function enqueue_scripts()
@@ -290,9 +373,35 @@ class IJWLP_Frontend_Common
     public function out_of_stock_display_shop_loop()
     {
         global $product;
+        if (!$product) return;
 
-        // Check if product is out of stock
-        if (!$product->is_in_stock()) {
+        $pro_id = $product->get_id();
+        $is_in_stock = $product->is_in_stock();
+
+        if ($is_in_stock) {
+            $stock_data = self::calculate_stock_and_cart_quantities($product, $pro_id);
+            if ($product->is_type('variable')) {
+                // For variable products, it's out of stock if ALL variations are out of stock after cart deduction
+                $all_out = true;
+                foreach ($stock_data['variation_quantities'] as $v_id => $qty) {
+                    if ($qty === null || $qty > 0) {
+                        $all_out = false;
+                        break;
+                    }
+                }
+                if ($all_out) {
+                    $is_in_stock = false;
+                }
+            } else {
+                // For simple products
+                if ($stock_data['stock_quantity'] !== null && $stock_data['stock_quantity'] <= 0) {
+                    $is_in_stock = false;
+                }
+            }
+        }
+
+         // Check if product is out of stock
+        if (!$is_in_stock) {
             echo '<div class="outofstock_wrapper shop-loop-outofstock"><span class="outofstock-label">' . esc_html__('Out of Stock', 'woolimit') . '</span></div>';
         }
     }
@@ -355,8 +464,29 @@ class IJWLP_Frontend_Common
             }
         }
 
-        // Standard WooCommerce out-of-stock
-        if (!$product->is_in_stock()) {
+        // Standard WooCommerce out-of-stock check with cart deduction
+        $is_in_stock = $product->is_in_stock();
+        if ($is_in_stock) {
+            $stock_data = self::calculate_stock_and_cart_quantities($product, $post_id);
+            if ($product->is_type('variable')) {
+                $all_out = true;
+                foreach ($stock_data['variation_quantities'] as $v_id => $qty) {
+                    if ($qty === null || $qty > 0) {
+                        $all_out = false;
+                        break;
+                    }
+                }
+                if ($all_out) {
+                    $is_in_stock = false;
+                }
+            } else {
+                if ($stock_data['stock_quantity'] !== null && $stock_data['stock_quantity'] <= 0) {
+                    $is_in_stock = false;
+                }
+            }
+        }
+
+        if (!$is_in_stock) {
             $classes[] = 'product-outofstock';
         }
 
