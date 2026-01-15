@@ -199,6 +199,13 @@ class IJWLP_Frontend_Product
 
         $is_limited = get_post_meta($check_pro_id, '_woo_limit_status', true);
 
+        // ALWAYS check global stock availability for the requested quantity (respect global reservations)
+        $global_passed = IJWLP_Frontend_Common::validate_global_availability($check_pro_id, ($pro_id != $check_pro_id ? $pro_id : 0), $quantity);
+        if ($global_passed !== true) {
+            wc_add_notice($global_passed, 'error');
+            return false;
+        }
+
         if ($is_limited !== 'yes') {
             return $passed;
         }

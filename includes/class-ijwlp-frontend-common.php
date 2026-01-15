@@ -160,10 +160,42 @@ class IJWLP_Frontend_Common
             }
         }
 
-        // Reduce quantities by anything already in the user's cart
-        // Ensure cart session is initialized (important for page caching scenarios)
+        // Global reservations from database (all users)
+        global $wpdb, $table_prefix;
+        $table = $table_prefix . 'woo_limit';
+        $reserved_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT product_id, quantity FROM $table 
+             WHERE parent_product_id = %d AND status = 'block' 
+             AND (expiry_time IS NULL OR expiry_time >= %s)",
+            $pro_id,
+            current_time('mysql')
+        ));
+
+        $global_reserved = [];
+        foreach ($reserved_rows as $row) {
+            $pid = intval($row->product_id);
+            $qty = intval($row->quantity);
+            if (!isset($global_reserved[$pid])) {
+                $global_reserved[$pid] = 0;
+            }
+            $global_reserved[$pid] += $qty;
+        }
+
+        // Reduce stocks by global reservations
+        if ($product->is_type('variable')) {
+            foreach ($variation_quantities as $v_id => $qty) {
+                if ($qty !== null && isset($global_reserved[$v_id])) {
+                    $variation_quantities[$v_id] = max(0, $qty - $global_reserved[$v_id]);
+                }
+            }
+        } else {
+            if ($stock_quantity !== null && isset($global_reserved[$pro_id])) {
+                $stock_quantity = max(0, $stock_quantity - $global_reserved[$pro_id]);
+            }
+        }
+
+        // Still calculate cart_quantity_for_product for current user (used for user-specific limits)
         if (function_exists('WC') && WC()->cart) {
-            // Force cart to load from session if not already loaded
             if (did_action('wp_loaded') && !WC()->cart->get_cart_contents_count() && WC()->session) {
                 WC()->cart->get_cart_from_session();
             }
@@ -174,25 +206,18 @@ class IJWLP_Frontend_Common
                 $cart_qty = isset($cart_item['quantity']) ? intval($cart_item['quantity']) : 0;
 
                 if ($product->is_type('variable')) {
-                    // If this cart item is a variation of the current parent product, reduce that variation's stock
                     if ($cart_variation_id > 0) {
                         $cart_variation_product = wc_get_product($cart_variation_id);
                         $parent_id = $cart_variation_product ? intval($cart_variation_product->get_parent_id()) : 0;
                         if ($parent_id === $pro_id) {
                             $cart_quantity_for_product += $cart_qty;
-                            if (isset($variation_quantities[$cart_variation_id]) && $variation_quantities[$cart_variation_id] !== null) {
-                                $variation_quantities[$cart_variation_id] = max(0, $variation_quantities[$cart_variation_id] - $cart_qty);
-                            }
+                            // Stock deduction is already handled by the global pool query above
                         }
                     }
                 } else {
-                    // Simple (non-variable) product: reduce stock when product matches
-                    // Also verify this is not a variation (variation_id should be 0 for simple products)
                     if (intval($cart_product_id) === intval($pro_id) && $cart_variation_id === 0) {
                         $cart_quantity_for_product += $cart_qty;
-                        if ($stock_quantity !== null) {
-                            $stock_quantity = max(0, $stock_quantity - $cart_qty);
-                        }
+                        // Stock deduction is already handled by the global pool query above
                     }
                 }
             }
@@ -203,6 +228,49 @@ class IJWLP_Frontend_Common
             'variation_quantities' => $variation_quantities,
             'cart_quantity_for_product' => $cart_quantity_for_product,
         ];
+    }
+
+    /**
+     * Check if requested quantity can be added to cart considering global reservations
+     *
+     * @param int $pro_id Main product ID (parent ID for variations)
+     * @param int $variation_id Specific variation ID (or 0)
+     * @param int $quantity Requested quantity (incremental quantity being added)
+     * @return bool|string True if passed, error message if failed
+     */
+    public static function validate_global_availability($pro_id, $variation_id, $quantity)
+    {
+        $data = self::calculate_stock_and_cart_quantities($pro_id);
+
+        $available_stock = 0;
+        if ($variation_id > 0) {
+            if (array_key_exists($variation_id, $data['variation_quantities'])) {
+                $available_stock = $data['variation_quantities'][$variation_id];
+            } else {
+                // Not managing stock or not found
+                return true;
+            }
+        } else {
+            if ($data['stock_quantity'] !== null) {
+                $available_stock = $data['stock_quantity'];
+            } else {
+                // Not managing stock
+                return true;
+            }
+        }
+
+        if ($available_stock === null) {
+            return true;
+        }
+
+        if ($quantity > $available_stock) {
+            return sprintf(
+                __('Sorry, there is not enough stock. Only %d items are currently available (including reservations by other customers).', 'woolimited'),
+                max(0, $available_stock)
+            );
+        }
+
+        return true;
     }
 
     /**

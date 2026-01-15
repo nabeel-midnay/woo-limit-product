@@ -49,6 +49,10 @@ class IJWLP_Frontend_Cart
         // Enforce quantity limits after cart merge on login
         // This prevents bypassing max quantity limits when guest cart merges with user cart
         add_action('woocommerce_cart_loaded_from_session', array($this, 'enforce_quantity_limits_on_cart_load'), 20);
+
+        // Update database when quantity changes in cart
+        add_filter('woocommerce_update_cart_validation', array($this, 'validate_cart_stock_on_update'), 10, 4);
+        add_action('woocommerce_after_cart_item_quantity_update', array($this, 'update_db_on_quantity_change'), 10, 4);
     }
 
     /**
@@ -581,50 +585,56 @@ class IJWLP_Frontend_Cart
             $parent_product_id
         ));
 
+        $cart = WC()->cart;
+        $cart_item = $cart ? $cart->get_cart_item($cart_item_key) : null;
+        $quantity = $cart_item ? intval($cart_item['quantity']) : 1;
+
         // Calculate expiry time from settings (use WordPress time for consistency)
         $limit_minutes = IJWLP_Options::get_setting('limittime', 15);
         $expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
 
         if ($existing_record) {
-            // Update existing record with new comma-separated numbers
+            // Update existing record with new comma-separated numbers and quantity
             $wpdb->update(
                 $table,
                 array(
                     'limit_no' => $limit_no_string,
+                    'quantity' => $quantity,
                     'time' => current_time('mysql'),
                     'expiry_time' => $expiry_time,
                 ),
                 array(
                     'id' => $existing_record->id
                 ),
-                array('%s', '%s', '%s'),
+                array('%s', '%d', '%s', '%s'),
                 array('%d')
             );
         } else {
-            // Check if any of the new numbers are already blocked or ordered
-            $numbers_to_check = $new_numbers;
-            $blocked_numbers = array();
+            // We skip number conflict check if it's an unlimited product (empty numbers)
+            $can_insert = true;
+            if (!empty($new_numbers)) {
+                $numbers_to_check = $new_numbers;
+                foreach ($numbers_to_check as $number) {
+                    $existing = $wpdb->get_row($wpdb->prepare(
+                        "SELECT id, status, limit_no FROM $table 
+                        WHERE parent_product_id = %d 
+                        AND (status = 'block' OR status = 'ordered')
+                        AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
+                        $parent_product_id,
+                        $number,
+                        $number . ',%',
+                        '%,' . $number,
+                        '%,' . $number . ',%'
+                    ));
 
-            foreach ($numbers_to_check as $number) {
-                $existing = $wpdb->get_row($wpdb->prepare(
-                    "SELECT id, status, limit_no FROM $table 
-                    WHERE parent_product_id = %d 
-                    AND (status = 'block' OR status = 'ordered')
-                    AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
-                    $parent_product_id,
-                    $number,
-                    $number . ',%',
-                    '%,' . $number,
-                    '%,' . $number . ',%'
-                ));
-
-                if ($existing) {
-                    $blocked_numbers[] = $number;
+                    if ($existing) {
+                        $can_insert = false;
+                        break;
+                    }
                 }
             }
 
-            // Only insert if none of the numbers are already blocked/ordered
-            if (empty($blocked_numbers)) {
+            if ($can_insert) {
                 $wpdb->insert(
                     $table,
                     array(
@@ -634,11 +644,12 @@ class IJWLP_Frontend_Cart
                         'product_id' => $actual_pro_id,
                         'product_type' => $product_type,
                         'limit_no' => $limit_no_string,
+                        'quantity' => $quantity,
                         'status' => 'block',
                         'time' => current_time('mysql'),
                         'expiry_time' => $expiry_time,
                     ),
-                    array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+                    array('%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s')
                 );
             }
         }
@@ -709,16 +720,10 @@ class IJWLP_Frontend_Cart
             return;
         }
 
-        // Check if limited edition number is in cart item data
-        if (!isset($cart_item['woo_limit']) || empty($cart_item['woo_limit'])) {
-            return;
-        }
-
-        // Handle array of limited edition numbers
-        $limited_numbers = is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit']);
+        // Handle array of limited edition numbers (empty for regular products)
+        $limited_numbers = isset($cart_item['woo_limit']) ? (is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit'])) : array();
         $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : ($variation_id > 0 ? $variation_id : $product_id);
 
-        // Get parent product ID for variable products
         $product = wc_get_product($actual_pro_id);
         $parent_product_id = $actual_pro_id;
 
@@ -726,96 +731,84 @@ class IJWLP_Frontend_Cart
             $parent_product_id = $product->get_parent_id();
         }
 
-        // Check if product is limited edition
-        $is_limited = get_post_meta($parent_product_id, '_woo_limit_status', true);
-        if ($is_limited !== 'yes') {
+        // We now block ALL products to enable global in-cart stock reduction
+        // Admin reports will filter by _woo_limit_status so they won't be cluttered
+
+        // Manually ensure product is blocked in database
+        // This ensures global reservation even for unlimited products
+        IJWLP_Options::block_limited_edition_number_in_db(
+            $cart_item_key,
+            $parent_product_id,
+            $actual_pro_id,
+            $limited_numbers
+        );
+    }
+
+    /**
+     * Validate global stock availability before updating cart quantity
+     *
+     * @param bool $passed
+     * @param string $cart_item_key
+     * @param array $values
+     * @param int $quantity New quantity
+     * @return bool
+     */
+    public function validate_cart_stock_on_update($passed, $cart_item_key, $values, $quantity)
+    {
+        $current_qty = isset($values['quantity']) ? intval($values['quantity']) : 0;
+        $added_qty = $quantity - $current_qty;
+
+        if ($added_qty <= 0) {
+            return $passed;
+        }
+
+        $product_id = isset($values['product_id']) ? intval($values['product_id']) : 0;
+        $variation_id = isset($values['variation_id']) ? intval($values['variation_id']) : 0;
+
+        $actual_pro_id = $variation_id > 0 ? $variation_id : $product_id;
+        $product = wc_get_product($actual_pro_id);
+        $parent_id = ($product && $product->is_type('variation')) ? $product->get_parent_id() : $actual_pro_id;
+
+        // Check if additional quantity is available in global pool
+        $check = IJWLP_Frontend_Common::validate_global_availability($parent_id, ($variation_id > 0 ? $variation_id : 0), $added_qty);
+
+        if ($check !== true) {
+            wc_add_notice($check, 'error');
+            return false;
+        }
+
+        return $passed;
+    }
+
+    /**
+     * Update database record when quantity changes in cart
+     * 
+     * @param string $cart_item_key Cart item key
+     * @param int $quantity New quantity
+     * @param int $old_quantity Old quantity
+     * @param WC_Cart $cart Cart object
+     */
+    public function update_db_on_quantity_change($cart_item_key, $quantity, $old_quantity, $cart)
+    {
+        $cart_item = $cart->get_cart_item($cart_item_key);
+        if (!$cart_item) {
             return;
         }
 
-        global $wpdb, $table_prefix;
-        $table = $table_prefix . 'woo_limit';
+        $product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
+        $variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
+        $actual_pro_id = isset($cart_item['woo_limit_pro_id']) ? $cart_item['woo_limit_pro_id'] : ($variation_id > 0 ? $variation_id : $product_id);
 
-        // Get user identifier (user ID for logged-in, IP-based for guests)
-        $user_id = IJWLP_Options::get_user_identifier();
-
-        // Get product type
-        $product_type = $product ? $product->get_type() : 'simple';
-
-        // Store all numbers as comma-separated string in a single record
-        $limit_no_string = implode(',', $limited_numbers);
-
-        // Check if a record already exists for this cart_key
-        $existing_record = $wpdb->get_row($wpdb->prepare(
-            "SELECT id, limit_no, status FROM $table 
-            WHERE cart_key = %s 
-            AND parent_product_id = %s 
-            AND status = 'block'",
-            $cart_item_key,
-            $parent_product_id
-        ));
-
-        // Calculate expiry time from settings (use WordPress time for consistency)
-        $limit_minutes = IJWLP_Options::get_setting('limittime', 15);
-        $expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
-
-        if ($existing_record) {
-            // Update existing record with all numbers (comma-separated)
-            $wpdb->update(
-                $table,
-                array(
-                    'limit_no' => $limit_no_string,
-                    'time' => current_time('mysql'),
-                    'expiry_time' => $expiry_time,
-                ),
-                array(
-                    'id' => $existing_record->id
-                ),
-                array('%s', '%s', '%s'),
-                array('%d')
-            );
-        } else {
-            // Check if any of these numbers are already blocked or ordered by another cart
-            $numbers_to_check = $limited_numbers;
-            $blocked_numbers = array();
-
-            foreach ($numbers_to_check as $number) {
-                $existing = $wpdb->get_row($wpdb->prepare(
-                    "SELECT id, status, limit_no FROM $table 
-                    WHERE parent_product_id = %d 
-                    AND (status = 'block' OR status = 'ordered')
-                    AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
-                    $parent_product_id,
-                    $number,
-                    $number . ',%',
-                    '%,' . $number,
-                    '%,' . $number . ',%'
-                ));
-
-                if ($existing) {
-                    $blocked_numbers[] = $number;
-                }
-            }
-
-            // Only insert if none of the numbers are already blocked/ordered
-            if (empty($blocked_numbers)) {
-                // Insert new record with all numbers comma-separated
-                $wpdb->insert(
-                    $table,
-                    array(
-                        'cart_key' => $cart_item_key,
-                        'user_id' => $user_id,
-                        'parent_product_id' => $parent_product_id,
-                        'product_id' => $actual_pro_id,
-                        'product_type' => $product_type,
-                        'limit_no' => $limit_no_string,
-                        'status' => 'block',
-                        'time' => current_time('mysql'),
-                        'expiry_time' => $expiry_time,
-                    ),
-                    array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
-                );
-            }
+        $product = wc_get_product($actual_pro_id);
+        $parent_product_id = $actual_pro_id;
+        if ($product && $product->is_type('variation')) {
+            $parent_product_id = $product->get_parent_id();
         }
+
+        $numbers = isset($cart_item['woo_limit']) ? (is_array($cart_item['woo_limit']) ? $cart_item['woo_limit'] : array($cart_item['woo_limit'])) : array();
+
+        // Use existing helper to update the database
+        $this->update_limited_edition_in_database($cart_item_key, array(), $numbers, $parent_product_id, $actual_pro_id);
     }
 
     /**

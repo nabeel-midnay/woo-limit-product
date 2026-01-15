@@ -55,26 +55,39 @@ if (!function_exists('woo_limit_activate_plugin')) {
             )) !== $table_name
         ) {
 
-            // SQL to create the table (includes expiry_time column)
+            // SQL to create the table (includes expiry_time and quantity columns)
             $sql = "CREATE TABLE `$table_name` (
                 `id` INT(11) NOT NULL AUTO_INCREMENT,
-                `cart_key` VARCHAR(500) NOT NULL,
+                `cart_key` VARCHAR(191) NOT NULL,
                 `user_id` VARCHAR(500) NOT NULL,
-                `parent_product_id` VARCHAR(500) NOT NULL,
-                `product_id` VARCHAR(500) NOT NULL,
+                `parent_product_id` VARCHAR(191) NOT NULL,
+                `product_id` VARCHAR(191) NOT NULL,
                 `product_type` VARCHAR(500) NOT NULL,
                 `limit_no` VARCHAR(500),
+                `quantity` INT(11) NOT NULL DEFAULT 1,
                 `status` VARCHAR(500) NOT NULL,
                 `time` VARCHAR(500) NOT NULL,
                 `expiry_time` DATETIME NULL,
                 `order_id` VARCHAR(500) NOT NULL,
                 `order_item_id` VARCHAR(500) NOT NULL,
                 `order_status` VARCHAR(500) NOT NULL,
-                PRIMARY KEY (`id`)
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `cart_key` (`cart_key`),
+                KEY `parent_product_id` (`parent_product_id`)
             ) ENGINE=InnoDB $charset_collate;";
 
             require_once ABSPATH . 'wp-admin/includes/upgrade.php';
             dbDelta($sql);
+        } else {
+            // Table exists, check for quantity column
+            $column = $wpdb->get_results($wpdb->prepare(
+                "SHOW COLUMNS FROM `$table_name` LIKE %s",
+                'quantity'
+            ));
+
+            if (empty($column)) {
+                $wpdb->query("ALTER TABLE `$table_name` ADD `quantity` INT(11) NOT NULL DEFAULT 1 AFTER `limit_no` ");
+            }
         }
 
         // Schedule cron for cleanup if not already scheduled

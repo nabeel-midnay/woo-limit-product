@@ -86,13 +86,11 @@ class IJWLP_Frontend_Checkout
         // Process each order item
         foreach ($order->get_items() as $item_id => $item) {
             $cart_item_key = $item->get_meta('_cart_item_key');
-            $limited_number = $item->get_meta('Limited Edition Number');
-
-            if (empty($limited_number) || empty($cart_item_key)) {
+            if (empty($cart_item_key)) {
                 continue;
             }
 
-            // Normalize limited_number to string for DB comparisons
+            // Normalization handle empty/null cases for unlimited products
             $limited_number = IJWLP_Frontend_Common::normalize_limited_number_for_storage($limited_number);
 
 
@@ -129,6 +127,7 @@ class IJWLP_Frontend_Checkout
 
             if ($updated === false || $updated === 0) {
                 // Try to find by product ID and number if cart key doesn't match
+                // We use prepare to safely handle empty limited_number strings
                 $updated = $wpdb->update(
                     $table,
                     array(
