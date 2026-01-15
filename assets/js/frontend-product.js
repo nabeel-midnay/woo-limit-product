@@ -341,6 +341,11 @@
             setOutOfStockState();
             disableAllSwatches(true, true); // Silent mode to prevent recursion
             $(".reset_variations").removeClass("show");
+
+            // Remove the form and add the out-of-stock message
+            $form.empty();
+            $form.append('<p class="stock out-of-stock">Out of stock</p>');
+
             window.IJWLP_Frontend_Common.showError(
                 "All variations are out of stock.", $errorDiv
             );
@@ -494,7 +499,7 @@
 
             // Only disable all swatches if ALL variations are out of stock
             if (areAllVariationsOutOfStock()) {
-                disableAllSwatches();
+                handleAllVariantsOutOfStock();
                 return;
             }
 
@@ -530,17 +535,16 @@
 
                     if (variationStockQuantities[variationId] <= 0) {
                         isNowOutOfStock = true;
-                        setOutOfStockState();
 
                         if (areAllVariationsOutOfStock()) {
-                            disableAllSwatches(true, true); // Clear selections silently when all variations out of stock
+                            handleAllVariantsOutOfStock();
                         } else {
+                            setOutOfStockState();
                             disableVariationSwatch(variationId);
+                            window.IJWLP_Frontend_Common.showError(
+                                "This variation is now out of stock.", $errorDiv
+                            );
                         }
-
-                        window.IJWLP_Frontend_Common.showError(
-                            "This variation is now out of stock.", $errorDiv
-                        );
                     }
                 }
             } else if (stockQuantityRemaining !== Infinity) {
