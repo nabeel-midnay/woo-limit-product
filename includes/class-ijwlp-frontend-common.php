@@ -68,6 +68,9 @@ class IJWLP_Frontend_Common
 
         // Render logout modal in footer
         add_action('wp_footer', array($this, 'render_logout_modal'), 10);
+
+        // Modify cart quantity input max values based on real stock availability
+        add_filter('woocommerce_quantity_input_args', array($this, 'modify_cart_quantity_input_args'), 10, 2);
     }
 
     /**
@@ -234,6 +237,94 @@ class IJWLP_Frontend_Common
             'variation_quantities' => $variation_quantities,
             'cart_quantity_for_product' => $cart_quantity_for_product,
         ];
+    }
+
+    /**
+     * Modify cart quantity input max value based on real stock availability
+     * 
+     * @param array $args Quantity input arguments
+     * @param WC_Product $product Product object
+     * @return array Modified arguments
+     */
+    public function modify_cart_quantity_input_args($args, $product)
+    {
+        // Only apply on cart page
+        if (!is_cart()) {
+            return $args;
+        }
+
+        // Get the cart item key from the current context
+        // WooCommerce passes product object but we need cart item data
+        $cart = WC()->cart->get_cart();
+        
+        foreach ($cart as $cart_item_key => $cart_item) {
+            $cart_product = $cart_item['data'];
+            
+            // Match the product instance to find the right cart item
+            if ($cart_product === $product) {
+                $cart_item_quantity = intval($cart_item['quantity']);
+                $variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
+                $product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
+                
+                // Determine the parent product ID and target ID for stock calculation
+                if ($variation_id > 0) {
+                    // For variations, parent_id is the variable product ID
+                    $parent_product = wc_get_product($product_id);
+                    if ($parent_product && $parent_product->is_type('variable')) {
+                        $target_id = $variation_id;
+                        $parent_id = $product_id;
+                    } else {
+                        return $args;
+                    }
+                } else {
+                    // For simple products
+                    $target_id = $product_id;
+                    $parent_id = $product_id;
+                }
+                
+                // Get the parent product for calculation
+                $parent_product = wc_get_product($parent_id);
+                if (!$parent_product) {
+                    return $args;
+                }
+                
+                // Calculate stock quantities
+                $stock_data = self::calculate_stock_and_cart_quantities($parent_product, $parent_id);
+                
+                // Get real limit based on product type
+                $real_limit = null;
+                if ($variation_id > 0) {
+                    // For variations
+                    if (isset($stock_data['variation_quantities'][$target_id])) {
+                        $real_limit = $stock_data['variation_quantities'][$target_id];
+                    }
+                } else {
+                    // For simple products
+                    $real_limit = $stock_data['stock_quantity'];
+                }
+                
+                // Only apply if we have a real limit (stock is managed and backorders are disabled)
+                if ($real_limit !== null) {
+                    // Add back current cart item quantity (JS will handle validation)
+                    $calculated_max = $real_limit + $cart_item_quantity;
+                    
+                    // Get min value (default to 1)
+                    $min_value = isset($args['min_value']) ? intval($args['min_value']) : 1;
+                    
+                    // Apply the calculated max, ensuring it's at least the minimum
+                    $args['max_value'] = max($calculated_max, $min_value);
+                    
+                    // Also update input_value if it exceeds the new max
+                    if (isset($args['input_value']) && intval($args['input_value']) > $args['max_value']) {
+                        $args['input_value'] = $args['max_value'];
+                    }
+                }
+                
+                break; // Found the matching cart item, exit loop
+            }
+        }
+        
+        return $args;
     }
 
     /**
