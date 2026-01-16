@@ -240,7 +240,12 @@ class IJWLP_Frontend_Common
      */
     public static function validate_global_availability($pro_id, $variation_id, $quantity)
     {
-        $data = self::calculate_stock_and_cart_quantities($pro_id);
+        $product = wc_get_product($pro_id);
+        if (!$product) {
+            return true;
+        }
+
+        $data = self::calculate_stock_and_cart_quantities($product, $pro_id);
 
         $available_stock = 0;
         if ($variation_id > 0) {
