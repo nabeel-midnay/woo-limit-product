@@ -151,6 +151,12 @@ class IJWLP_Frontend_Common
                         continue;
                     }
 
+                    // Check for stock status explicitly
+                    if ( ! $variation->is_in_stock() ) {
+                        $variation_quantities[$variation_id] = 0;
+                        continue;
+                    }
+
                     if ($variation->get_manage_stock() && $variation->get_backorders() === 'no') {
                         $variation_quantities[$variation_id] = intval($variation->get_stock_quantity());
                     } else {
