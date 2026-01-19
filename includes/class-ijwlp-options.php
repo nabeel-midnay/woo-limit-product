@@ -351,9 +351,20 @@ class IJWLP_Options
 					// All numbers are available! Re-insert the record to restore reservation
 					$user_id = $order->get_user_id() ? (string) $order->get_user_id() : 'guest';
 					
-					// Use 15 minutes expiry as fallback, though for ordered status it doesn't matter much
-					$limit_minutes = self::get_setting('limittime', 15);
-					$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
+					// Calculate expiry time based on product type
+					if (!empty($limited_number)) {
+						// Limited product - use minutes setting
+						$limit_minutes = self::get_setting('limittime', 15);
+						$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
+					} else {
+						// Unlimited product - use hours setting
+						$limit_hours = self::get_setting('unlimited_expire_time', 24);
+						if ($limit_hours == 0) {
+							$expiry_time = null;
+						} else {
+							$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_hours * 3600));
+						}
+					}
 					
 					$product_obj = wc_get_product($actual_product_id);
 					$product_type = $product_obj ? $product_obj->get_type() : 'simple';
@@ -737,8 +748,22 @@ class IJWLP_Options
 		));
 
 		// Calculate expiry time from settings (use WordPress time for consistency)
-		$limit_minutes = self::get_setting('limittime', 15);
-		$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
+		// For unlimited products (no limited numbers), use the unlimited_expire_time setting (in hours)
+		// For limited products, use the limittime setting (in minutes)
+		if (empty($new_numbers)) {
+			// Unlimited product - use hours setting
+			$limit_hours = self::get_setting('unlimited_expire_time', 24);
+			if ($limit_hours == 0) {
+				// 0 means no expiry
+				$expiry_time = null;
+			} else {
+				$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_hours * 3600));
+			}
+		} else {
+			// Limited product - use minutes setting
+			$limit_minutes = self::get_setting('limittime', 15);
+			$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
+		}
 
 		$cart = WC()->cart;
 		$cart_item = $cart ? $cart->get_cart_item($cart_item_key) : null;
@@ -1157,8 +1182,22 @@ class IJWLP_Options
 		));
 
 		// Calculate expiry time from settings (use WordPress time for consistency)
-		$limit_minutes = self::get_setting('limittime', 15);
-		$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
+		// For unlimited products (no limited numbers), use the unlimited_expire_time setting (in hours)
+		// For limited products, use the limittime setting (in minutes)
+		if (empty($limited_numbers)) {
+			// Unlimited product - use hours setting
+			$limit_hours = self::get_setting('unlimited_expire_time', 24);
+			if ($limit_hours == 0) {
+				// 0 means no expiry
+				$expiry_time = null;
+			} else {
+				$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_hours * 3600));
+			}
+		} else {
+			// Limited product - use minutes setting
+			$limit_minutes = self::get_setting('limittime', 15);
+			$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
+		}
 
 		$cart = WC()->cart;
 		$cart_item = $cart ? $cart->get_cart_item($cart_item_key) : null;

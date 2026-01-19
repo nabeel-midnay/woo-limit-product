@@ -33,12 +33,12 @@ class ControlPanel{
                     echo '<div class="error fade" id="message" style="background-color: rgb(255, 204, 204); width: 500px; margin-left: 50px"><p class="pblc">Timer Limit must be a number between 1 and 1440 minutes. Default value of 15 minutes has been set.</p></div>';
                 }
 
-                // Reserve period setting
-                $reserve_period = stripslashes($_POST['reserve_period']);
-                if (is_numeric($reserve_period) && $reserve_period >= 0) {
-                    $this->options["reserve_period"] = intval($reserve_period);
+                // Unlimited product expire time setting (in hours, 0 for unlimited)
+                $unlimited_expire_time = stripslashes($_POST['unlimited_expire_time']);
+                if (is_numeric($unlimited_expire_time) && $unlimited_expire_time >= 0) {
+                    $this->options["unlimited_expire_time"] = intval($unlimited_expire_time);
                 } else {
-                    $this->options["reserve_period"] = 24;
+                    $this->options["unlimited_expire_time"] = 24;
                 }
                 
                 update_option('ijwlp_advanced_settings', $this->options);
@@ -136,8 +136,8 @@ class ControlPanel{
                             <td><input type="number" name="limittime" min="1" max="60" step="1" value="<?php echo $this->options["limittime"]; ?>" placeholder="Enter time in minutes" /></td>
                         </tr>
                         <tr>
-                            <td> Reserve Period (Hours) (0 for unlimited)</td>
-                            <td><input type="number" name="reserve_period" min="0" step="1" value="<?php echo isset($this->options["reserve_period"]) ? $this->options["reserve_period"] : 24; ?>" placeholder="Enter time in hours" /></td>
+                            <td> Unlimited Product Expire Time (Hours) (0 for unlimited)</td>
+                            <td><input type="number" name="unlimited_expire_time" min="0" step="1" value="<?php echo isset($this->options["unlimited_expire_time"]) ? $this->options["unlimited_expire_time"] : 24; ?>" placeholder="Enter time in hours (default: 24)" /></td>
                         </tr>
                     </table>
                     <div class="cp_separator"></div>                    
