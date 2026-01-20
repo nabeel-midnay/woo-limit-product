@@ -23,22 +23,28 @@
         $(document.body).on("updated_checkout", function () {
             // Update totals in the custom order summary
             $.ajax({
-                url: wc_checkout_params.ajax_url,
+                url: ijwlp_frontend.ajax_url,
                 type: "POST",
                 data: {
                     action: "get_cart_totals",
-                    security: wc_checkout_params.update_order_review_nonce,
+                    security: ijwlp_frontend.nonce,
+                    billing_country: $('#billing_country').val(),
+                    billing_state: $('#billing_state').val(),
+                    billing_postcode: $('#billing_postcode').val(),
+                    shipping_country: $('#shipping_country').val(),
+                    shipping_state: $('#shipping_state').val(),
+                    shipping_postcode: $('#shipping_postcode').val(),
                 },
                 success: function (response) {
-                    if (response && response.totals) {
+                    if (response.success && response.data && response.data.totals) {
+                        var totals = response.data.totals;
                         // Update delivery cost
-                        var shippingTotal = response.totals.shipping_total;
-                        var currencySymbol =
-                            "<?php echo get_woocommerce_currency_symbol(); ?>";
+                        var shippingTotal = totals.shipping_total;
+                        var currencySymbol = ijwlp_frontend.currency_symbol;
                         var deliveryCost =
                             shippingTotal > 0
                                 ? currencySymbol +
-                                  parseFloat(shippingTotal).toFixed(2)
+                                parseFloat(shippingTotal).toFixed(2)
                                 : "FREE";
                         $(
                             '.custom-order-summary-wrapper .summary-line .label:contains("Delivery:")'
@@ -47,9 +53,7 @@
                             .text(deliveryCost);
 
                         // Update total
-                        var total = response.totals.total;
-                        var currencySymbol =
-                            "<?php echo get_woocommerce_currency_symbol(); ?>";
+                        var total = totals.total;
                         var totalFormatted =
                             currencySymbol + parseFloat(total).toFixed(2);
                         $(

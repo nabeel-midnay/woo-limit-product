@@ -31,6 +31,10 @@ class IJWLP_Frontend_Checkout
 		add_action('woocommerce_checkout_process', array($this, 'validate_delivery_preference_field'), 10, 1);
 		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_delivery_preference_field'), 10, 1);
 
+        // AJAX handler for cart totals (used when checkout country changes)
+        add_action('wp_ajax_get_cart_totals', array($this, 'ajax_get_cart_totals'));
+        add_action('wp_ajax_nopriv_get_cart_totals', array($this, 'ajax_get_cart_totals'));
+
     }
 
     /**
@@ -407,5 +411,65 @@ class IJWLP_Frontend_Checkout
 		}
 
 		return false;
+	}
+
+	/**
+	 * AJAX handler to get updated cart totals
+	 * Called when checkout form changes (e.g., country selection)
+	 * 
+	 * @return void
+	 */
+	public function ajax_get_cart_totals()
+	{
+		// Verify nonce for security
+		check_ajax_referer('ijwlp_frontend_nonce', 'security');
+
+		// Get cart instance
+		$cart = WC()->cart;
+		if (!$cart) {
+			wp_send_json_error(array('message' => 'Cart not available'));
+			return;
+		}
+
+		// Update customer location if address data is provided in the request
+		// This ensures that shipping and tax calculations are based on the current selection in the checkout form
+		if (WC()->customer) {
+			if (isset($_POST['billing_country'])) {
+				WC()->customer->set_billing_country(sanitize_text_field($_POST['billing_country']));
+			}
+			if (isset($_POST['billing_state'])) {
+				WC()->customer->set_billing_state(sanitize_text_field($_POST['billing_state']));
+			}
+			if (isset($_POST['billing_postcode'])) {
+				WC()->customer->set_billing_postcode(sanitize_text_field($_POST['billing_postcode']));
+			}
+			
+			if (isset($_POST['shipping_country'])) {
+				WC()->customer->set_shipping_country(sanitize_text_field($_POST['shipping_country']));
+			}
+			if (isset($_POST['shipping_state'])) {
+				WC()->customer->set_shipping_state(sanitize_text_field($_POST['shipping_state']));
+			}
+			if (isset($_POST['shipping_postcode'])) {
+				WC()->customer->set_shipping_postcode(sanitize_text_field($_POST['shipping_postcode']));
+			}
+		}
+
+		// Calculate cart totals (this will recalculate shipping based on current session data)
+		// WooCommerce automatically updates the session with new address data from the checkout form
+		$cart->calculate_totals();
+
+		// Prepare response with updated totals
+		$response = array(
+			'totals' => array(
+				'shipping_total' => $cart->get_shipping_total(),
+				'subtotal' => $cart->get_subtotal(),
+				'total' => $cart->get_total('raw'),
+				'discount_total' => $cart->get_discount_total(),
+				'cart_contents_total' => $cart->get_cart_contents_total(),
+			)
+		);
+
+		wp_send_json_success($response);
 	}
 }

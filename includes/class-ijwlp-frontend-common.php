@@ -404,7 +404,8 @@ class IJWLP_Frontend_Common
         // Prepare AJAX data for all scripts
         $ajax_data = array(
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('ijwlp_frontend_nonce')
+            'nonce' => wp_create_nonce('ijwlp_frontend_nonce'),
+            'currency_symbol' => get_woocommerce_currency_symbol()
         );
 
         // Localize script data to common script

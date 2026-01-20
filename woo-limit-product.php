@@ -153,8 +153,8 @@ if (is_admin()) {
     IJWLP();
 }
 
-// Load frontend class only on frontend
-if (!is_admin()) {
+// Load frontend class only on frontend or during AJAX
+if (!is_admin() || wp_doing_ajax()) {
     new IJWLP_Frontend(IJWLP_FILE, IJWLP_VERSION);
 }
 
