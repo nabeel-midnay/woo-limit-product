@@ -34,9 +34,13 @@
         // ==================== UTILITY FUNCTIONS ====================
 
         // Parse integer with fallback
+        // Parse integer with fallback
         function safeInt(val, fallback) {
             var parsed = parseInt(val || "", 10);
-            return isNaN(parsed) ? (fallback || 0) : parsed;
+            if (isNaN(parsed)) {
+                return fallback !== undefined ? fallback : 0;
+            }
+            return parsed;
         }
 
         // Check if input is empty
