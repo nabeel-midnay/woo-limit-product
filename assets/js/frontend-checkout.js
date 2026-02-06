@@ -42,32 +42,25 @@
                         response.data.totals
                     ) {
                         var totals = response.data.totals;
-                        // Update delivery cost
-                        var shippingTotal = totals.shipping_total;
-                        var currencySymbol = ijwlp_frontend.currency_symbol;
-                        var deliveryCost =
-                            shippingTotal > 0
-                                ? currencySymbol +
-                                parseFloat(shippingTotal).toFixed(2)
-                                : "FREE";
+                        
+                        // Update delivery cost using formatted value from PHP
                         $(
                             '.custom-order-summary-wrapper .summary-line .label:contains("Delivery:")',
                         )
                             .next()
-                            .text(deliveryCost);
+                            .html(totals.shipping_total_formatted);
 
                         // Update tax
                         var taxTotal = totals.tax_total;
-                        var taxFormatted = currencySymbol + parseFloat(taxTotal).toFixed(2);
                         var taxLine = $('.custom-order-summary-wrapper .summary-line.tax-line');
 
                         if (parseFloat(taxTotal) > 0) {
                             if (taxLine.length) {
-                                taxLine.find('.value').text(taxFormatted);
+                                taxLine.find('.value').html(totals.tax_total_formatted);
                             } else {
                                 var taxHtml = '<div class="summary-line tax-line">' +
                                     '<span class="label">Tax:</span>' +
-                                    '<span class="value">' + taxFormatted + '</span>' +
+                                    '<span class="value">' + totals.tax_total_formatted + '</span>' +
                                     '</div>';
                                 $('.custom-order-summary-wrapper .total-line').before(taxHtml);
                             }
@@ -77,17 +70,17 @@
                             }
                         }
 
-                        // Update total
-                        var total = totals.total;
-                        var totalFormatted =
-                            currencySymbol + parseFloat(total).toFixed(2);
+                        // Update total using formatted value from PHP
                         $(
                             ".custom-order-summary-wrapper .total-line .value",
-                        ).text(totalFormatted);
+                        ).html(totals.total_formatted);
                         $(
                             ".custom-order-summary-wrapper .items-count .value",
-                        ).text("Total: " + totalFormatted);
+                        ).html("Total: " + totals.total_formatted);
                     }
+                },
+                error: function (xhr, status, error) {
+                    console.error('Cart totals AJAX error:', status, error, xhr.responseText);
                 },
             });
         });

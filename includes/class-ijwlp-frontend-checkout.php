@@ -50,7 +50,7 @@ class IJWLP_Frontend_Checkout
             if (!empty($numbers)) {
                 $display = esc_html(implode(', ', $numbers));
                 $item_data[] = array(
-                    'key'   => esc_html__('Limited Edition Number', 'woo-limit-product'),
+                    'key' => esc_html__('Limited Edition Number', 'woo-limit-product'),
                     'value' => $display,
                 );
             }
@@ -158,12 +158,12 @@ class IJWLP_Frontend_Checkout
     public function custom_checkout_order_summary()
     {
         // Minimal checkout order summary: only HTML structure and limited edition numbers
-        if (! is_checkout()) {
+        if (!is_checkout()) {
             return;
         }
 
         $cart = WC()->cart;
-        if (! $cart || $cart->is_empty()) {
+        if (!$cart || $cart->is_empty()) {
             return;
         }
 
@@ -176,11 +176,12 @@ class IJWLP_Frontend_Checkout
         if (!empty($coupons)) {
             $coupon_discount = $cart->get_discount_total();
         }
-?>
+        ?>
         <div class="checkout-order-summary-container">
             <div id="custom-order-summary" class="custom-order-summary-wrapper">
                 <div class="order-summary-container">
-                    <a href="<?php echo esc_url(wc_get_cart_url()); ?>" class="view-cart-btn"><?php echo esc_html__('View cart', 'woo-limit-product'); ?></a>
+                    <a href="<?php echo esc_url(wc_get_cart_url()); ?>"
+                        class="view-cart-btn"><?php echo esc_html__('View cart', 'woo-limit-product'); ?></a>
                     <div class="order-summary-wrap">
                         <div class="order-summary-header">
                             <h3><?php echo esc_html__('ORDER SUMMARY', 'woo-limit-product'); ?></h3>
@@ -189,7 +190,8 @@ class IJWLP_Frontend_Checkout
                         <div class="order-summary-totals">
                             <div class="summary-line">
                                 <span class="label">Delivery:</span>
-                                <span class="value"><?php echo $shipping_total > 0 ? wc_price($shipping_total) : 'FREE'; ?></span>
+                                <span
+                                    class="value"><?php echo $shipping_total > 0 ? wc_price($shipping_total) : 'FREE'; ?></span>
                             </div>
                             <?php if ($coupon_discount > 0): ?>
                                 <div class="summary-line">
@@ -197,10 +199,10 @@ class IJWLP_Frontend_Checkout
                                     <span class="value"><?php echo wc_price($coupon_discount); ?></span>
                                 </div>
                             <?php endif; ?>
-                            <?php 
+                            <?php
                             // Add tax display if exists
-                            if ($cart->get_total_tax() > 0) :
-                                foreach ($cart->get_tax_totals() as $code => $tax) : ?>
+                            if ($cart->get_total_tax() > 0):
+                                foreach ($cart->get_tax_totals() as $code => $tax): ?>
                                     <div class="summary-line tax-line">
                                         <span class="label"><?php echo esc_html($tax->label) . ':'; ?></span>
                                         <span class="value"><?php echo wp_kses_post($tax->formatted_amount); ?></span>
@@ -217,12 +219,13 @@ class IJWLP_Frontend_Checkout
 
                     <div class="order-summary-content">
                         <div class="summary-line items-count">
-                            <span class="label"><?php echo $total_items; ?> Item<?php echo $total_items > 1 ? 's' : ''; ?></span>
+                            <span class="label"><?php echo $total_items; ?>
+                                Item<?php echo $total_items > 1 ? 's' : ''; ?></span>
                             <span class="value">Total: <?php echo wc_price($total); ?></span>
                         </div>
-                        <?php foreach ($cart_items as $ci_key => $ci_item) :
+                        <?php foreach ($cart_items as $ci_key => $ci_item):
                             $product = isset($ci_item['data']) ? $ci_item['data'] : null;
-                            if (! is_object($product)) {
+                            if (!is_object($product)) {
                                 continue;
                             }
 
@@ -235,9 +238,9 @@ class IJWLP_Frontend_Checkout
 
                             // Get limited edition numbers (preferred keys only)
                             $numbers = array();
-                            if (! empty($ci_item['woo_limit'])) {
+                            if (!empty($ci_item['woo_limit'])) {
                                 $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit']);
-                            } elseif (! empty($ci_item['woo_limit_display'])) {
+                            } elseif (!empty($ci_item['woo_limit_display'])) {
                                 $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit_display']);
                             }
 
@@ -249,7 +252,7 @@ class IJWLP_Frontend_Checkout
                                 $limited_range = $start_range . ' - ' . $end_range;
                             }
 
-                        ?>
+                            ?>
                             <div class="order-summary-item">
                                 <div class="item-image"><?php echo $image; ?></div>
                                 <div class="item-details">
@@ -257,10 +260,11 @@ class IJWLP_Frontend_Checkout
 
                                     <?php
                                     // Display product attributes (for variable products)
-                                    if (!empty($ci_item['variation']) && is_array($ci_item['variation'])) : ?>
+                                    if (!empty($ci_item['variation']) && is_array($ci_item['variation'])): ?>
                                         <div class="item-attributes">
-                                            <?php foreach ($ci_item['variation'] as $attr_key => $attr_value) :
-                                                if (empty($attr_value)) continue;
+                                            <?php foreach ($ci_item['variation'] as $attr_key => $attr_value):
+                                                if (empty($attr_value))
+                                                    continue;
 
                                                 // Get clean attribute name
                                                 $attr_name = wc_attribute_label(str_replace('attribute_', '', $attr_key));
@@ -273,23 +277,28 @@ class IJWLP_Frontend_Checkout
                                                         $attr_value = $term->name;
                                                     }
                                                 }
-                                            ?>
-                                                <span class="product-attribute"><?php echo esc_html($attr_name); ?>: <?php echo esc_html($attr_value); ?></span>
+                                                ?>
+                                                <span class="product-attribute"><?php echo esc_html($attr_name); ?>:
+                                                    <?php echo esc_html($attr_value); ?></span>
                                             <?php endforeach; ?>
                                         </div>
                                     <?php endif; ?>
 
                                     <div class="item-quantity"><?php echo '&#215;' . esc_html($quantity); ?></div>
 
-                                    <?php if ($limited_range) : ?>
-                                        <div class="limited-edition-range"><?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?>: <?php echo esc_html($limited_range); ?></div>
+                                    <?php if ($limited_range): ?>
+                                        <div class="limited-edition-range">
+                                            <?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?>:
+                                            <?php echo esc_html($limited_range); ?>
+                                        </div>
                                     <?php endif; ?>
 
-                                    <?php if (! empty($numbers)) : ?>
+                                    <?php if (!empty($numbers)): ?>
                                         <div class="limited-edition-display">
-                                            <span class="limited-edition-label"><?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?></span>
+                                            <span
+                                                class="limited-edition-label"><?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?></span>
                                             <div class="limited-number-list">
-                                                <?php foreach ($numbers as $num) : ?>
+                                                <?php foreach ($numbers as $num): ?>
                                                     <span class="limited-number"><?php echo esc_html((string) $num); ?></span>
                                                 <?php endforeach; ?>
                                             </div>
@@ -299,11 +308,12 @@ class IJWLP_Frontend_Checkout
                                     <?php
                                     // Backorder notification (keep as-is)
                                     $backorder_status = $product->get_stock_status();
-                                    if ($backorder_status === 'onbackorder') :
-                                    ?>
+                                    if ($backorder_status === 'onbackorder'):
+                                        ?>
                                         <div class="backorder_notification">
                                             <?php echo esc_html__('Available on backorder', 'woo-limit-product'); ?>
-                                            <span class="backorder-help-icon help-icon" data-tooltip="<?php echo esc_attr__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woo-limit-product'); ?>">?</span>
+                                            <span class="backorder-help-icon help-icon"
+                                                data-tooltip="<?php echo esc_attr__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woo-limit-product'); ?>">?</span>
                                         </div>
                                     <?php endif; ?>
                                 </div>
@@ -313,7 +323,7 @@ class IJWLP_Frontend_Checkout
                 </div>
             </div>
         </div>
-<?php
+        <?php
     }
 
     /**
@@ -430,8 +440,12 @@ class IJWLP_Frontend_Checkout
      */
     public function ajax_get_cart_totals()
     {
-        // Verify nonce for security
-        check_ajax_referer('ijwlp_frontend_nonce', 'security');
+        // Verify nonce for security (check both 'security' and 'nonce' fields for compatibility)
+        $nonce = isset($_POST['security']) ? $_POST['security'] : (isset($_POST['nonce']) ? $_POST['nonce'] : '');
+        if (!$nonce || !wp_verify_nonce($nonce, 'ijwlp_frontend_nonce')) {
+            wp_send_json_error(array('message' => 'Security check failed'));
+            return;
+        }
 
         // Get cart instance
         $cart = WC()->cart;
@@ -478,6 +492,10 @@ class IJWLP_Frontend_Checkout
                 'cart_contents_total' => $cart->get_cart_contents_total(),
                 'tax_total' => $cart->get_total_tax(),
                 'taxes' => $this->get_cart_tax_totals($cart),
+                // Formatted prices for display
+                'shipping_total_formatted' => $cart->get_shipping_total() > 0 ? wc_price($cart->get_shipping_total()) : 'FREE',
+                'total_formatted' => wc_price($cart->get_total('raw')),
+                'tax_total_formatted' => wc_price($cart->get_total_tax()),
             )
         );
 
