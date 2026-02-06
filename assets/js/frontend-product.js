@@ -341,11 +341,6 @@
             setOutOfStockState();
             disableAllSwatches(true, true); // Silent mode to prevent recursion
             $(".reset_variations").removeClass("show");
-
-            // Remove the form and add the out-of-stock message
-            $form.empty();
-            $form.append('<p class="stock out-of-stock">Out of stock</p>');
-
             window.IJWLP_Frontend_Common.showError(
                 "All variations are out of stock.", $errorDiv
             );
@@ -499,7 +494,7 @@
 
             // Only disable all swatches if ALL variations are out of stock
             if (areAllVariationsOutOfStock()) {
-                handleAllVariantsOutOfStock();
+                disableAllSwatches();
                 return;
             }
 
@@ -535,16 +530,17 @@
 
                     if (variationStockQuantities[variationId] <= 0) {
                         isNowOutOfStock = true;
+                        setOutOfStockState();
 
                         if (areAllVariationsOutOfStock()) {
-                            handleAllVariantsOutOfStock();
+                            disableAllSwatches(true, true); // Clear selections silently when all variations out of stock
                         } else {
-                            setOutOfStockState();
                             disableVariationSwatch(variationId);
-                            window.IJWLP_Frontend_Common.showError(
-                                "This variation is now out of stock.", $errorDiv
-                            );
                         }
+
+                        window.IJWLP_Frontend_Common.showError(
+                            "This variation is now out of stock.", $errorDiv
+                        );
                     }
                 }
             } else if (stockQuantityRemaining !== Infinity) {
@@ -733,21 +729,9 @@
          * Handle successful add-to-cart response
          */
         function handleSuccessResponse(response, originalText, isLimited, wooLimit, variationId, quantity) {
-            // Track if available count reached zero
-            var availableCountReachedZero = false;
-
             // Update limited product available numbers
             if (isLimited && wooLimit) {
                 updateAvailableNumbersList(wooLimit);
-
-                // Check if count reached zero after update
-                var $availableCountInput = $(".woo-limit-available-count");
-                if ($availableCountInput.length) {
-                    var newCount = parseInt($availableCountInput.val());
-                    if (newCount <= 0) {
-                        availableCountReachedZero = true;
-                    }
-                }
             }
 
             // Update cart fragments
@@ -771,15 +755,6 @@
 
             // Clear messages and show success
             clearAllMessages();
-
-            // Show sold out div if available count reached zero
-            if (availableCountReachedZero) {
-                // Empty the form
-                $form.empty();
-                // Show sold out div
-                $form.append('<div class="soldout_wrapper"><span class="soldout-label">Sold Out</span></div>');
-            }
-
             $addToCartButton.text("Added").addClass("woo-limit-added");
             setTimeout(function () {
                 $addToCartButton.text(originalText).removeClass("woo-limit-added");
@@ -850,10 +825,12 @@
                     var newCount = newAvailable.length;
                     $availableCountInput.val(newCount);
 
-                    // If count reaches zero, set out of stock state
-                    // Message will be shown in handleSuccessResponse
+                    // If count reaches zero, show sold out message
                     if (newCount <= 0) {
                         setOutOfStockState();
+                        window.IJWLP_Frontend_Common.showError(
+                            "All limited edition numbers are now sold out.", $errorDiv
+                        );
                     }
                 }
             }

@@ -234,7 +234,7 @@
 
             var newTimerId = setTimeout(function () {
                 $el.fadeOut(300, function () {
-                    $(this).removeClass("woo-limit-error woo-limit-count-error").removeData("error-timer");
+                    $(this).removeClass("woo-limit-error").removeData("error-timer");
                     if (typeof onHide === "function") onHide();
                 });
             }, duration || 5000);
@@ -370,7 +370,7 @@
         // Hide all limit-related error messages
         function hideAllLimitErrors() {
             $(SEL.limitMessage).hide().removeClass("woo-limit-error");
-            $(SEL.quantityMessage).hide().removeClass("woo-limit-error woo-limit-count-error");
+            $(SEL.quantityMessage).hide().removeClass("woo-limit-error");
             $(".woo-limit.woo-limit-error").removeClass("woo-limit-error");
             $(".woo-limit.woo-limit-empty-error").removeClass("woo-limit-empty-error");
             $(".woo-number-range.woo-limit-error").removeClass("woo-limit-error");
@@ -627,28 +627,14 @@
                     return;
                 }
 
-                // Check available count for limited edition products
-                var $availableCountInput = $wrapper.find(".woo-limit-available-count").first();
-                if ($availableCountInput.length) {
-                    var availableCountVal = $availableCountInput.val();
-                    var availableCount = availableCountVal === "" ? Infinity : parseInt(availableCountVal);
-
-                    // Check if we have enough available limited edition numbers
-                    // We need at least (newQty - currentCount) available numbers
-                    var neededCount = newQty - currentCount;
-                    if (availableCount < neededCount) {
-                        var productName = getProductName(null, $wrapper);
-                        const msg = "All numbers currently taken";
-
-
-                        var $rowErr = $wrapper.find(".woo-limit-quantity-message").first();
-                        // Add custom class for limit count errors
-                        $rowErr.addClass("woo-limit-count-error");
-                        showTimedError($rowErr, msg, 5000);
-                        $qty.val(oldQty);
-                        finalizeQty(oldQty);
-                        return;
-                    }
+                // Check if max limit reached
+                if (max !== null && currentCount >= max) {
+                    var prodName = getProductName(null, $wrapper);
+                    var msg = "Max quantity for " + prodName + " reached";
+                    showClientNotice(msg);
+                    $qty.val(oldQty);
+                    finalizeQty(oldQty);
+                    return;
                 }
 
                 // Only add one field at a time for limited products

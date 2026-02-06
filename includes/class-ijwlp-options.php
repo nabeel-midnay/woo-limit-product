@@ -259,11 +259,14 @@ class IJWLP_Options
 			$cart_item_key = $item->get_meta('_cart_item_key');
 			$limited_number = $item->get_meta('Limited Edition Number');
 
+			// Ensure limited_number is a string, not an array
 			if (is_array($limited_number)) {
 				$limited_number = implode(',', $limited_number);
 			}
 
-			// We no longer skip if empty, to support unlimited products
+			if (empty($limited_number)) {
+				continue;
+			}
 
 			// Get product ID
 			$product_id = $item->get_product_id();
@@ -318,32 +321,30 @@ class IJWLP_Options
 			if ($updated_rows === 0 && $order_status !== 'cancelled' && $order_status !== 'failed') {
 				
 				// Check if these numbers are available or taken by another order
-				$limit_numbers_array = array_filter(explode(',', $limited_number));
+				$limit_numbers_array = explode(',', $limited_number);
 				$taken_numbers = array();
 				
-				if (!empty($limit_numbers_array)) {
-					foreach ($limit_numbers_array as $num) {
-						$num = trim($num);
-						if (empty($num)) continue;
-						
-						// Check if this number is already used by ANOTHER order
-						$existing = $wpdb->get_row($wpdb->prepare(
-							"SELECT order_id FROM $table 
-							WHERE parent_product_id = %s 
-							AND (status = 'block' OR status = 'ordered')
-							AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)
-							AND order_id != %s",
-							$parent_product_id,
-							$num,
-							$num . ',%',
-							'%,' . $num,
-							'%,' . $num . ',%',
-							(string) $order_id
-						));
-						
-						if ($existing) {
-							$taken_numbers[] = $num;
-						}
+				foreach ($limit_numbers_array as $num) {
+					$num = trim($num);
+					if (empty($num)) continue;
+					
+					// Check if this number is already used by ANOTHER order
+					$existing = $wpdb->get_row($wpdb->prepare(
+						"SELECT order_id FROM $table 
+						WHERE parent_product_id = %s 
+						AND (status = 'block' OR status = 'ordered')
+						AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)
+						AND order_id != %s",
+						$parent_product_id,
+						$num,
+						$num . ',%',
+						'%,' . $num,
+						'%,' . $num . ',%',
+						(string) $order_id
+					));
+					
+					if ($existing) {
+						$taken_numbers[] = $num;
 					}
 				}
 				
@@ -351,20 +352,9 @@ class IJWLP_Options
 					// All numbers are available! Re-insert the record to restore reservation
 					$user_id = $order->get_user_id() ? (string) $order->get_user_id() : 'guest';
 					
-					// Calculate expiry time based on product type
-					if (!empty($limited_number)) {
-						// Limited product - use minutes setting
-						$limit_minutes = self::get_setting('limittime', 15);
-						$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
-					} else {
-						// Unlimited product - use hours setting
-						$limit_hours = self::get_setting('unlimited_expire_time', 24);
-						if ($limit_hours == 0) {
-							$expiry_time = null;
-						} else {
-							$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_hours * 3600));
-						}
-					}
+					// Use 15 minutes expiry as fallback, though for ordered status it doesn't matter much
+					$limit_minutes = self::get_setting('limittime', 15);
+					$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
 					
 					$product_obj = wc_get_product($actual_product_id);
 					$product_type = $product_obj ? $product_obj->get_type() : 'simple';
@@ -452,12 +442,6 @@ class IJWLP_Options
 
 		$is_limited = get_post_meta($parent_product_id, '_woo_limit_status', true);
 
-		// ALWAYS check global stock availability for the requested quantity (respect global reservations)
-		$global_passed = IJWLP_Frontend_Common::validate_global_availability($parent_product_id, ($product_id != $parent_product_id ? $product_id : 0), $quantity);
-		if ($global_passed !== true) {
-			wp_send_json_error(array('message' => $global_passed));
-		}
-
 		if ($is_limited === 'yes') {
 			if (empty($limited_number)) {
 				wp_send_json_error(array('message' => __('Please enter a Limited Edition Number.', 'woolimited')));
@@ -503,14 +487,11 @@ class IJWLP_Options
 		$cart_item_key = WC()->cart->add_to_cart($product_id, $quantity, $variation_id, array(), $cart_item_data);
 
 		if ($cart_item_key) {
-			// Manually ensure product is blocked in database
-			// This ensures global reservation even for unlimited products
-			$this->block_limited_edition_number_in_db(
-				$cart_item_key, 
-				$parent_product_id, 
-				$actual_pro_id, 
-				!empty($limited_number) ? array($limited_number) : array()
-			);
+			// Manually ensure limited edition number is blocked in database
+			// This ensures the number is added to the table even when adding via AJAX
+			if (!empty($limited_number) && $is_limited === 'yes') {
+				$this->block_limited_edition_number_in_db($cart_item_key, $parent_product_id, $actual_pro_id, array($limited_number));
+			}
 
 			// Get cart fragments for AJAX response
 			ob_start();
@@ -737,6 +718,9 @@ class IJWLP_Options
 		$product_type = $product ? $product->get_type() : 'simple';
 		$user_id = self::get_user_identifier();
 
+		// Store new numbers as comma-separated string
+		$limit_no_string = implode(',', $new_numbers);
+
 		// Check if record exists for this cart_key
 		$existing_record = $wpdb->get_row($wpdb->prepare(
 			"SELECT id FROM $table 
@@ -748,69 +732,49 @@ class IJWLP_Options
 		));
 
 		// Calculate expiry time from settings (use WordPress time for consistency)
-		// For unlimited products (no limited numbers), use the unlimited_expire_time setting (in hours)
-		// For limited products, use the limittime setting (in minutes)
-		if (empty($new_numbers)) {
-			// Unlimited product - use hours setting
-			$limit_hours = self::get_setting('unlimited_expire_time', 24);
-			if ($limit_hours == 0) {
-				// 0 means no expiry
-				$expiry_time = null;
-			} else {
-				$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_hours * 3600));
-			}
-		} else {
-			// Limited product - use minutes setting
-			$limit_minutes = self::get_setting('limittime', 15);
-			$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
-		}
-
-		$cart = WC()->cart;
-		$cart_item = $cart ? $cart->get_cart_item($cart_item_key) : null;
-		$quantity = $cart_item ? intval($cart_item['quantity']) : 1;
+		$limit_minutes = self::get_setting('limittime', 15);
+		$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
 
 		if ($existing_record) {
-			// Update existing record with new comma-separated numbers and quantity
+			// Update existing record with new comma-separated numbers
 			$wpdb->update(
 				$table,
 				array(
 					'limit_no' => $limit_no_string,
-					'quantity' => $quantity,
 					'time' => current_time('mysql'),
 					'expiry_time' => $expiry_time,
 				),
 				array(
 					'id' => $existing_record->id
 				),
-				array('%s', '%d', '%s', '%s'),
+				array('%s', '%s', '%s'),
 				array('%d')
 			);
 		} else {
-			// We skip number conflict check if it's an unlimited product (empty numbers)
-			$can_insert = true;
-			if (!empty($new_numbers)) {
-				$numbers_to_check = $new_numbers;
-				foreach ($numbers_to_check as $number) {
-					$existing = $wpdb->get_row($wpdb->prepare(
-						"SELECT id, status, limit_no FROM $table 
-						WHERE parent_product_id = %s 
-						AND (status = 'block' OR status = 'ordered')
-						AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
-						$parent_product_id,
-						$number,
-						$number . ',%',
-						'%,' . $number,
-						'%,' . $number . ',%'
-					));
+			// Check if any of the new numbers are already blocked or ordered
+			$numbers_to_check = $new_numbers;
+			$blocked_numbers = array();
 
-					if ($existing) {
-						$can_insert = false;
-						break;
-					}
+			foreach ($numbers_to_check as $number) {
+				$existing = $wpdb->get_row($wpdb->prepare(
+					"SELECT id, status, limit_no FROM $table 
+				WHERE parent_product_id = %s 
+				AND (status = 'block' OR status = 'ordered')
+				AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
+					$parent_product_id,
+					$number,
+					$number . ',%',
+					'%,' . $number,
+					'%,' . $number . ',%'
+				));
+
+				if ($existing) {
+					$blocked_numbers[] = $number;
 				}
 			}
 
-			if ($can_insert) {
+			// Only insert if none of the numbers are already blocked/ordered
+			if (empty($blocked_numbers)) {
 				$wpdb->insert(
 					$table,
 					array(
@@ -820,12 +784,11 @@ class IJWLP_Options
 						'product_id' => $actual_pro_id,
 						'product_type' => $product_type,
 						'limit_no' => $limit_no_string,
-						'quantity' => $quantity,
 						'status' => 'block',
 						'time' => current_time('mysql'),
 						'expiry_time' => $expiry_time,
 					),
-					array('%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s')
+					array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
 				);
 			}
 		}
@@ -1149,14 +1112,14 @@ class IJWLP_Options
 
 	/**
 	 * Block limited edition number in database
-	 * Centralized method to ensure products/numbers are blocked correctly
+	 * Helper method to ensure numbers are blocked when adding via AJAX
 	 * 
 	 * @param string $cart_item_key - Cart item key
 	 * @param int $parent_product_id - Parent product ID
 	 * @param int $actual_pro_id - Actual product/variation ID
 	 * @param array $limited_numbers - Array of limited edition numbers
 	 */
-	public static function block_limited_edition_number_in_db($cart_item_key, $parent_product_id, $actual_pro_id, $limited_numbers)
+	private function block_limited_edition_number_in_db($cart_item_key, $parent_product_id, $actual_pro_id, $limited_numbers)
 	{
 		global $wpdb, $table_prefix;
 		$table = $table_prefix . 'woo_limit';
@@ -1182,31 +1145,8 @@ class IJWLP_Options
 		));
 
 		// Calculate expiry time from settings (use WordPress time for consistency)
-		// For unlimited products (no limited numbers), use the unlimited_expire_time setting (in hours)
-		// For limited products, use the limittime setting (in minutes)
-		if (empty($limited_numbers)) {
-			// Unlimited product - use hours setting
-			$limit_hours = self::get_setting('unlimited_expire_time', 24);
-			if ($limit_hours == 0) {
-				// 0 means no expiry
-				$expiry_time = null;
-			} else {
-				$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_hours * 3600));
-			}
-		} else {
-			// Limited product - use minutes setting
-			$limit_minutes = self::get_setting('limittime', 15);
-			$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
-		}
-
-		$cart = WC()->cart;
-		$cart_item = $cart ? $cart->get_cart_item($cart_item_key) : null;
-		// If it's a regular product, qty is from cart. If limited, it's count of numbers.
-		if (empty($limited_numbers)) {
-			$quantity = $cart_item ? intval($cart_item['quantity']) : 1;
-		} else {
-			$quantity = count($limited_numbers);
-		}
+		$limit_minutes = self::get_setting('limittime', 15);
+		$expiry_time = date('Y-m-d H:i:s', current_time('timestamp') + ($limit_minutes * 60));
 
 		if ($existing_record) {
 			// Merge existing numbers with the new ones (avoid duplicates) and update
@@ -1224,42 +1164,38 @@ class IJWLP_Options
 				$table,
 				array(
 					'limit_no' => $merged_limit_no_string,
-					'quantity' => $quantity,
 					'time' => current_time('mysql'),
 					'expiry_time' => $expiry_time,
 				),
 				array(
 					'id' => $existing_record->id
 				),
-				array('%s', '%d', '%s', '%s'),
+				array('%s', '%s', '%s'),
 				array('%d')
 			);
 		} else {
-			// We skip number conflict check if it's an unlimited product (empty numbers)
-			$can_insert = true;
-			if (!empty($limited_numbers)) {
-				$numbers_to_check = $limited_numbers;
-				foreach ($numbers_to_check as $number) {
-					$existing = $wpdb->get_row($wpdb->prepare(
-						"SELECT id, status, limit_no FROM $table 
-						WHERE parent_product_id = %s 
-						AND (status = 'block' OR status = 'ordered')
-						AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
-						$parent_product_id,
-						$number,
-						$number . ',%',
-						'%,' . $number,
-						'%,' . $number . ',%'
-					));
+			// Check if any of these numbers are already blocked or ordered by another cart
+			$numbers_to_check = $limited_numbers;
+			$blocked_numbers = array();
 
-					if ($existing) {
-						$can_insert = false;
-						break;
-					}
+			foreach ($numbers_to_check as $number) {
+				$existing = $wpdb->get_row($wpdb->prepare(
+					"SELECT id, status, limit_no FROM $table 
+				WHERE parent_product_id = %s 
+				AND (status = 'block' OR status = 'ordered')
+				AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s)",
+					$parent_product_id,
+					$number,
+					$number . ',%',
+					'%,' . $number,
+					'%,' . $number . ',%'
+				));
+
+				if ($existing) {
+					$blocked_numbers[] = $number;
 				}
-			}
-
-			if ($can_insert) {
+			}			// Only insert if none of the numbers are already blocked/ordered
+			if (empty($blocked_numbers)) {
 				// Insert new record with all numbers comma-separated
 				$wpdb->insert(
 					$table,
@@ -1270,12 +1206,12 @@ class IJWLP_Options
 						'product_id' => $actual_pro_id,
 						'product_type' => $product_type,
 						'limit_no' => $limit_no_string,
-						'quantity' => $quantity,
 						'status' => 'block',
+						'order_id' => 'block',
 						'time' => current_time('mysql'),
 						'expiry_time' => $expiry_time,
 					),
-					array('%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s')
+					array('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
 				);
 			}
 		}

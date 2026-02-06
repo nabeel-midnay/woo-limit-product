@@ -195,12 +195,6 @@ class IJWLP_Backend
                 ));
 
                 woocommerce_wp_checkbox(array(
-                    'id'            => '_woo_limit_soldout',
-                    'label'         => esc_html__('Soldout', 'woolimited'),
-                    'description'     => esc_html__('Product is soldout', 'woolimited'),
-                ));
-
-                woocommerce_wp_checkbox(array(
                     'id'            => '_woo_limit_status',
                     'label'         => esc_html__('Status', 'woolimited'),
                     'description'   => esc_html__('Enable / disable limited number options', 'woolimited'),
@@ -238,7 +232,6 @@ class IJWLP_Backend
 
         //Limited
         $limit_status     = isset($_POST['_woo_limit_status']) ? $_POST['_woo_limit_status'] : '';
-		$limit_soldout    = isset($_POST['_woo_limit_soldout']) ? $_POST['_woo_limit_soldout'] : '';
         $limit_start      = isset($_POST['_woo_limit_start_value']) ? $_POST['_woo_limit_start_value'] : '';
         $limit_end        = isset($_POST['_woo_limit_end_value']) ? $_POST['_woo_limit_end_value'] : '';
 
@@ -246,12 +239,6 @@ class IJWLP_Backend
             update_post_meta($post_id, '_woo_limit_max_quantity', $max_quantity);
         } else {
             delete_post_meta($post_id, '_woo_limit_max_quantity');
-        }
-
-        if(!empty($limit_soldout)){
-            update_post_meta($post_id, '_woo_limit_soldout', $limit_soldout);
-        }else{
-            delete_post_meta($post_id, '_woo_limit_soldout');
         }
 
         //Limited

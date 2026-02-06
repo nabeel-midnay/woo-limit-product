@@ -68,9 +68,6 @@ class IJWLP_Frontend_Common
 
         // Render logout modal in footer
         add_action('wp_footer', array($this, 'render_logout_modal'), 10);
-
-        // Modify cart quantity input max values based on real stock availability
-        add_filter('woocommerce_quantity_input_args', array($this, 'modify_cart_quantity_input_args'), 10, 2);
     }
 
     /**
@@ -123,256 +120,6 @@ class IJWLP_Frontend_Common
         return array_values(array_filter($parts, function ($v) {
             return $v !== '' && $v !== null;
         }));
-    }
-
-    /**
-     * Calculate stock quantities and cart deductions
-     *
-     * @param WC_Product $product The product object
-     * @param int $pro_id Product ID
-     * @return array Array with 'stock_quantity', 'variation_quantities', 'cart_quantity_for_product'
-     */
-    public static function calculate_stock_and_cart_quantities($product, $pro_id)
-    {
-        $variation_quantities = [];
-        $stock_quantity = null;
-        $cart_quantity_for_product = 0;
-
-        // Get stock quantity for the main product (simple products)
-        if (!$product->is_type('variable') && $product->get_manage_stock() && $product->get_backorders() === 'no') {
-            $stock_quantity = intval($product->get_stock_quantity());
-        }
-
-        // Get stock quantities for variations (if product is variable)
-        if ($product->is_type('variable')) {
-            foreach ($product->get_children() as $variation_id) {
-                $variation = wc_get_product($variation_id);
-                if ($variation) {
-                    // Check if variation is purchasable (has price, etc.)
-                    if (!$variation->is_purchasable() || $variation->get_price() === '') {
-                        $variation_quantities[$variation_id] = 0; // Treat as out of stock
-                        continue;
-                    }
-
-                    // Check for stock status explicitly
-                    if ( ! $variation->is_in_stock() ) {
-                        $variation_quantities[$variation_id] = 0;
-                        continue;
-                    }
-
-                    if ($variation->get_manage_stock() && $variation->get_backorders() === 'no') {
-                        $variation_quantities[$variation_id] = intval($variation->get_stock_quantity());
-                    } else {
-                        $variation_quantities[$variation_id] = null;
-                    }
-                }
-            }
-        }
-
-        // Global reservations from database (all users)
-        global $wpdb, $table_prefix;
-        $table = $table_prefix . 'woo_limit';
-        $reserved_rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT product_id, quantity FROM $table 
-             WHERE parent_product_id = %d AND status = 'block' 
-             AND (expiry_time IS NULL OR expiry_time >= %s)",
-            $pro_id,
-            current_time('mysql')
-        ));
-
-        $global_reserved = [];
-        foreach ($reserved_rows as $row) {
-            $pid = intval($row->product_id);
-            $qty = intval($row->quantity);
-            if (!isset($global_reserved[$pid])) {
-                $global_reserved[$pid] = 0;
-            }
-            $global_reserved[$pid] += $qty;
-        }
-
-        // Reduce stocks by global reservations
-        if ($product->is_type('variable')) {
-            foreach ($variation_quantities as $v_id => $qty) {
-                if ($qty !== null && isset($global_reserved[$v_id])) {
-                    $variation_quantities[$v_id] = max(0, $qty - $global_reserved[$v_id]);
-                }
-            }
-        } else {
-            if ($stock_quantity !== null && isset($global_reserved[$pro_id])) {
-                $stock_quantity = max(0, $stock_quantity - $global_reserved[$pro_id]);
-            }
-        }
-
-        // Still calculate cart_quantity_for_product for current user (used for user-specific limits)
-        if (function_exists('WC') && WC()->cart) {
-            if (did_action('wp_loaded') && !WC()->cart->get_cart_contents_count() && WC()->session) {
-                WC()->cart->get_cart_from_session();
-            }
-
-            foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
-                $cart_product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
-                $cart_variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
-                $cart_qty = isset($cart_item['quantity']) ? intval($cart_item['quantity']) : 0;
-
-                if ($product->is_type('variable')) {
-                    if ($cart_variation_id > 0) {
-                        $cart_variation_product = wc_get_product($cart_variation_id);
-                        $parent_id = $cart_variation_product ? intval($cart_variation_product->get_parent_id()) : 0;
-                        if ($parent_id === $pro_id) {
-                            $cart_quantity_for_product += $cart_qty;
-                            // Stock deduction is already handled by the global pool query above
-                        }
-                    }
-                } else {
-                    if (intval($cart_product_id) === intval($pro_id) && $cart_variation_id === 0) {
-                        $cart_quantity_for_product += $cart_qty;
-                        // Stock deduction is already handled by the global pool query above
-                    }
-                }
-            }
-        }
-
-        return [
-            'stock_quantity' => $stock_quantity,
-            'variation_quantities' => $variation_quantities,
-            'cart_quantity_for_product' => $cart_quantity_for_product,
-        ];
-    }
-
-    /**
-     * Modify cart quantity input max value based on real stock availability
-     * 
-     * @param array $args Quantity input arguments
-     * @param WC_Product $product Product object
-     * @return array Modified arguments
-     */
-    public function modify_cart_quantity_input_args($args, $product)
-    {
-        // Only apply on cart page
-        if (!is_cart()) {
-            return $args;
-        }
-
-        // Get the cart item key from the current context
-        // WooCommerce passes product object but we need cart item data
-        $cart = WC()->cart->get_cart();
-        
-        foreach ($cart as $cart_item_key => $cart_item) {
-            $cart_product = $cart_item['data'];
-            
-            // Match the product instance to find the right cart item
-            if ($cart_product === $product) {
-                $cart_item_quantity = intval($cart_item['quantity']);
-                $variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
-                $product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
-                
-                // Determine the parent product ID and target ID for stock calculation
-                if ($variation_id > 0) {
-                    // For variations, parent_id is the variable product ID
-                    $parent_product = wc_get_product($product_id);
-                    if ($parent_product && $parent_product->is_type('variable')) {
-                        $target_id = $variation_id;
-                        $parent_id = $product_id;
-                    } else {
-                        return $args;
-                    }
-                } else {
-                    // For simple products
-                    $target_id = $product_id;
-                    $parent_id = $product_id;
-                }
-                
-                // Get the parent product for calculation
-                $parent_product = wc_get_product($parent_id);
-                if (!$parent_product) {
-                    return $args;
-                }
-                
-                // Calculate stock quantities
-                $stock_data = self::calculate_stock_and_cart_quantities($parent_product, $parent_id);
-                
-                // Get real limit based on product type
-                $real_limit = null;
-                if ($variation_id > 0) {
-                    // For variations
-                    if (isset($stock_data['variation_quantities'][$target_id])) {
-                        $real_limit = $stock_data['variation_quantities'][$target_id];
-                    }
-                } else {
-                    // For simple products
-                    $real_limit = $stock_data['stock_quantity'];
-                }
-                
-                // Only apply if we have a real limit (stock is managed and backorders are disabled)
-                if ($real_limit !== null) {
-                    // Add back current cart item quantity (JS will handle validation)
-                    $calculated_max = $real_limit + $cart_item_quantity;
-                    
-                    // Get min value (default to 1)
-                    $min_value = isset($args['min_value']) ? intval($args['min_value']) : 1;
-                    
-                    // Apply the calculated max, ensuring it's at least the minimum
-                    $args['max_value'] = max($calculated_max, $min_value);
-                    
-                    // Also update input_value if it exceeds the new max
-                    if (isset($args['input_value']) && intval($args['input_value']) > $args['max_value']) {
-                        $args['input_value'] = $args['max_value'];
-                    }
-                }
-                
-                break; // Found the matching cart item, exit loop
-            }
-        }
-        
-        return $args;
-    }
-
-    /**
-     * Check if requested quantity can be added to cart considering global reservations
-     *
-     * @param int $pro_id Main product ID (parent ID for variations)
-     * @param int $variation_id Specific variation ID (or 0)
-     * @param int $quantity Requested quantity (incremental quantity being added)
-     * @return bool|string True if passed, error message if failed
-     */
-    public static function validate_global_availability($pro_id, $variation_id, $quantity)
-    {
-        $product = wc_get_product($pro_id);
-        if (!$product) {
-            return true;
-        }
-
-        $data = self::calculate_stock_and_cart_quantities($product, $pro_id);
-
-        $available_stock = 0;
-        if ($variation_id > 0) {
-            if (array_key_exists($variation_id, $data['variation_quantities'])) {
-                $available_stock = $data['variation_quantities'][$variation_id];
-            } else {
-                // Not managing stock or not found
-                return true;
-            }
-        } else {
-            if ($data['stock_quantity'] !== null) {
-                $available_stock = $data['stock_quantity'];
-            } else {
-                // Not managing stock
-                return true;
-            }
-        }
-
-        if ($available_stock === null) {
-            return true;
-        }
-
-        if ($quantity > $available_stock) {
-            return sprintf(
-                __('Sorry, there is not enough stock. Only %d items are currently available (including reservations by other customers).', 'woolimited'),
-                max(0, $available_stock)
-            );
-        }
-
-        return true;
     }
 
     /**
@@ -468,7 +215,6 @@ class IJWLP_Frontend_Common
                 true
             );
         }
-
     }
 
     /**
@@ -494,7 +240,6 @@ class IJWLP_Frontend_Common
             array(),
             $this->_version
         );
-
     }
 
     /**
@@ -524,19 +269,12 @@ class IJWLP_Frontend_Common
 
         // Check if this product has limited edition feature enabled
         $status = get_post_meta($product_id, '_woo_limit_status', true);
-        $soldout = get_post_meta($product_id, '_woo_limit_soldout', true);
-
-        if($soldout == 'yes') {
-            echo '<div class="soldout_wrapper shop-loop-soldout"><span class="soldout-label">' . esc_html__('Sold Out', 'woolimit') . '</span></div>';
-            return;
-        }
 
         // Only check for limited edition availability if the product has limited edition enabled
         if ($status == 'yes') {
             $limitedNosAvailableCount = limitedNosAvailableCount($product_id);
             if ($limitedNosAvailableCount == 0) {
                 echo '<div class="soldout_wrapper shop-loop-soldout"><span class="soldout-label">' . esc_html__('Sold Out', 'woolimit') . '</span></div>';
-                return;
             }
         }
     }
@@ -544,35 +282,9 @@ class IJWLP_Frontend_Common
     public function out_of_stock_display_shop_loop()
     {
         global $product;
-        if (!$product) return;
 
-        $pro_id = $product->get_id();
-        $is_in_stock = $product->is_in_stock();
-
-        if ($is_in_stock) {
-            $stock_data = self::calculate_stock_and_cart_quantities($product, $pro_id);
-            if ($product->is_type('variable')) {
-                // For variable products, it's out of stock if ALL variations are out of stock after cart deduction
-                $all_out = true;
-                foreach ($stock_data['variation_quantities'] as $v_id => $qty) {
-                    if ($qty === null || $qty > 0) {
-                        $all_out = false;
-                        break;
-                    }
-                }
-                if ($all_out) {
-                    $is_in_stock = false;
-                }
-            } else {
-                // For simple products
-                if ($stock_data['stock_quantity'] !== null && $stock_data['stock_quantity'] <= 0) {
-                    $is_in_stock = false;
-                }
-            }
-        }
-
-         // Check if product is out of stock
-        if (!$is_in_stock) {
+        // Check if product is out of stock
+        if (!$product->is_in_stock()) {
             echo '<div class="outofstock_wrapper shop-loop-outofstock"><span class="outofstock-label">' . esc_html__('Out of Stock', 'woolimit') . '</span></div>';
         }
     }
@@ -621,11 +333,6 @@ class IJWLP_Frontend_Common
             return $classes;
         }
 
-        $soldout = get_post_meta($post_id, '_woo_limit_soldout', true);
-        if ($soldout === 'yes') {
-            $classes[] = 'product-soldout';
-        }
-
         // Limited edition sold-out (custom logic in this plugin)
         $status = get_post_meta($post_id, '_woo_limit_status', true);
         if ($status === 'yes') {
@@ -635,29 +342,8 @@ class IJWLP_Frontend_Common
             }
         }
 
-        // Standard WooCommerce out-of-stock check with cart deduction
-        $is_in_stock = $product->is_in_stock();
-        if ($is_in_stock) {
-            $stock_data = self::calculate_stock_and_cart_quantities($product, $post_id);
-            if ($product->is_type('variable')) {
-                $all_out = true;
-                foreach ($stock_data['variation_quantities'] as $v_id => $qty) {
-                    if ($qty === null || $qty > 0) {
-                        $all_out = false;
-                        break;
-                    }
-                }
-                if ($all_out) {
-                    $is_in_stock = false;
-                }
-            } else {
-                if ($stock_data['stock_quantity'] !== null && $stock_data['stock_quantity'] <= 0) {
-                    $is_in_stock = false;
-                }
-            }
-        }
-
-        if (!$is_in_stock) {
+        // Standard WooCommerce out-of-stock
+        if (!$product->is_in_stock()) {
             $classes[] = 'product-outofstock';
         }
 
@@ -671,7 +357,7 @@ class IJWLP_Frontend_Common
      */
     public function render_logout_modal()
     {
-        ?>
+?>
         <div id="woo-limit-logout-modal" class="field-selection-modal" style="display:none;">
             <div class="field-selection-modal-content" style="max-width: 400px; text-align: center;">
                 <h3 class="field-selection-title" style="margin-top: 0; color: #333; margin-bottom: 20px;">Leaving so soon?</h3>
@@ -681,7 +367,6 @@ class IJWLP_Frontend_Common
                 </div>
             </div>
         </div>
-        <?php
+<?php
     }
-
 }

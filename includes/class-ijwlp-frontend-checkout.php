@@ -26,15 +26,13 @@ class IJWLP_Frontend_Checkout
         add_action('woocommerce_checkout_order_created', array($this, 'update_limited_edition_status'), 10, 1);
 
         add_action('woocommerce_checkout_after_customer_details', array($this, 'custom_checkout_order_summary'), 5);
-    	
-        add_action('woocommerce_after_checkout_shipping_form', array($this, 'add_delivery_preference_field'), 10, 1);
-		add_action('woocommerce_checkout_process', array($this, 'validate_delivery_preference_field'), 10, 1);
-		add_action('woocommerce_checkout_update_order_meta', array($this, 'save_delivery_preference_field'), 10, 1);
 
-        // AJAX handler for cart totals (used when checkout country changes)
+        add_action('woocommerce_after_checkout_shipping_form', array($this, 'add_delivery_preference_field'), 10, 1);
+        add_action('woocommerce_checkout_process', array($this, 'validate_delivery_preference_field'), 10, 1);
+        add_action('woocommerce_checkout_update_order_meta', array($this, 'save_delivery_preference_field'), 10, 1);
+
         add_action('wp_ajax_get_cart_totals', array($this, 'ajax_get_cart_totals'));
         add_action('wp_ajax_nopriv_get_cart_totals', array($this, 'ajax_get_cart_totals'));
-
     }
 
     /**
@@ -90,11 +88,13 @@ class IJWLP_Frontend_Checkout
         // Process each order item
         foreach ($order->get_items() as $item_id => $item) {
             $cart_item_key = $item->get_meta('_cart_item_key');
-            if (empty($cart_item_key)) {
+            $limited_number = $item->get_meta('Limited Edition Number');
+
+            if (empty($limited_number) || empty($cart_item_key)) {
                 continue;
             }
 
-            // Normalization handle empty/null cases for unlimited products
+            // Normalize limited_number to string for DB comparisons
             $limited_number = IJWLP_Frontend_Common::normalize_limited_number_for_storage($limited_number);
 
 
@@ -131,7 +131,6 @@ class IJWLP_Frontend_Checkout
 
             if ($updated === false || $updated === 0) {
                 // Try to find by product ID and number if cart key doesn't match
-                // We use prepare to safely handle empty limited_number strings
                 $updated = $wpdb->update(
                     $table,
                     array(
@@ -198,6 +197,16 @@ class IJWLP_Frontend_Checkout
                                     <span class="value"><?php echo wc_price($coupon_discount); ?></span>
                                 </div>
                             <?php endif; ?>
+                            <?php 
+                            // Add tax display if exists
+                            if ($cart->get_total_tax() > 0) :
+                                foreach ($cart->get_tax_totals() as $code => $tax) : ?>
+                                    <div class="summary-line tax-line">
+                                        <span class="label"><?php echo esc_html($tax->label) . ':'; ?></span>
+                                        <span class="value"><?php echo wp_kses_post($tax->formatted_amount); ?></span>
+                                    </div>
+                                <?php endforeach;
+                            endif; ?>
                             <div class="summary-line total-line">
                                 <span class="label">Total:</span>
                                 <span class="value"><?php echo wc_price($total); ?></span>
@@ -208,9 +217,9 @@ class IJWLP_Frontend_Checkout
 
                     <div class="order-summary-content">
                         <div class="summary-line items-count">
-							<span class="label"><?php echo $total_items; ?> Item<?php echo $total_items > 1 ? 's' : ''; ?></span>
-							<span class="value">Total: <?php echo wc_price($total); ?></span>
-						</div>
+                            <span class="label"><?php echo $total_items; ?> Item<?php echo $total_items > 1 ? 's' : ''; ?></span>
+                            <span class="value">Total: <?php echo wc_price($total); ?></span>
+                        </div>
                         <?php foreach ($cart_items as $ci_key => $ci_item) :
                             $product = isset($ci_item['data']) ? $ci_item['data'] : null;
                             if (! is_object($product)) {
@@ -245,17 +254,17 @@ class IJWLP_Frontend_Checkout
                                 <div class="item-image"><?php echo $image; ?></div>
                                 <div class="item-details">
                                     <div class="item-name"><?php echo esc_html($product_name); ?></div>
-                                    
-                                    <?php 
+
+                                    <?php
                                     // Display product attributes (for variable products)
                                     if (!empty($ci_item['variation']) && is_array($ci_item['variation'])) : ?>
                                         <div class="item-attributes">
-                                            <?php foreach ($ci_item['variation'] as $attr_key => $attr_value) : 
+                                            <?php foreach ($ci_item['variation'] as $attr_key => $attr_value) :
                                                 if (empty($attr_value)) continue;
-                                                
+
                                                 // Get clean attribute name
                                                 $attr_name = wc_attribute_label(str_replace('attribute_', '', $attr_key));
-                                                
+
                                                 // Get term name if it's a taxonomy attribute
                                                 $taxonomy = str_replace('attribute_', '', $attr_key);
                                                 if (taxonomy_exists($taxonomy)) {
@@ -269,7 +278,7 @@ class IJWLP_Frontend_Checkout
                                             <?php endforeach; ?>
                                         </div>
                                     <?php endif; ?>
-                                    
+
                                     <div class="item-quantity"><?php echo '&#215;' . esc_html($quantity); ?></div>
 
                                     <?php if ($limited_range) : ?>
@@ -308,168 +317,189 @@ class IJWLP_Frontend_Checkout
     }
 
     /**
-	 * Add delivery preference field to checkout page
-	 * 
-	 * @param WC_Checkout $checkout
-	 */
-	public function add_delivery_preference_field($checkout)
-	{
-		// Check if there are any backordered items in the cart
-		$has_backordered_items = $this->check_for_backordered_items();
+     * Add delivery preference field to checkout page
+     * 
+     * @param WC_Checkout $checkout
+     */
+    public function add_delivery_preference_field($checkout)
+    {
+        // Check if there are any backordered items in the cart
+        $has_backordered_items = $this->check_for_backordered_items();
 
-		if (!$has_backordered_items) {
-			return; // Don't show the field if no backordered items
-		}
+        if (!$has_backordered_items) {
+            return; // Don't show the field if no backordered items
+        }
 
-		echo '<div id="delivery_preference_field">';
-		echo '<h3><span class="backorder-help-text">' . __('Backorder Delivery', 'woocommerce') . '</span><span class="required" aria-hidden="true">*</span><span class="help-icon" data-tooltip="' . esc_attr(__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woocommerce')) . '">?</span></h3>';
-		echo '<p class="backorder-para">' . __('Choose how to deliver items with backorders:', 'woocommerce') . '</p>';
-		// Custom HTML for radio buttons with individual div wrappers
-		$field_value = $checkout->get_value('delivery_preference') ?: 'partial_delivery';
+        echo '<div id="delivery_preference_field">';
+        echo '<h3><span class="backorder-help-text">' . __('Backorder Delivery', 'woocommerce') . '</span><span class="required" aria-hidden="true">*</span><span class="help-icon" data-tooltip="' . esc_attr(__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woocommerce')) . '">?</span></h3>';
+        echo '<p class="backorder-para">' . __('Choose how to deliver items with backorders:', 'woocommerce') . '</p>';
+        // Custom HTML for radio buttons with individual div wrappers
+        $field_value = $checkout->get_value('delivery_preference') ?: 'partial_delivery';
 
-		echo '<div class="woocommerce-input-wrapper">';
+        echo '<div class="woocommerce-input-wrapper">';
 
-		// Partial delivery option
-		echo '<div class="radio-option-wrapper">';
-		echo '<input type="radio" class="input-radio" value="partial_delivery" name="delivery_preference" aria-required="true" id="delivery_preference_partial_delivery"' .
-			($field_value === 'partial_delivery' ? ' checked="checked"' : '') . '>';
-		echo '<label for="delivery_preference_partial_delivery" class="radio required_field">' .
-			__('Deliver available items now; backordered items later', 'woocommerce') .
-			'</label>';
-		echo '</div>';
+        // Partial delivery option
+        echo '<div class="radio-option-wrapper">';
+        echo '<input type="radio" class="input-radio" value="partial_delivery" name="delivery_preference" aria-required="true" id="delivery_preference_partial_delivery"' .
+            ($field_value === 'partial_delivery' ? ' checked="checked"' : '') . '>';
+        echo '<label for="delivery_preference_partial_delivery" class="radio required_field">' .
+            __('Deliver available items now; backordered items later', 'woocommerce') .
+            '</label>';
+        echo '</div>';
 
-		// Complete delivery option
-		echo '<div class="radio-option-wrapper">';
-		echo '<input type="radio" class="input-radio" value="complete_delivery" name="delivery_preference" aria-required="true" id="delivery_preference_complete_delivery"' .
-			($field_value === 'complete_delivery' ? ' checked="checked"' : '') . '>';
-		echo '<label for="delivery_preference_complete_delivery" class="radio required_field">' .
-			__('Deliver everything together when all items are available', 'woocommerce') .
-			'</label>';
-		echo '</div>';
+        // Complete delivery option
+        echo '<div class="radio-option-wrapper">';
+        echo '<input type="radio" class="input-radio" value="complete_delivery" name="delivery_preference" aria-required="true" id="delivery_preference_complete_delivery"' .
+            ($field_value === 'complete_delivery' ? ' checked="checked"' : '') . '>';
+        echo '<label for="delivery_preference_complete_delivery" class="radio required_field">' .
+            __('Deliver everything together when all items are available', 'woocommerce') .
+            '</label>';
+        echo '</div>';
 
-		echo '</div>';
-		echo '</div>';
-	}
-
-	/**
-	 * Validate delivery preference field
-	 */
-	public function validate_delivery_preference_field()
-	{
-		// Check if there are any backordered items in the cart
-		$has_backordered_items = $this->check_for_backordered_items();
-
-		if (!$has_backordered_items) {
-			return; // Don't validate if no backordered items
-		}
-
-		if (empty($_POST['delivery_preference'])) {
-			wc_add_notice(__('Please select a delivery preference for your backordered items.', 'woocommerce'), 'error');
-		}
-	}
-
-	/**
-	 * Save delivery preference to order meta
-	 * 
-	 * @param int $order_id
-	 */
-	public function save_delivery_preference_field($order_id)
-	{
-		if (!empty($_POST['delivery_preference'])) {
-			$delivery_preference = sanitize_text_field($_POST['delivery_preference']);
-			update_post_meta($order_id, '_delivery_preference', $delivery_preference);
-
-			// Add a note to the order
-			$order = wc_get_order($order_id);
-			if ($order) {
-				$preference_text = $delivery_preference === 'partial_delivery' ?
-					__('Deliver available items now, backordered items when ready', 'woocommerce') :
-					__('Wait for all items to be available before delivery', 'woocommerce');
-
-				$order->add_order_note(sprintf(__('Customer delivery preference: %s', 'woocommerce'), $preference_text));
-			}
-		}
-	}
+        echo '</div>';
+        echo '</div>';
+    }
 
     /**
-	 * Check if cart has backordered items
-	 * 
-	 * @return bool
-	 */
-	private function check_for_backordered_items()
-	{
-		$cart = WC()->cart;
-		if (!$cart) {
-			return false;
-		}
+     * Validate delivery preference field
+     */
+    public function validate_delivery_preference_field()
+    {
+        // Check if there are any backordered items in the cart
+        $has_backordered_items = $this->check_for_backordered_items();
 
-		foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
-			$product = $cart_item['data'];
-			if ($product && $product->is_on_backorder($cart_item['quantity'])) {
-				return true;
-			}
-		}
+        if (!$has_backordered_items) {
+            return; // Don't validate if no backordered items
+        }
 
-		return false;
-	}
+        if (empty($_POST['delivery_preference'])) {
+            wc_add_notice(__('Please select a delivery preference for your backordered items.', 'woocommerce'), 'error');
+        }
+    }
 
-	/**
-	 * AJAX handler to get updated cart totals
-	 * Called when checkout form changes (e.g., country selection)
-	 * 
-	 * @return void
-	 */
-	public function ajax_get_cart_totals()
-	{
-		// Verify nonce for security
-		check_ajax_referer('ijwlp_frontend_nonce', 'security');
+    /**
+     * Save delivery preference to order meta
+     * 
+     * @param int $order_id
+     */
+    public function save_delivery_preference_field($order_id)
+    {
+        if (!empty($_POST['delivery_preference'])) {
+            $delivery_preference = sanitize_text_field($_POST['delivery_preference']);
+            update_post_meta($order_id, '_delivery_preference', $delivery_preference);
 
-		// Get cart instance
-		$cart = WC()->cart;
-		if (!$cart) {
-			wp_send_json_error(array('message' => 'Cart not available'));
-			return;
-		}
+            // Add a note to the order
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $preference_text = $delivery_preference === 'partial_delivery' ?
+                    __('Deliver available items now, backordered items when ready', 'woocommerce') :
+                    __('Wait for all items to be available before delivery', 'woocommerce');
 
-		// Update customer location if address data is provided in the request
-		// This ensures that shipping and tax calculations are based on the current selection in the checkout form
-		if (WC()->customer) {
-			if (isset($_POST['billing_country'])) {
-				WC()->customer->set_billing_country(sanitize_text_field($_POST['billing_country']));
-			}
-			if (isset($_POST['billing_state'])) {
-				WC()->customer->set_billing_state(sanitize_text_field($_POST['billing_state']));
-			}
-			if (isset($_POST['billing_postcode'])) {
-				WC()->customer->set_billing_postcode(sanitize_text_field($_POST['billing_postcode']));
-			}
-			
-			if (isset($_POST['shipping_country'])) {
-				WC()->customer->set_shipping_country(sanitize_text_field($_POST['shipping_country']));
-			}
-			if (isset($_POST['shipping_state'])) {
-				WC()->customer->set_shipping_state(sanitize_text_field($_POST['shipping_state']));
-			}
-			if (isset($_POST['shipping_postcode'])) {
-				WC()->customer->set_shipping_postcode(sanitize_text_field($_POST['shipping_postcode']));
-			}
-		}
+                $order->add_order_note(sprintf(__('Customer delivery preference: %s', 'woocommerce'), $preference_text));
+            }
+        }
+    }
 
-		// Calculate cart totals (this will recalculate shipping based on current session data)
-		// WooCommerce automatically updates the session with new address data from the checkout form
-		$cart->calculate_totals();
+    /**
+     * Check if cart has backordered items
+     * 
+     * @return bool
+     */
+    private function check_for_backordered_items()
+    {
+        $cart = WC()->cart;
+        if (!$cart) {
+            return false;
+        }
 
-		// Prepare response with updated totals
-		$response = array(
-			'totals' => array(
-				'shipping_total' => $cart->get_shipping_total(),
-				'subtotal' => $cart->get_subtotal(),
-				'total' => $cart->get_total('raw'),
-				'discount_total' => $cart->get_discount_total(),
-				'cart_contents_total' => $cart->get_cart_contents_total(),
-			)
-		);
+        foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+            $product = $cart_item['data'];
+            if ($product && $product->is_on_backorder($cart_item['quantity'])) {
+                return true;
+            }
+        }
 
-		wp_send_json_success($response);
-	}
+        return false;
+    }
+
+    /**
+     * AJAX handler to get updated cart totals
+     * Called when checkout form changes (e.g., country selection)
+     * 
+     * @return void
+     */
+    public function ajax_get_cart_totals()
+    {
+        // Verify nonce for security
+        check_ajax_referer('ijwlp_frontend_nonce', 'security');
+
+        // Get cart instance
+        $cart = WC()->cart;
+        if (!$cart) {
+            wp_send_json_error(array('message' => 'Cart not available'));
+            return;
+        }
+
+        // Update customer location if address data is provided in the request
+        // This ensures that shipping and tax calculations are based on the current selection in the checkout form
+        if (WC()->customer) {
+            if (isset($_POST['billing_country'])) {
+                WC()->customer->set_billing_country(sanitize_text_field($_POST['billing_country']));
+            }
+            if (isset($_POST['billing_state'])) {
+                WC()->customer->set_billing_state(sanitize_text_field($_POST['billing_state']));
+            }
+            if (isset($_POST['billing_postcode'])) {
+                WC()->customer->set_billing_postcode(sanitize_text_field($_POST['billing_postcode']));
+            }
+
+            if (isset($_POST['shipping_country'])) {
+                WC()->customer->set_shipping_country(sanitize_text_field($_POST['shipping_country']));
+            }
+            if (isset($_POST['shipping_state'])) {
+                WC()->customer->set_shipping_state(sanitize_text_field($_POST['shipping_state']));
+            }
+            if (isset($_POST['shipping_postcode'])) {
+                WC()->customer->set_shipping_postcode(sanitize_text_field($_POST['shipping_postcode']));
+            }
+        }
+
+        // Calculate cart totals (this will recalculate shipping based on current session data)
+        // WooCommerce automatically updates the session with new address data from the checkout form
+        $cart->calculate_totals();
+
+        // Prepare response with updated totals
+        $response = array(
+            'totals' => array(
+                'shipping_total' => $cart->get_shipping_total(),
+                'subtotal' => $cart->get_subtotal(),
+                'total' => $cart->get_total('raw'),
+                'discount_total' => $cart->get_discount_total(),
+                'cart_contents_total' => $cart->get_cart_contents_total(),
+                'tax_total' => $cart->get_total_tax(),
+                'taxes' => $this->get_cart_tax_totals($cart),
+            )
+        );
+
+        wp_send_json_success($response);
+    }
+
+    /**
+     * Get cart tax totals formatted for JSON response
+     * 
+     * @param WC_Cart $cart
+     * @return array
+     */
+    private function get_cart_tax_totals($cart)
+    {
+        $taxes = array();
+        foreach ($cart->get_tax_totals() as $code => $tax) {
+            $taxes[] = array(
+                'label' => $tax->label,
+                'amount' => $tax->amount,
+                'formatted_amount' => $tax->formatted_amount,
+            );
+        }
+        return $taxes;
+    }
 }
