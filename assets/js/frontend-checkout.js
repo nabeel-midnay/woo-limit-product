@@ -50,26 +50,6 @@
                             .next()
                             .html(totals.shipping_total_formatted);
 
-                        // Update tax
-                        var taxTotal = totals.tax_total;
-                        var taxLine = $('.custom-order-summary-wrapper .summary-line.tax-line');
-
-                        if (parseFloat(taxTotal) > 0) {
-                            if (taxLine.length) {
-                                taxLine.find('.value').html(totals.tax_total_formatted);
-                            } else {
-                                var taxHtml = '<div class="summary-line tax-line">' +
-                                    '<span class="label">Tax:</span>' +
-                                    '<span class="value">' + totals.tax_total_formatted + '</span>' +
-                                    '</div>';
-                                $('.custom-order-summary-wrapper .total-line').before(taxHtml);
-                            }
-                        } else {
-                            if (taxLine.length) {
-                                taxLine.remove();
-                            }
-                        }
-
                         // Update total using formatted value from PHP
                         $(
                             ".custom-order-summary-wrapper .total-line .value",

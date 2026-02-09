@@ -199,16 +199,6 @@ class IJWLP_Frontend_Checkout
                                     <span class="value"><?php echo wc_price($coupon_discount); ?></span>
                                 </div>
                             <?php endif; ?>
-                            <?php
-                            // Add tax display if exists
-                            if ($cart->get_total_tax() > 0):
-                                foreach ($cart->get_tax_totals() as $code => $tax): ?>
-                                    <div class="summary-line tax-line">
-                                        <span class="label"><?php echo esc_html($tax->label) . ':'; ?></span>
-                                        <span class="value"><?php echo wp_kses_post($tax->formatted_amount); ?></span>
-                                    </div>
-                                <?php endforeach;
-                            endif; ?>
                             <div class="summary-line total-line">
                                 <span class="label">Total:</span>
                                 <span class="value"><?php echo wc_price($total); ?></span>
@@ -490,12 +480,9 @@ class IJWLP_Frontend_Checkout
                 'total' => $cart->get_total('raw'),
                 'discount_total' => $cart->get_discount_total(),
                 'cart_contents_total' => $cart->get_cart_contents_total(),
-                'tax_total' => $cart->get_total_tax(),
-                'taxes' => $this->get_cart_tax_totals($cart),
                 // Formatted prices for display
                 'shipping_total_formatted' => $cart->get_shipping_total() > 0 ? wc_price($cart->get_shipping_total()) : 'FREE',
                 'total_formatted' => wc_price($cart->get_total('raw')),
-                'tax_total_formatted' => wc_price($cart->get_total_tax()),
             )
         );
 
