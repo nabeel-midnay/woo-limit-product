@@ -15,6 +15,11 @@
          * Reusable function called by multiple events
          */
         function updateOrderSummaryTotals() {
+            const container = $('.custom-order-summary-wrapper');
+            if (!container.length) {
+                return;
+            }
+            container.addClass('loading');
             $.ajax({
                 url: ijwlp_frontend.ajax_url,
                 type: "POST",
@@ -65,9 +70,11 @@
                         $('.custom-order-summary-wrapper .total-line .value').html(totals.total_formatted);
                         $('.custom-order-summary-wrapper .items-count .value').html("Total: " + totals.total_formatted);
                     }
+                    container.removeClass('loading');
                 },
                 error: function (xhr, status, error) {
                     console.error('Cart totals AJAX error:', status, error, xhr.responseText);
+                    container.removeClass('loading');
                 },
             });
         }
