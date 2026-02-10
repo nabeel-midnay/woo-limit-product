@@ -131,7 +131,7 @@ class IJWLP_Frontend_Checkout
 
             if ($updated === false || $updated === 0) {
                 // Try to find by product ID and number if cart key doesn't match
-                $updated = $wpdb->update(
+                $wpdb->update(
                     $table,
                     array(
                         'order_id' => (string) $order_id,
@@ -157,7 +157,6 @@ class IJWLP_Frontend_Checkout
      */
     public function custom_checkout_order_summary()
     {
-        // Minimal checkout order summary: only HTML structure and limited edition numbers
         if (!is_checkout()) {
             return;
         }
@@ -168,28 +167,7 @@ class IJWLP_Frontend_Checkout
         }
 
         $cart_items = $cart->get_cart();
-        $total_items = $cart->get_cart_contents_count();
-        $shipping_total = $cart->get_shipping_total();
-        $total = 0;
-        $coupons = $cart->get_coupons();
-
-        if (!empty($coupons)) {
-            $coupon_discount = $cart->get_discount_total();
-        }
-
-        foreach ($cart->get_cart() as $cart_item) {
-            $product = $cart_item['data'];
-            $line_total = $product->get_price() * $cart_item['quantity'];
-            $tax_data = calculate_geo_tax_for_price($line_total, $product->get_tax_class());
-            
-            $total += $tax_data ? $tax_data['price_with_tax'] : $line_total;
-        }
-        $total += $shipping_total;
-        $total -= $coupon_discount;
-
-        foreach ($cart->get_fees() as $fee) {
-            $total += $fee->total + $fee->tax;
-        }
+        $totals = $this->calculate_cart_totals_with_tax();
 
         ?>
         <div class="checkout-order-summary-container">
@@ -205,130 +183,400 @@ class IJWLP_Frontend_Checkout
                         <div class="order-summary-totals">
                             <div class="summary-line">
                                 <span class="label">Delivery:</span>
-                                <span
-                                    class="value"><?php echo $shipping_total > 0 ? wc_price($shipping_total) : 'FREE'; ?></span>
+                                <span class="value"><?php echo $totals['shipping_formatted']; ?></span>
                             </div>
-                            <?php if ($coupon_discount > 0): ?>
+                            <?php if ($totals['discount'] > 0): ?>
                                 <div class="summary-line">
                                     <span class="label">Coupon:</span>
-                                    <span class="value"><?php echo wc_price($coupon_discount); ?></span>
+                                    <span class="value"><?php echo wc_price($totals['discount']); ?></span>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($totals['tax_info'] && $totals['tax_info']['tax_amount'] > 0): ?>
+                                <div class="summary-line tax-line">
+                                    <span class="label"><?php echo esc_html($totals['tax_info']['tax_label']); ?>
+                                        (Included)
+                                    </span>
                                 </div>
                             <?php endif; ?>
                             <div class="summary-line total-line">
                                 <span class="label">Total:</span>
-                                <span class="value"><?php echo wc_price($total); ?></span>
+                                <span class="value"><?php echo wc_price($totals['total']); ?></span>
                             </div>
-
                         </div>
                     </div>
 
                     <div class="order-summary-content">
                         <div class="summary-line items-count">
-                            <span class="label"><?php echo $total_items; ?>
-                                Item<?php echo $total_items > 1 ? 's' : ''; ?></span>
-                            <span class="value">Total: <?php echo wc_price($total); ?></span>
+                            <span class="label"><?php echo $totals['item_count']; ?>
+                                Item<?php echo $totals['item_count'] > 1 ? 's' : ''; ?></span>
+                            <span class="value">Total: <?php echo wc_price($totals['total']); ?></span>
                         </div>
                         <?php foreach ($cart_items as $ci_key => $ci_item):
-                            $product = isset($ci_item['data']) ? $ci_item['data'] : null;
-                            if (!is_object($product)) {
-                                continue;
-                            }
-
-                            $product_name = $product->get_name();
-                            $image = wp_kses_post($product->get_image('thumbnail'));
-                            $quantity = isset($ci_item['quantity']) ? (int) $ci_item['quantity'] : 1;
-
-                            // Resolve product id (use cart item parent product id when available)
-                            $product_id = isset($ci_item['product_id']) ? $ci_item['product_id'] : $product->get_id();
-
-                            // Get limited edition numbers (preferred keys only)
-                            $numbers = array();
-                            if (!empty($ci_item['woo_limit'])) {
-                                $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit']);
-                            } elseif (!empty($ci_item['woo_limit_display'])) {
-                                $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit_display']);
-                            }
-
-                            // Get limited edition range
-                            $limited_range = '';
-                            $start_range = get_post_meta($product_id, '_woo_limit_start_value', true);
-                            $end_range = get_post_meta($product_id, '_woo_limit_end_value', true);
-                            if ($start_range !== '' && $end_range !== '') {
-                                $limited_range = $start_range . ' - ' . $end_range;
-                            }
-
-                            ?>
-                            <div class="order-summary-item">
-                                <div class="item-image"><?php echo $image; ?></div>
-                                <div class="item-details">
-                                    <div class="item-name"><?php echo esc_html($product_name); ?></div>
-
-                                    <?php
-                                    // Display product attributes (for variable products)
-                                    if (!empty($ci_item['variation']) && is_array($ci_item['variation'])): ?>
-                                        <div class="item-attributes">
-                                            <?php foreach ($ci_item['variation'] as $attr_key => $attr_value):
-                                                if (empty($attr_value))
-                                                    continue;
-
-                                                // Get clean attribute name
-                                                $attr_name = wc_attribute_label(str_replace('attribute_', '', $attr_key));
-
-                                                // Get term name if it's a taxonomy attribute
-                                                $taxonomy = str_replace('attribute_', '', $attr_key);
-                                                if (taxonomy_exists($taxonomy)) {
-                                                    $term = get_term_by('slug', $attr_value, $taxonomy);
-                                                    if ($term && !is_wp_error($term)) {
-                                                        $attr_value = $term->name;
-                                                    }
-                                                }
-                                                ?>
-                                                <span class="product-attribute"><?php echo esc_html($attr_name); ?>:
-                                                    <?php echo esc_html($attr_value); ?></span>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <div class="item-quantity"><?php echo '&#215;' . esc_html($quantity); ?></div>
-
-                                    <?php if ($limited_range): ?>
-                                        <div class="limited-edition-range">
-                                            <?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?>:
-                                            <?php echo esc_html($limited_range); ?>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <?php if (!empty($numbers)): ?>
-                                        <div class="limited-edition-display">
-                                            <span
-                                                class="limited-edition-label"><?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?></span>
-                                            <div class="limited-number-list">
-                                                <?php foreach ($numbers as $num): ?>
-                                                    <span class="limited-number"><?php echo esc_html((string) $num); ?></span>
-                                                <?php endforeach; ?>
-                                            </div>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <?php
-                                    // Backorder notification (keep as-is)
-                                    $backorder_status = $product->get_stock_status();
-                                    if ($backorder_status === 'onbackorder'):
-                                        ?>
-                                        <div class="backorder_notification">
-                                            <?php echo esc_html__('Available on backorder', 'woo-limit-product'); ?>
-                                            <span class="backorder-help-icon help-icon"
-                                                data-tooltip="<?php echo esc_attr__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woo-limit-product'); ?>">?</span>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
+                            $this->render_cart_item($ci_item);
+                        endforeach; ?>
                     </div>
                 </div>
             </div>
         </div>
         <?php
+    }
+
+    /**
+     * Render a single cart item in the order summary
+     * 
+     * @param array $ci_item Cart item
+     */
+    private function render_cart_item($ci_item)
+    {
+        $product = isset($ci_item['data']) ? $ci_item['data'] : null;
+        if (!is_object($product)) {
+            return;
+        }
+
+        $product_name = $product->get_name();
+        $image = wp_kses_post($product->get_image('thumbnail'));
+        $quantity = isset($ci_item['quantity']) ? (int) $ci_item['quantity'] : 1;
+        $product_id = isset($ci_item['product_id']) ? $ci_item['product_id'] : $product->get_id();
+
+        // Get limited edition numbers
+        $numbers = $this->get_limited_edition_numbers($ci_item);
+
+        // Get limited edition range
+        $limited_range = $this->get_limited_edition_range($product_id);
+
+        ?>
+        <div class="order-summary-item">
+            <div class="item-image"><?php echo $image; ?></div>
+            <div class="item-details">
+                <div class="item-name"><?php echo esc_html($product_name); ?></div>
+
+                <?php $this->render_product_attributes($ci_item); ?>
+
+                <div class="item-quantity"><?php echo '&#215;' . esc_html($quantity); ?></div>
+
+                <?php if ($limited_range): ?>
+                    <div class="limited-edition-range">
+                        <?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?>:
+                        <?php echo esc_html($limited_range); ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!empty($numbers)): ?>
+                    <div class="limited-edition-display">
+                        <span class="limited-edition-label"><?php echo esc_html__('Limited Edition', 'woo-limit-product'); ?></span>
+                        <div class="limited-number-list">
+                            <?php foreach ($numbers as $num): ?>
+                                <span class="limited-number"><?php echo esc_html((string) $num); ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php $this->render_backorder_notification($product); ?>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render product attributes for variable products
+     * 
+     * @param array $ci_item Cart item
+     */
+    private function render_product_attributes($ci_item)
+    {
+        if (empty($ci_item['variation']) || !is_array($ci_item['variation'])) {
+            return;
+        }
+
+        ?>
+        <div class="item-attributes">
+            <?php foreach ($ci_item['variation'] as $attr_key => $attr_value):
+                if (empty($attr_value))
+                    continue;
+
+                $attr_name = wc_attribute_label(str_replace('attribute_', '', $attr_key));
+                $taxonomy = str_replace('attribute_', '', $attr_key);
+                
+                if (taxonomy_exists($taxonomy)) {
+                    $term = get_term_by('slug', $attr_value, $taxonomy);
+                    if ($term && !is_wp_error($term)) {
+                        $attr_value = $term->name;
+                    }
+                }
+                ?>
+                <span class="product-attribute">
+                    <?php echo esc_html($attr_name); ?>: <?php echo esc_html($attr_value); ?>
+                </span>
+            <?php endforeach; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render backorder notification
+     * 
+     * @param WC_Product $product
+     */
+    private function render_backorder_notification($product)
+    {
+        if ($product->get_stock_status() !== 'onbackorder') {
+            return;
+        }
+
+        ?>
+        <div class="backorder_notification">
+            <?php echo esc_html__('Available on backorder', 'woo-limit-product'); ?>
+            <span class="backorder-help-icon help-icon"
+                data-tooltip="<?php echo esc_attr__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woo-limit-product'); ?>">?</span>
+        </div>
+        <?php
+    }
+
+    /**
+     * Get limited edition numbers from cart item
+     * 
+     * @param array $ci_item Cart item
+     * @return array
+     */
+    private function get_limited_edition_numbers($ci_item)
+    {
+        $numbers = array();
+        
+        if (!empty($ci_item['woo_limit'])) {
+            $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit']);
+        } elseif (!empty($ci_item['woo_limit_display'])) {
+            $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit_display']);
+        }
+        
+        return $numbers;
+    }
+
+    /**
+     * Get limited edition range for product
+     * 
+     * @param int $product_id
+     * @return string
+     */
+    private function get_limited_edition_range($product_id)
+    {
+        $start_range = get_post_meta($product_id, '_woo_limit_start_value', true);
+        $end_range = get_post_meta($product_id, '_woo_limit_end_value', true);
+        
+        if ($start_range !== '' && $end_range !== '') {
+            return $start_range . ' - ' . $end_range;
+        }
+        
+        return '';
+    }
+
+    /**
+     * Calculate cart totals with geo-based tax
+     * 
+     * @return array
+     */
+    private function calculate_cart_totals_with_tax()
+    {
+        $cart = WC()->cart;
+        $subtotal_with_tax = 0;
+        
+        // Calculate subtotal with tax
+        foreach ($cart->get_cart() as $cart_item) {
+            $product = $cart_item['data'];
+            $line_total = $product->get_price() * $cart_item['quantity'];
+            $tax_data = $this->calculate_geo_tax_for_price($line_total, $product->get_tax_class());
+            
+            $subtotal_with_tax += $tax_data ? $tax_data['price_with_tax'] : $line_total;
+        }
+
+        // Calculate total
+        $shipping_total = $cart->get_shipping_total();
+        $discount_total = $cart->get_discount_total();
+        $total = $subtotal_with_tax + $shipping_total - $discount_total;
+        
+        // Add fees
+        foreach ($cart->get_fees() as $fee) {
+            $total += $fee->total + $fee->tax;
+        }
+
+        // Get tax information
+        $tax_info = $this->get_cart_tax_info();
+
+        return array(
+            'subtotal' => $subtotal_with_tax,
+            'shipping' => $shipping_total,
+            'shipping_formatted' => $shipping_total > 0 ? wc_price($shipping_total) : 'FREE',
+            'discount' => $discount_total,
+            'total' => $total,
+            'total_formatted' => wc_price($total),
+            'tax_info' => $tax_info,
+            'item_count' => $cart->get_cart_contents_count()
+        );
+    }
+
+    /**
+     * Get cart tax information (label with percentage)
+     * 
+     * @return array|false Array with 'tax_label', 'tax_amount', 'tax_percentage' or false if no tax
+     */
+    private function get_cart_tax_info()
+    {
+        $cart = WC()->cart;
+        if (!$cart) {
+            return false;
+        }
+
+        $total_tax = 0;
+        $tax_rates = array();
+
+        // Calculate total tax from all cart items
+        foreach ($cart->get_cart() as $cart_item) {
+            $product = $cart_item['data'];
+            $line_total = $product->get_price() * $cart_item['quantity'];
+            $tax_data = $this->calculate_geo_tax_for_price($line_total, $product->get_tax_class());
+            
+            if ($tax_data) {
+                $total_tax += $tax_data['tax_amount'];
+                if (!empty($tax_data['tax_rates'])) {
+                    $tax_rates = $tax_data['tax_rates'];
+                }
+            }
+        }
+
+        if ($total_tax <= 0) {
+            return false;
+        }
+
+        // Get clean tax label
+        $tax_label = $this->get_clean_tax_label($tax_rates);
+        
+        // Get tax percentage
+        $tax_percentage = '';
+        if (!empty($tax_rates)) {
+            $tax_rate = reset($tax_rates);
+            if (isset($tax_rate['rate'])) {
+                $tax_percentage = ' ' . floatval($tax_rate['rate']) . '%';
+            }
+        }
+
+        return array(
+            'tax_label' => $tax_label . $tax_percentage,
+            'tax_amount' => $total_tax,
+            'tax_percentage' => $tax_percentage
+        );
+    }
+
+    /**
+     * Get clean tax label from tax rates
+     */
+    private function get_clean_tax_label($tax_rates)
+    {
+        if (empty($tax_rates)) {
+            return 'Tax';
+        }
+
+        $tax_rate = reset($tax_rates);
+
+        if (!empty($tax_rate['label'])) {
+            $label = $tax_rate['label'];
+            $label = preg_replace('/\s*\(.*?\)\s*/', '', $label);
+            $label = preg_replace('/\s*\d+%?\s*/', '', $label);
+            $label = trim($label);
+
+            if (!empty($label)) {
+                return $label;
+            }
+        }
+
+        $country = $this->get_customer_country_for_tax();
+        return $this->get_default_tax_label_by_country($country);
+    }
+
+    /**
+     * Get default tax label by country
+     */
+    private function get_default_tax_label_by_country($country)
+    {
+        $default_labels = array(
+            'VAT' => array('GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'AT', 'IE', 'PT', 'FI', 'SE', 'DK', 'PL', 'CZ', 'HU', 'RO', 'BG', 'HR', 'GR', 'SK', 'SI', 'LT', 'LV', 'EE', 'CY', 'MT', 'LU'),
+            'GST' => array('AU', 'NZ', 'IN', 'SG', 'CA'),
+            'Tax' => array('US', 'JP', 'CN', 'KR', 'TW', 'HK', 'TH', 'MY', 'PH', 'ID', 'VN')
+        );
+
+        foreach ($default_labels as $label => $countries) {
+            if (in_array($country, $countries)) {
+                return $label;
+            }
+        }
+
+        return 'Tax';
+    }
+
+    /**
+     * Helper function to calculate price with geo-based tax
+     * 
+     * @param float $price The base price
+     * @param string $tax_class The product tax class
+     * @return array|false Array with 'price_with_tax', 'tax_amount', 'tax_rates' or false if no tax
+     */
+    private function calculate_geo_tax_for_price($price, $tax_class = '')
+    {
+        $country = $this->get_customer_country_for_tax();
+        if (!$country) {
+            return false;
+        }
+
+        $tax_rates = WC_Tax::find_rates(array(
+            'country' => $country,
+            'state' => '',
+            'postcode' => '',
+            'city' => '',
+            'tax_class' => $tax_class
+        ));
+
+        if (empty($tax_rates)) {
+            return false;
+        }
+
+        $taxes = WC_Tax::calc_tax($price, $tax_rates, false);
+        $tax_amount = array_sum($taxes);
+
+        return array(
+            'price_with_tax' => $price + $tax_amount,
+            'tax_amount' => $tax_amount,
+            'tax_rates' => $tax_rates
+        );
+    }
+
+    /**
+     * Get customer country for tax calculation
+     * Priority: Shipping address → Geolocation
+     */
+    private function get_customer_country_for_tax()
+    {
+        // Check shipping address from logged in customer
+        if (is_user_logged_in() && WC()->customer) {
+            $shipping_country = WC()->customer->get_shipping_country();
+            if (!empty($shipping_country)) {
+                return $shipping_country;
+            }
+        }
+
+        // Check shipping address from session
+        if (WC()->session) {
+            $customer_data = WC()->session->get('customer');
+            if (!empty($customer_data['shipping_country'])) {
+                return $customer_data['shipping_country'];
+            }
+        }
+
+        // Fallback to geolocation
+        $geolocation = WC_Geolocation::geolocate_ip();
+        if (!empty($geolocation['country'])) {
+            return $geolocation['country'];
+        }
+
+        return WC()->countries->get_base_country();
     }
 
     /**
@@ -338,38 +586,30 @@ class IJWLP_Frontend_Checkout
      */
     public function add_delivery_preference_field($checkout)
     {
-        // Check if there are any backordered items in the cart
-        $has_backordered_items = $this->check_for_backordered_items();
-
-        if (!$has_backordered_items) {
-            return; // Don't show the field if no backordered items
+        if (!$this->check_for_backordered_items()) {
+            return;
         }
+
+        $field_value = $checkout->get_value('delivery_preference') ?: 'partial_delivery';
 
         echo '<div id="delivery_preference_field">';
         echo '<h3><span class="backorder-help-text">' . __('Backorder Delivery', 'woocommerce') . '</span><span class="required" aria-hidden="true">*</span><span class="help-icon" data-tooltip="' . esc_attr(__('Available on backorder means that this particular product/size is currently not in stock. However, it can be ordered and will be delivered as soon as available (usually 10 days).', 'woocommerce')) . '">?</span></h3>';
         echo '<p class="backorder-para">' . __('Choose how to deliver items with backorders:', 'woocommerce') . '</p>';
-        // Custom HTML for radio buttons with individual div wrappers
-        $field_value = $checkout->get_value('delivery_preference') ?: 'partial_delivery';
 
         echo '<div class="woocommerce-input-wrapper">';
 
-        // Partial delivery option
-        echo '<div class="radio-option-wrapper">';
-        echo '<input type="radio" class="input-radio" value="partial_delivery" name="delivery_preference" aria-required="true" id="delivery_preference_partial_delivery"' .
-            ($field_value === 'partial_delivery' ? ' checked="checked"' : '') . '>';
-        echo '<label for="delivery_preference_partial_delivery" class="radio required_field">' .
-            __('Deliver available items now; backordered items later', 'woocommerce') .
-            '</label>';
-        echo '</div>';
+        $options = array(
+            'partial_delivery' => __('Deliver available items now; backordered items later', 'woocommerce'),
+            'complete_delivery' => __('Deliver everything together when all items are available', 'woocommerce')
+        );
 
-        // Complete delivery option
-        echo '<div class="radio-option-wrapper">';
-        echo '<input type="radio" class="input-radio" value="complete_delivery" name="delivery_preference" aria-required="true" id="delivery_preference_complete_delivery"' .
-            ($field_value === 'complete_delivery' ? ' checked="checked"' : '') . '>';
-        echo '<label for="delivery_preference_complete_delivery" class="radio required_field">' .
-            __('Deliver everything together when all items are available', 'woocommerce') .
-            '</label>';
-        echo '</div>';
+        foreach ($options as $value => $label) {
+            echo '<div class="radio-option-wrapper">';
+            echo '<input type="radio" class="input-radio" value="' . esc_attr($value) . '" name="delivery_preference" aria-required="true" id="delivery_preference_' . esc_attr($value) . '"' .
+                ($field_value === $value ? ' checked="checked"' : '') . '>';
+            echo '<label for="delivery_preference_' . esc_attr($value) . '" class="radio required_field">' . esc_html($label) . '</label>';
+            echo '</div>';
+        }
 
         echo '</div>';
         echo '</div>';
@@ -380,11 +620,8 @@ class IJWLP_Frontend_Checkout
      */
     public function validate_delivery_preference_field()
     {
-        // Check if there are any backordered items in the cart
-        $has_backordered_items = $this->check_for_backordered_items();
-
-        if (!$has_backordered_items) {
-            return; // Don't validate if no backordered items
+        if (!$this->check_for_backordered_items()) {
+            return;
         }
 
         if (empty($_POST['delivery_preference'])) {
@@ -399,20 +636,23 @@ class IJWLP_Frontend_Checkout
      */
     public function save_delivery_preference_field($order_id)
     {
-        if (!empty($_POST['delivery_preference'])) {
-            $delivery_preference = sanitize_text_field($_POST['delivery_preference']);
-            update_post_meta($order_id, '_delivery_preference', $delivery_preference);
-
-            // Add a note to the order
-            $order = wc_get_order($order_id);
-            if ($order) {
-                $preference_text = $delivery_preference === 'partial_delivery' ?
-                    __('Deliver available items now, backordered items when ready', 'woocommerce') :
-                    __('Wait for all items to be available before delivery', 'woocommerce');
-
-                $order->add_order_note(sprintf(__('Customer delivery preference: %s', 'woocommerce'), $preference_text));
-            }
+        if (empty($_POST['delivery_preference'])) {
+            return;
         }
+
+        $delivery_preference = sanitize_text_field($_POST['delivery_preference']);
+        update_post_meta($order_id, '_delivery_preference', $delivery_preference);
+
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+
+        $preference_text = $delivery_preference === 'partial_delivery' ?
+            __('Deliver available items now, backordered items when ready', 'woocommerce') :
+            __('Wait for all items to be available before delivery', 'woocommerce');
+
+        $order->add_order_note(sprintf(__('Customer delivery preference: %s', 'woocommerce'), $preference_text));
     }
 
     /**
@@ -427,7 +667,7 @@ class IJWLP_Frontend_Checkout
             return false;
         }
 
-        foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+        foreach ($cart->get_cart() as $cart_item) {
             $product = $cart_item['data'];
             if ($product && $product->is_on_backorder($cart_item['quantity'])) {
                 return true;
@@ -452,6 +692,9 @@ class IJWLP_Frontend_Checkout
             return;
         }
 
+        // Update customer location if address data is provided
+        $this->update_customer_location_from_post();
+
         // Get cart instance
         $cart = WC()->cart;
         if (!$cart) {
@@ -459,69 +702,53 @@ class IJWLP_Frontend_Checkout
             return;
         }
 
-        // Update customer location if address data is provided
-        if (WC()->customer) {
-            if (isset($_POST['billing_country'])) {
-                WC()->customer->set_billing_country(sanitize_text_field($_POST['billing_country']));
-            }
-            if (isset($_POST['billing_state'])) {
-                WC()->customer->set_billing_state(sanitize_text_field($_POST['billing_state']));
-            }
-            if (isset($_POST['billing_postcode'])) {
-                WC()->customer->set_billing_postcode(sanitize_text_field($_POST['billing_postcode']));
-            }
-
-            if (isset($_POST['shipping_country'])) {
-                WC()->customer->set_shipping_country(sanitize_text_field($_POST['shipping_country']));
-            }
-            if (isset($_POST['shipping_state'])) {
-                WC()->customer->set_shipping_state(sanitize_text_field($_POST['shipping_state']));
-            }
-            if (isset($_POST['shipping_postcode'])) {
-                WC()->customer->set_shipping_postcode(sanitize_text_field($_POST['shipping_postcode']));
-            }
-        }
-
         // Calculate cart totals
         $cart->calculate_totals();
 
-        // Calculate subtotal with geo tax
-        $subtotal_with_tax = 0;
-        foreach ($cart->get_cart() as $cart_item) {
-            $product = $cart_item['data'];
-            $line_total = $product->get_price() * $cart_item['quantity'];
-            $tax_data = calculate_geo_tax_for_price($line_total, $product->get_tax_class());
-            
-            $subtotal_with_tax += $tax_data ? $tax_data['price_with_tax'] : $line_total;
-        }
+        // Get calculated totals
+        $totals = $this->calculate_cart_totals_with_tax();
 
-        // Calculate total with geo tax
-        $total_with_tax = $subtotal_with_tax;
-        $total_with_tax += $cart->get_shipping_total(); // Shipping only, no shipping tax
-        $total_with_tax -= $cart->get_discount_total(); // Subtract discounts
-        
-        // Add fees
-        foreach ($cart->get_fees() as $fee) {
-            $total_with_tax += $fee->total + $fee->tax;
-        }
-
-        // Prepare response with updated totals
+        // Prepare response
         $response = array(
             'totals' => array(
-                'shipping_total' => $cart->get_shipping_total(),
-                'subtotal' => $subtotal_with_tax, // Use geo-calculated subtotal
-                'total' => $total_with_tax, // Use geo-calculated total
-                'discount_total' => $cart->get_discount_total(),
-                'cart_contents_total' => $subtotal_with_tax,
-                'tax_total' => 0, // Set to 0 since tax is included in prices
-                'taxes' => array(), // Empty array since we're hiding tax rows
-                // Formatted prices for display
-                'shipping_total_formatted' => $cart->get_shipping_total() > 0 ? wc_price($cart->get_shipping_total()) : 'FREE',
-                'total_formatted' => wc_price($total_with_tax),
-                'tax_total_formatted' => wc_price(0), // No separate tax display
+                'shipping_total' => $totals['shipping'],
+                'shipping_total_formatted' => $totals['shipping_formatted'],
+                'subtotal' => $totals['subtotal'],
+                'total' => $totals['total'],
+                'total_formatted' => $totals['total_formatted'],
+                'discount_total' => $totals['discount'],
+                'cart_contents_total' => $totals['subtotal'],
+                'tax_info' => $totals['tax_info'],
+                'tax_label' => $totals['tax_info'] ? $totals['tax_info']['tax_label'] : '',
+                'tax_amount' => $totals['tax_info'] ? $totals['tax_info']['tax_amount'] : 0,
             )
         );
 
         wp_send_json_success($response);
+    }
+
+    /**
+     * Update customer location from POST data
+     */
+    private function update_customer_location_from_post()
+    {
+        if (!WC()->customer) {
+            return;
+        }
+
+        $address_fields = array(
+            'billing_country' => 'set_billing_country',
+            'billing_state' => 'set_billing_state',
+            'billing_postcode' => 'set_billing_postcode',
+            'shipping_country' => 'set_shipping_country',
+            'shipping_state' => 'set_shipping_state',
+            'shipping_postcode' => 'set_shipping_postcode',
+        );
+
+        foreach ($address_fields as $field => $method) {
+            if (isset($_POST[$field])) {
+                WC()->customer->$method(sanitize_text_field($_POST[$field]));
+            }
+        }
     }
 }
