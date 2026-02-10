@@ -151,8 +151,7 @@ class IJWLP_Frontend_Common
         // Prepare AJAX data for all scripts
         $ajax_data = array(
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('ijwlp_frontend_nonce'),
-            'currency_symbol' => get_woocommerce_currency_symbol()
+            'nonce' => wp_create_nonce('ijwlp_frontend_nonce')
         );
 
         // Localize script data to common script
@@ -215,6 +214,7 @@ class IJWLP_Frontend_Common
                 true
             );
         }
+
     }
 
     /**
@@ -240,6 +240,7 @@ class IJWLP_Frontend_Common
             array(),
             $this->_version
         );
+
     }
 
     /**
@@ -357,7 +358,7 @@ class IJWLP_Frontend_Common
      */
     public function render_logout_modal()
     {
-?>
+        ?>
         <div id="woo-limit-logout-modal" class="field-selection-modal" style="display:none;">
             <div class="field-selection-modal-content" style="max-width: 400px; text-align: center;">
                 <h3 class="field-selection-title" style="margin-top: 0; color: #333; margin-bottom: 20px;">Leaving so soon?</h3>
@@ -367,6 +368,7 @@ class IJWLP_Frontend_Common
                 </div>
             </div>
         </div>
-<?php
+        <?php
     }
+
 }

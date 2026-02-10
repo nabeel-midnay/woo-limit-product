@@ -170,12 +170,27 @@ class IJWLP_Frontend_Checkout
         $cart_items = $cart->get_cart();
         $total_items = $cart->get_cart_contents_count();
         $shipping_total = $cart->get_shipping_total();
-        $total = $cart->get_total('raw');
+        $total = 0;
         $coupons = $cart->get_coupons();
 
         if (!empty($coupons)) {
             $coupon_discount = $cart->get_discount_total();
         }
+
+        foreach ($cart->get_cart() as $cart_item) {
+            $product = $cart_item['data'];
+            $line_total = $product->get_price() * $cart_item['quantity'];
+            $tax_data = calculate_geo_tax_for_price($line_total, $product->get_tax_class());
+            
+            $total += $tax_data ? $tax_data['price_with_tax'] : $line_total;
+        }
+        $total += $shipping_total;
+        $total -= $coupon_discount;
+
+        foreach ($cart->get_fees() as $fee) {
+            $total += $fee->total + $fee->tax;
+        }
+
         ?>
         <div class="checkout-order-summary-container">
             <div id="custom-order-summary" class="custom-order-summary-wrapper">
@@ -430,7 +445,7 @@ class IJWLP_Frontend_Checkout
      */
     public function ajax_get_cart_totals()
     {
-        // Verify nonce for security (check both 'security' and 'nonce' fields for compatibility)
+        // Verify nonce for security
         $nonce = isset($_POST['security']) ? $_POST['security'] : (isset($_POST['nonce']) ? $_POST['nonce'] : '');
         if (!$nonce || !wp_verify_nonce($nonce, 'ijwlp_frontend_nonce')) {
             wp_send_json_error(array('message' => 'Security check failed'));
@@ -444,8 +459,7 @@ class IJWLP_Frontend_Checkout
             return;
         }
 
-        // Update customer location if address data is provided in the request
-        // This ensures that shipping and tax calculations are based on the current selection in the checkout form
+        // Update customer location if address data is provided
         if (WC()->customer) {
             if (isset($_POST['billing_country'])) {
                 WC()->customer->set_billing_country(sanitize_text_field($_POST['billing_country']));
@@ -468,43 +482,46 @@ class IJWLP_Frontend_Checkout
             }
         }
 
-        // Calculate cart totals (this will recalculate shipping based on current session data)
-        // WooCommerce automatically updates the session with new address data from the checkout form
+        // Calculate cart totals
         $cart->calculate_totals();
+
+        // Calculate subtotal with geo tax
+        $subtotal_with_tax = 0;
+        foreach ($cart->get_cart() as $cart_item) {
+            $product = $cart_item['data'];
+            $line_total = $product->get_price() * $cart_item['quantity'];
+            $tax_data = calculate_geo_tax_for_price($line_total, $product->get_tax_class());
+            
+            $subtotal_with_tax += $tax_data ? $tax_data['price_with_tax'] : $line_total;
+        }
+
+        // Calculate total with geo tax
+        $total_with_tax = $subtotal_with_tax;
+        $total_with_tax += $cart->get_shipping_total(); // Shipping only, no shipping tax
+        $total_with_tax -= $cart->get_discount_total(); // Subtract discounts
+        
+        // Add fees
+        foreach ($cart->get_fees() as $fee) {
+            $total_with_tax += $fee->total + $fee->tax;
+        }
 
         // Prepare response with updated totals
         $response = array(
             'totals' => array(
                 'shipping_total' => $cart->get_shipping_total(),
-                'subtotal' => $cart->get_subtotal(),
-                'total' => $cart->get_total('raw'),
+                'subtotal' => $subtotal_with_tax, // Use geo-calculated subtotal
+                'total' => $total_with_tax, // Use geo-calculated total
                 'discount_total' => $cart->get_discount_total(),
-                'cart_contents_total' => $cart->get_cart_contents_total(),
+                'cart_contents_total' => $subtotal_with_tax,
+                'tax_total' => 0, // Set to 0 since tax is included in prices
+                'taxes' => array(), // Empty array since we're hiding tax rows
                 // Formatted prices for display
                 'shipping_total_formatted' => $cart->get_shipping_total() > 0 ? wc_price($cart->get_shipping_total()) : 'FREE',
-                'total_formatted' => wc_price($cart->get_total('raw')),
+                'total_formatted' => wc_price($total_with_tax),
+                'tax_total_formatted' => wc_price(0), // No separate tax display
             )
         );
 
         wp_send_json_success($response);
-    }
-
-    /**
-     * Get cart tax totals formatted for JSON response
-     * 
-     * @param WC_Cart $cart
-     * @return array
-     */
-    private function get_cart_tax_totals($cart)
-    {
-        $taxes = array();
-        foreach ($cart->get_tax_totals() as $code => $tax) {
-            $taxes[] = array(
-                'label' => $tax->label,
-                'amount' => $tax->amount,
-                'formatted_amount' => $tax->formatted_amount,
-            );
-        }
-        return $taxes;
     }
 }
