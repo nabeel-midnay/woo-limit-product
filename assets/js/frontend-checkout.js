@@ -53,10 +53,8 @@
                             if ($taxLine.length) {
                                 $taxLine.find('.label').html('(Inc. ' + totals.tax_label + ')');
                             } else {
-                                var taxHtml = '<div class="summary-line tax-line">' +
-                                    '<span class="label">' + '(Inc. ' + totals.tax_label + ')' + '</span>' +
-                                    '</div>';
-                                $('.custom-order-summary-wrapper .total-line').before(taxHtml);
+                                var taxHtml = '<p class="summary-line tax-line"> (Inc. ' + totals.tax_label + ')' + '</p>';
+                                $('.custom-order-summary-wrapper .total-line .label').append(taxHtml);
                             }
                         } else {
                             // No tax - remove tax line if it exists
