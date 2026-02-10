@@ -191,15 +191,16 @@ class IJWLP_Frontend_Checkout
                                     <span class="value"><?php echo wc_price($totals['discount']); ?></span>
                                 </div>
                             <?php endif; ?>
-                            <?php if ($totals['tax_info'] && $totals['tax_info']['tax_amount'] > 0): ?>
-                                <div class="summary-line tax-line">
-                                    <span class="label"><?php echo esc_html($totals['tax_info']['tax_label']); ?>
-                                        (Included)
-                                    </span>
-                                </div>
-                            <?php endif; ?>
                             <div class="summary-line total-line">
-                                <span class="label">Total:</span>
+                                <span class="label">
+                                    Total:
+                                    <?php if ($totals['tax_info'] && $totals['tax_info']['tax_amount'] > 0): ?>
+                                        <p class="summary-line tax-line">
+                                            <?php echo esc_html($totals['tax_info']['tax_label']); ?>
+                                            (Included)
+                                        </p>
+                                    <?php endif; ?>
+                                </span>
                                 <span class="value"><?php echo wc_price($totals['total']); ?></span>
                             </div>
                         </div>
