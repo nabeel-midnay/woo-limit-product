@@ -196,8 +196,7 @@ class IJWLP_Frontend_Checkout
                                     Total:
                                     <?php if ($totals['tax_info'] && $totals['tax_info']['tax_amount'] > 0): ?>
                                         <p class="summary-line tax-line">
-                                            <?php echo esc_html($totals['tax_info']['tax_label']); ?>
-                                            (Included)
+                                            (Inc. <?php echo esc_html($totals['tax_info']['tax_label']); ?>)
                                         </p>
                                     <?php endif; ?>
                                 </span>

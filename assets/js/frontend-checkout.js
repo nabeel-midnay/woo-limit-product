@@ -50,14 +50,11 @@
                         var $taxLine = $('.custom-order-summary-wrapper .tax-line');
 
                         if (totals.tax_info && totals.tax_amount > 0) {
-                            // Tax exists - update or create the line
                             if ($taxLine.length) {
-                                // Update existing tax line
-                                $taxLine.find('.label').html(totals.tax_label + ' (included)');
+                                $taxLine.find('.label').html('(Inc. ' + totals.tax_label + ')');
                             } else {
-                                // Create new tax line (insert before total line)
                                 var taxHtml = '<div class="summary-line tax-line">' +
-                                    '<span class="label">' + totals.tax_label + ' (included)</span>' +
+                                    '<span class="label">' + '(Inc. ' + totals.tax_label + ')' + '</span>' +
                                     '</div>';
                                 $('.custom-order-summary-wrapper .total-line').before(taxHtml);
                             }
