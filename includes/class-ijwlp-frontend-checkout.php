@@ -392,8 +392,12 @@ class IJWLP_Frontend_Checkout
 
         // Calculate total
         $shipping_total = $cart->get_shipping_total();
+        $shipping_tax_class = get_option('woocommerce_shipping_tax_class');
+        $shipping_tax_data = $this->calculate_geo_tax_for_price($shipping_total, $shipping_tax_class);
+        $shipping_total_with_tax = $shipping_tax_data ? $shipping_tax_data['price_with_tax'] : $shipping_total;
+
         $discount_total = $cart->get_discount_total();
-        $total = $subtotal_with_tax + $shipping_total - $discount_total;
+        $total = $subtotal_with_tax + $shipping_total_with_tax - $discount_total;
         
         // Add fees
         foreach ($cart->get_fees() as $fee) {
@@ -422,8 +426,8 @@ class IJWLP_Frontend_Checkout
 
         return array(
             'subtotal' => $subtotal_with_tax,
-            'shipping' => $shipping_total,
-            'shipping_formatted' => $shipping_total > 0 ? wc_price($shipping_total) : 'FREE',
+            'shipping' => $shipping_total_with_tax,
+            'shipping_formatted' => $shipping_total_with_tax > 0 ? wc_price($shipping_total_with_tax) : 'FREE',
             'discount' => $discount_total,
             'total' => $total,
             'total_formatted' => wc_price($total),
@@ -459,6 +463,17 @@ class IJWLP_Frontend_Checkout
                 if (!empty($tax_data['tax_rates'])) {
                     $tax_rates = $tax_data['tax_rates'];
                 }
+            }
+        }
+
+        // Add shipping tax
+        $shipping_total = $cart->get_shipping_total();
+        $shipping_tax_class = get_option('woocommerce_shipping_tax_class', '');
+        $shipping_tax_data = $this->calculate_geo_tax_for_price($shipping_total, $shipping_tax_class);
+        if ($shipping_tax_data) {
+            $total_tax += $shipping_tax_data['tax_amount'];
+            if (empty($tax_rates) && !empty($shipping_tax_data['tax_rates'])) {
+                $tax_rates = $shipping_tax_data['tax_rates'];
             }
         }
 
