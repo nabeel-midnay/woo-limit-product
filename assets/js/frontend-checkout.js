@@ -51,9 +51,9 @@
 
                         if (totals.tax_info && totals.tax_amount > 0) {
                             if ($taxLine.length) {
-                                $taxLine.find('.label').html('(Inc. ' + totals.tax_label + ')');
+                                $taxLine.html(totals.tax_display_suffix);
                             } else {
-                                var taxHtml = '<small class="summary-line tax-line"> (Inc. ' + totals.tax_label + ')' + '</small>';
+                                var taxHtml = '<small class="summary-line tax-line">' + totals.tax_display_suffix + '</small>';
                                 $('.custom-order-summary-wrapper .total-line .label').append(taxHtml);
                             }
                         } else {

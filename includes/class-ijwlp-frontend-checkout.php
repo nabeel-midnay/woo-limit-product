@@ -196,7 +196,7 @@ class IJWLP_Frontend_Checkout
                                     Total
                                     <?php if ($totals['tax_info'] && $totals['tax_info']['tax_amount'] > 0): ?>
                                         <small class="summary-line tax-line">
-                                            (Inc. <?php echo esc_html($totals['tax_info']['tax_label']); ?>)
+                                            <?php echo esc_html($totals['tax_display_suffix']); ?>
                                         </small>
                                     <?php endif; ?>
                                     : 
@@ -403,6 +403,25 @@ class IJWLP_Frontend_Checkout
         // Get tax information
         $tax_info = $this->get_cart_tax_info();
 
+        // Get WooCommerce price display suffix
+        $tax_display_suffix = get_option('woocommerce_price_display_suffix');
+        if ($tax_display_suffix && $tax_info) {
+            $tax_display_suffix = str_replace(
+                array('{price_including_tax}', '{price_excluding_tax}'),
+                array('', ''),
+                $tax_display_suffix
+            );
+            $tax_display_suffix = str_replace('{tax_label}', $tax_info['tax_label'], $tax_display_suffix);
+            $tax_display_suffix = trim($tax_display_suffix);
+            
+            // Fallback if suffix doesn't contain the label or is empty after replacement
+            if (empty($tax_display_suffix)) {
+                $tax_display_suffix = '(Inc. ' . $tax_info['tax_label'] . ')';
+            }
+        } else {
+            $tax_display_suffix = $tax_info ? '(Inc. ' . $tax_info['tax_label'] . ')' : '';
+        }
+
         return array(
             'subtotal' => $subtotal_with_tax,
             'shipping' => $shipping_total,
@@ -411,6 +430,7 @@ class IJWLP_Frontend_Checkout
             'total' => $total,
             'total_formatted' => wc_price($total),
             'tax_info' => $tax_info,
+            'tax_display_suffix' => $tax_display_suffix,
             'item_count' => $cart->get_cart_contents_count()
         );
     }
@@ -722,6 +742,7 @@ class IJWLP_Frontend_Checkout
                 'tax_info' => $totals['tax_info'],
                 'tax_label' => $totals['tax_info'] ? $totals['tax_info']['tax_label'] : '',
                 'tax_amount' => $totals['tax_info'] ? $totals['tax_info']['tax_amount'] : 0,
+                'tax_display_suffix' => $totals['tax_display_suffix'],
             )
         );
 
