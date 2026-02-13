@@ -196,10 +196,10 @@ class IJWLP_Frontend_Checkout
                                     Total
                                     <?php if ($totals['tax_info'] && $totals['tax_info']['tax_amount'] > 0): ?>
                                         <small class="summary-line tax-line">
-                                            <?php echo esc_html($totals['tax_display_suffix']); ?>
+                                            <?php echo $totals['tax_display_suffix']; ?>
                                         </small>
                                     <?php endif; ?>
-                                    : 
+                                    :
                                 </span>
                                 <span class="value"><?php echo wc_price($totals['total']); ?></span>
                             </div>
@@ -403,23 +403,21 @@ class IJWLP_Frontend_Checkout
         // Get tax information
         $tax_info = $this->get_cart_tax_info();
 
-        // Get WooCommerce price display suffix
-        $tax_display_suffix = get_option('woocommerce_price_display_suffix');
-        if ($tax_display_suffix && $tax_info) {
-            $tax_display_suffix = str_replace(
-                array('{price_including_tax}', '{price_excluding_tax}'),
-                array('', ''),
-                $tax_display_suffix
+        // Construct custom tax display suffix: (Prefix. Tax Percentage Tax Label, Tax Amount)
+        $tax_display_suffix = '';
+        if ($tax_info && $tax_info['tax_amount'] > 0) {            
+            // Try to get prefix from WC settings if available, but default to 'Incl.' as it's the standard for this plugin
+            $wc_suffix = get_option('woocommerce_price_display_suffix');
+
+            $prefix = $wc_suffix ? $wc_suffix : 'Incl.';
+
+            $tax_display_suffix = sprintf(
+                '(%s %s%s, %s)',
+                $prefix,
+                trim($tax_info['tax_percentage']),
+                $tax_info['tax_label_only'] ? ' ' . $tax_info['tax_label_only'] : '',
+                wc_price($tax_info['tax_amount'])
             );
-            $tax_display_suffix = str_replace('{tax_label}', $tax_info['tax_label'], $tax_display_suffix);
-            $tax_display_suffix = trim($tax_display_suffix);
-            
-            // Fallback if suffix doesn't contain the label or is empty after replacement
-            if (empty($tax_display_suffix)) {
-                $tax_display_suffix = '(Inc. ' . $tax_info['tax_label'] . ')';
-            }
-        } else {
-            $tax_display_suffix = $tax_info ? '(Inc. ' . $tax_info['tax_label'] . ')' : '';
         }
 
         return array(
@@ -469,19 +467,20 @@ class IJWLP_Frontend_Checkout
         }
 
         // Get clean tax label
-        $tax_label = $this->get_clean_tax_label($tax_rates);
+        $tax_label_only = $this->get_clean_tax_label($tax_rates);
         
         // Get tax percentage
         $tax_percentage = '';
         if (!empty($tax_rates)) {
             $tax_rate = reset($tax_rates);
             if (isset($tax_rate['rate'])) {
-                $tax_percentage = ' ' . floatval($tax_rate['rate']) . '%';
+                $tax_percentage = floatval($tax_rate['rate']) . '%';
             }
         }
 
         return array(
-            'tax_label' => $tax_label . $tax_percentage,
+            'tax_label' => $tax_label_only . ($tax_percentage ? ' ' . $tax_percentage : ''),
+            'tax_label_only' => $tax_label_only,
             'tax_amount' => $total_tax,
             'tax_percentage' => $tax_percentage
         );
