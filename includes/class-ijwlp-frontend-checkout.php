@@ -382,13 +382,13 @@ class IJWLP_Frontend_Checkout
         $subtotal_with_tax = 0;
         
         // Calculate subtotal with tax
-        foreach ($cart->get_cart() as $cart_item) {
-            $product = $cart_item['data'];
-            $line_total = $product->get_price() * $cart_item['quantity'];
-            $tax_data = $this->calculate_geo_tax_for_price($line_total, $product->get_tax_class());
-            
-            $subtotal_with_tax += $tax_data ? $tax_data['price_with_tax'] : $line_total;
-        }
+		foreach ($cart->get_cart() as $cart_item) {
+			$product = $cart_item['data'];
+			$line_total = $product->get_price() * $cart_item['quantity'];
+			$tax_data = $this->calculate_geo_tax_for_price($line_total, $product->get_tax_class());
+
+			$subtotal_with_tax += $tax_data ? round($tax_data['price_with_tax']) : $line_total;
+		}
 
         // Calculate total
         $shipping_total = $cart->get_shipping_total();
@@ -403,6 +403,8 @@ class IJWLP_Frontend_Checkout
         foreach ($cart->get_fees() as $fee) {
             $total += $fee->total + $fee->tax;
         }
+		
+		$total = round($total);
 
         // Get tax information
         $tax_info = $this->get_cart_tax_info();
