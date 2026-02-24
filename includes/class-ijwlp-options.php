@@ -1230,9 +1230,28 @@ class IJWLP_Options
 			wp_send_json_error(array('message' => __('Security check failed.', 'woolimited')));
 		}
 
+		$invalid_items = self::get_cart_validation_errors();
+
+		if (!empty($invalid_items)) {
+			wp_send_json_error(array(
+				'invalid_items' => $invalid_items,
+				'message'       => __('Some items in your cart are no longer available.', 'woolimited')
+			));
+		}
+
+		wp_send_json_success(array('message' => __('All items available.', 'woolimited')));
+	}
+
+	/**
+	 * Get cart validation errors for stock and limits
+	 * 
+	 * @return array List of invalid items with reasons
+	 */
+	public static function get_cart_validation_errors()
+	{
 		$cart = WC()->cart;
 		if (!$cart) {
-			wp_send_json_error(array('message' => __('Cart not found.', 'woolimited')));
+			return array();
 		}
 
 		$invalid_items = array();
@@ -1303,15 +1322,46 @@ class IJWLP_Options
 					continue;
 				}
 			}
+
+			// 3. Check limited edition number availability
+			$is_limited = get_post_meta($parent_pro_id, '_woo_limit_status', true);
+			if ($is_limited === 'yes' && isset($cart_item['woo_limit'])) {
+				$limited_numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($cart_item['woo_limit']);
+				$available_numbers = limitedNosAvailable($parent_pro_id);
+				$available_array = array_map('trim', explode(',', $available_numbers));
+
+				// Check if any of these numbers are NOT in the available array 
+				// AND not already blocked for this specific cart item
+				global $wpdb, $table_prefix;
+				$table = $table_prefix . 'woo_limit';
+				$user_identifier = IJWLP_Options::get_user_identifier();
+
+				foreach ($limited_numbers as $num) {
+					// Check if this number is blocked by current cart or current user
+					$is_blocked_by_me = $wpdb->get_var($wpdb->prepare(
+						"SELECT id FROM $table WHERE parent_product_id = %s AND (limit_no = %s OR limit_no LIKE %s OR limit_no LIKE %s OR limit_no LIKE %s) AND (user_id = %s OR cart_key = %s) AND status = 'block'",
+						$parent_pro_id,
+						$num,
+						$num . ',%',
+						'%,' . $num,
+						'%,' . $num . ',%',
+						$user_identifier,
+						$cart_item_key
+					));
+
+					if (!in_array($num, $available_array) && !$is_blocked_by_me) {
+						$invalid_items[] = array(
+							'cart_key'     => $cart_item_key,
+							'product_name' => $product_name,
+							'reason'       => sprintf(__('Limited Edition Number %s is no longer available.', 'woolimited'), $num)
+						);
+						break;
+					}
+				}
+			}
 		}
 
-		if (!empty($invalid_items)) {
-			wp_send_json_error(array(
-				'invalid_items' => $invalid_items,
-				'message'       => __('Some items in your cart are no longer available.', 'woolimited')
-			));
-		}
-
-		wp_send_json_success(array('message' => __('All items available.', 'woolimited')));
+		return $invalid_items;
 	}
+
 }
