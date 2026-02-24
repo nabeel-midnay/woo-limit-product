@@ -188,7 +188,7 @@ class IJWLP_Frontend_Checkout
                             <?php if ($totals['discount'] > 0): ?>
                                 <div class="summary-line">
                                     <span class="label">Coupon:</span>
-                                    <span class="value"><?php echo wc_price($totals['discount']); ?></span>
+                                    <span class="value"><?php echo wc_price($totals['discount'], array('decimals' => 2)); ?></span>
                                 </div>
                             <?php endif; ?>
                             <div class="summary-line total-line">
@@ -201,7 +201,7 @@ class IJWLP_Frontend_Checkout
                                     <?php endif; ?>
                                     :
                                 </span>
-                                <span class="value"><?php echo wc_price($totals['total']); ?></span>
+                                <span class="value"><?php echo wc_price($totals['total'], array('decimals' => 2)); ?></span>
                             </div>
                         </div>
                     </div>
@@ -210,7 +210,7 @@ class IJWLP_Frontend_Checkout
                         <div class="summary-line items-count">
                             <span class="label"><?php echo $totals['item_count']; ?>
                                 Item<?php echo $totals['item_count'] > 1 ? 's' : ''; ?></span>
-                            <span class="value">Total: <?php echo wc_price($totals['total']); ?></span>
+                            <span class="value">Total: <?php echo wc_price($totals['total'], array('decimals' => 2)); ?></span>
                         </div>
                         <?php foreach ($cart_items as $ci_key => $ci_item):
                             $this->render_cart_item($ci_item);
@@ -387,7 +387,7 @@ class IJWLP_Frontend_Checkout
 			$line_total = $product->get_price() * $cart_item['quantity'];
 			$tax_data = $this->calculate_geo_tax_for_price($line_total, $product->get_tax_class());
 
-			$subtotal_with_tax += $tax_data ? round($tax_data['price_with_tax']) : $line_total;
+			$subtotal_with_tax += $tax_data ? $tax_data['price_with_tax'] : $line_total;
 		}
 
         // Calculate total
@@ -404,7 +404,7 @@ class IJWLP_Frontend_Checkout
             $total += $fee->total + $fee->tax;
         }
 		
-		$total = round($total);
+		$total = $total;
 
         // Get tax information
         $tax_info = $this->get_cart_tax_info();
@@ -422,17 +422,17 @@ class IJWLP_Frontend_Checkout
                 $prefix,
                 trim($tax_info['tax_percentage']),
                 $tax_info['tax_label_only'] ? ' ' . $tax_info['tax_label_only'] : '',
-                wc_price($tax_info['tax_amount'])
+                wc_price($tax_info['tax_amount'], array('decimals' => 2))
             );
         }
 
         return array(
             'subtotal' => $subtotal_with_tax,
             'shipping' => $shipping_total_with_tax,
-            'shipping_formatted' => $shipping_total_with_tax > 0 ? wc_price($shipping_total_with_tax) : 'FREE',
+            'shipping_formatted' => $shipping_total_with_tax > 0 ? wc_price($shipping_total_with_tax, array('decimals' => 2)) : 'FREE',
             'discount' => $discount_total,
             'total' => $total,
-            'total_formatted' => wc_price($total),
+            'total_formatted' => wc_price($total, array('decimals' => 2)),
             'tax_info' => $tax_info,
             'tax_display_suffix' => $tax_display_suffix,
             'item_count' => $cart->get_cart_contents_count()
