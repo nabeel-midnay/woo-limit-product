@@ -418,7 +418,7 @@ class IJWLP_Frontend_Checkout
             $prefix = $wc_suffix ? $wc_suffix : 'Incl.';
 
             $tax_display_suffix = sprintf(
-                '(%s %s%s, %s)',
+                '&nbsp;(%s %s%s,&nbsp;%s)',
                 $prefix,
                 trim($tax_info['tax_percentage']),
                 $tax_info['tax_label_only'] ? ' ' . $tax_info['tax_label_only'] : '',
