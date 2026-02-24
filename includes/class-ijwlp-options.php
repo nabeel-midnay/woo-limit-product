@@ -50,6 +50,9 @@ class IJWLP_Options
 		add_action('wp_ajax_ijwlp_check_number_availability', array($this, 'ajax_check_number_availability'));
 		add_action('wp_ajax_nopriv_ijwlp_check_number_availability', array($this, 'ajax_check_number_availability'));
 
+		add_action('wp_ajax_ijwlp_check_cart_stock', array($this, 'ajax_check_cart_stock'));
+		add_action('wp_ajax_nopriv_ijwlp_check_cart_stock', array($this, 'ajax_check_cart_stock'));
+
 	}
 
 	/**
@@ -1217,4 +1220,98 @@ class IJWLP_Options
 		}
 	}
 
+	/**
+	 * AJAX handler for checking cart stock before checkout
+	 */
+	public function ajax_check_cart_stock()
+	{
+		// Verify nonce
+		if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'ijwlp_frontend_nonce')) {
+			wp_send_json_error(array('message' => __('Security check failed.', 'woolimited')));
+		}
+
+		$cart = WC()->cart;
+		if (!$cart) {
+			wp_send_json_error(array('message' => __('Cart not found.', 'woolimited')));
+		}
+
+		$invalid_items = array();
+		$cart_items = $cart->get_cart();
+
+		foreach ($cart_items as $cart_item_key => $cart_item) {
+			$product_id = $cart_item['product_id'];
+			$variation_id = $cart_item['variation_id'];
+			$quantity = $cart_item['quantity'];
+			$actual_pro_id = $variation_id > 0 ? $variation_id : $product_id;
+			$product = wc_get_product($actual_pro_id);
+
+			if (!$product) {
+				continue;
+			}
+
+			$product_name = $product->get_name();
+			$parent_pro_id = $product->is_type('variation') ? $product->get_parent_id() : $actual_pro_id;
+
+			// 1. Check basic stock status
+			if (!$product->is_in_stock()) {
+				$invalid_items[] = array(
+					'cart_key'     => $cart_item_key,
+					'product_name' => $product_name,
+					'reason'       => __('Out of stock', 'woolimited')
+				);
+				continue;
+			}
+
+			// If it's a variation, check parent stock status and quantity
+			if ($product->is_type('variation')) {
+				$parent_product = wc_get_product($product->get_parent_id());
+				if ($parent_product) {
+					// Check parent basic stock status
+					if (!$parent_product->is_in_stock()) {
+						$invalid_items[] = array(
+							'cart_key'     => $cart_item_key,
+							'product_name' => $product_name,
+							'reason'       => __('Out of stock', 'woolimited')
+						);
+						continue;
+					}
+
+					// Check parent stock quantity if managed
+					if ($parent_product->managing_stock()) {
+						$parent_stock_quantity = $parent_product->get_stock_quantity();
+						if ($parent_stock_quantity !== null && $quantity > $parent_stock_quantity && !$parent_product->backorders_allowed()) {
+							$invalid_items[] = array(
+								'cart_key'     => $cart_item_key,
+								'product_name' => $product_name,
+								'reason'       => sprintf(__('Only %d left in stock', 'woolimited'), $parent_stock_quantity)
+							);
+							continue;
+						}
+					}
+				}
+			}
+
+			// 2. Check stock quantity if managed
+			if ($product->managing_stock()) {
+				$stock_quantity = $product->get_stock_quantity();
+				if ($stock_quantity !== null && $quantity > $stock_quantity && !$product->backorders_allowed()) {
+					$invalid_items[] = array(
+						'cart_key'     => $cart_item_key,
+						'product_name' => $product_name,
+						'reason'       => sprintf(__('Only %d left in stock', 'woolimited'), $stock_quantity)
+					);
+					continue;
+				}
+			}
+		}
+
+		if (!empty($invalid_items)) {
+			wp_send_json_error(array(
+				'invalid_items' => $invalid_items,
+				'message'       => __('Some items in your cart are no longer available.', 'woolimited')
+			));
+		}
+
+		wp_send_json_success(array('message' => __('All items available.', 'woolimited')));
+	}
 }

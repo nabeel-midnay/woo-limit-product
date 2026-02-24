@@ -386,6 +386,8 @@
 
             var $updateBtn = $(SEL.updateBtn).first();
             if ($updateBtn.length) {
+                // Ensure button is not disabled before triggering click
+                $updateBtn.prop("disabled", false).removeClass("disabled");
                 setTimeout(function () { $updateBtn.trigger("click"); }, 150);
                 return;
             }
@@ -937,6 +939,12 @@
         // ==================== CHECKOUT VALIDATION ====================
 
         $(document.body).on("click", SEL.checkoutBtn, function (e) {
+            var $btn = $(this);
+            if ($btn.hasClass("ijwlp-validating")) {
+                e.preventDefault();
+                return false;
+            }
+
             var isValid = true;
             var $firstError = null;
 
@@ -966,6 +974,55 @@
                 if ($firstError) $firstError.focus();
                 return false;
             }
+
+            // Real-time stock validation
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            $btn.addClass("disabled ijwlp-validating").prop("disabled", true);
+
+            $.ajax({
+                url: ijwlp_frontend.ajax_url,
+                type: "POST",
+                data: {
+                    action: "ijwlp_check_cart_stock",
+                    nonce: ijwlp_frontend.nonce
+                },
+                success: function (response) {
+                    if (response.success) {
+                        // Stock is fine, proceed to checkout
+                        window.location.href = $btn.attr("href") || wc_checkout_params.checkout_url;
+                    } else {
+                        $btn.removeClass("disabled ijwlp-validating").prop("disabled", false);
+
+                        if (response.data && response.data.invalid_items) {
+                            var messages = [];
+                            $.each(response.data.invalid_items, function (i, item) {
+                                var $row = $(SEL.fieldWrapper + '[data-cart-item-key="' + item.cart_key + '"]').closest(SEL.cartItem);
+                                if ($row.length) {
+                                    // Add out of stock label if not already there
+                                    var $nameCell = $row.find(".product-name");
+                                    if ($nameCell.find(".outofstock-label").length === 0) {
+                                        $nameCell.append('<div class="outofstock_wrapper"><span class="outofstock-label">' + item.reason + '</span></div>');
+                                    }
+                                    $row.find(SEL.qtyInput).val(0).trigger("change");
+                                    const parentTable = $row.closest('table');
+                                    parentTable.addClass("ijwlp-out-of-stock disabled");
+                                }
+                                messages.push(item.product_name + ": " + item.reason);
+                            });
+                            setTimeout(function () {
+                                triggerCartUpdate();
+                            }, 3000);
+                        }
+                    }
+                },
+                error: function () {
+                    $btn.removeClass("disabled ijwlp-validating").prop("disabled", false);
+                }
+            });
+
+            return false;
         });
 
         // ==================== BACKORDER HELP ICON ====================
