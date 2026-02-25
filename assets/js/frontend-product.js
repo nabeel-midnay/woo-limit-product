@@ -825,12 +825,20 @@
                     var newCount = newAvailable.length;
                     $availableCountInput.val(newCount);
 
-                    // If count reaches zero, show sold out message
+                    // If count reaches zero
                     if (newCount <= 0) {
                         setOutOfStockState();
-                        window.IJWLP_Frontend_Common.showError(
-                            "All limited edition numbers are now sold out.", $errorDiv
+
+                        // Add soldout class to main product container
+                        $(".product").addClass("product-soldout");
+
+                        // Add the "Sold Out" badge BEFORE the form
+                        $("form.cart").before(
+                            '<div class="soldout_wrapper"><span class="soldout-label">Sold Out</span></div>'
                         );
+
+                        // Remove the cart form
+                        $("form.cart").remove();
                     }
                 }
             }
