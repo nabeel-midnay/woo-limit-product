@@ -534,13 +534,23 @@
 
                         if (areAllVariationsOutOfStock()) {
                             disableAllSwatches(true, true); // Clear selections silently when all variations out of stock
+
+                            // Add soldout class to main product container
+                            $(".product").addClass("product-soldout");
+
+                            // Add the "Out of stock" message BEFORE the form
+                            $("form.cart").before(
+                                '<div class="soldout_wrapper"><p class="stock out-of-stock">Out of stock</p></div>'
+                            );
+
+                            // Remove the cart form
+                            $("form.cart").remove();
                         } else {
                             disableVariationSwatch(variationId);
+                            window.IJWLP_Frontend_Common.showError(
+                                "This variation is now out of stock.", $errorDiv
+                            );
                         }
-
-                        window.IJWLP_Frontend_Common.showError(
-                            "This variation is now out of stock.", $errorDiv
-                        );
                     }
                 }
             } else if (stockQuantityRemaining !== Infinity) {
@@ -549,9 +559,17 @@
                 if (stockQuantityRemaining <= 0) {
                     isNowOutOfStock = true;
                     setOutOfStockState();
-                    window.IJWLP_Frontend_Common.showError(
-                        "This product is now out of stock.", $errorDiv
+
+                    // Add soldout class to main product container
+                    $(".product").addClass("product-soldout");
+
+                    // Add the "Out of stock" message BEFORE the form
+                    $("form.cart").before(
+                        '<div class="soldout_wrapper"><p class="stock out-of-stock">Out of stock</p></div>'
                     );
+
+                    // Remove the cart form
+                    $("form.cart").remove();
                 }
             }
 
