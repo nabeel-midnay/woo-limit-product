@@ -16,7 +16,7 @@
     $(document).ready(function () {
         var cartAvailableTimer = null;
 
-        // ==================== SELECTORS (DRY) ====================
+        // ==================== SELECTORS ====================
         var SEL = {
             limitInput: ".woo-limit-cart-item input.woo-limit",
             limitItem: ".woo-limit-cart-item",

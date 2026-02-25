@@ -57,7 +57,7 @@
         var isSettingButtonState = false;
 
         // ========================================
-        // Helper Functions - DRY Utilities
+        // Helper Functions
         // ========================================
 
         /**
