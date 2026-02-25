@@ -83,11 +83,19 @@ class IJWLP_Frontend_Product
             foreach ($product->get_children() as $variation_id) {
                 $variation = wc_get_product($variation_id);
                 if ($variation) {
-                    if ($variation->get_manage_stock() && $variation->get_backorders() === 'no') {
-                        $variation_quantities[$variation_id] = intval($variation->get_stock_quantity());
+                if ($variation) {
+                    // Only include variation if it has a price (WooCommerce requirement for purchasable variations)
+                    if ($variation->get_price() !== '') {
+                        if ($variation->get_manage_stock() && $variation->get_backorders() === 'no') {
+                            $variation_quantities[$variation_id] = intval($variation->get_stock_quantity());
+                        } else {
+                            $variation_quantities[$variation_id] = null;
+                        }
                     } else {
-                        $variation_quantities[$variation_id] = null;
+                        // If no price, consider it as 0 stock (not available for purchase)
+                        $variation_quantities[$variation_id] = 0;
                     }
+                }
                 }
             }
         }
