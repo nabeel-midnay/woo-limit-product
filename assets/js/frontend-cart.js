@@ -627,7 +627,13 @@
                 }).length;
 
                 if (emptyCount > 0) {
-                    showClientNotice(ijwlp_frontend.fill_all_inputs_message || "Please fill all existing Limited Edition Number inputs before increasing the quantity.");
+                    var $qtyErr = $wrapper.find(".woo-limit-quantity-message").first();
+                    var msg = ijwlp_frontend.fill_all_inputs_message || "Please fill all existing Limited Edition Number inputs before increasing the quantity.";
+                    if ($qtyErr.length) {
+                        showTimedError($qtyErr, msg, 5000);
+                    } else {
+                        showClientNotice(msg);
+                    }
                     $qty.val(oldQty);
                     finalizeQty(oldQty);
                     return;
@@ -637,7 +643,28 @@
                 if (max !== null && currentCount >= max) {
                     var prodName = getProductName(null, $wrapper);
                     var msg = "Max quantity for " + prodName + " reached";
-                    showClientNotice(msg);
+                    if ($qtyErr.length) {
+                        showTimedError($qtyErr, msg, 5000);
+                    } else {
+                        showClientNotice(msg);
+                    }
+                    $qty.val(oldQty);
+                    finalizeQty(oldQty);
+                    return;
+                }
+
+                // Check if there are any available numbers left in the pool
+                var $availableField = $wrapper.find(".woo-limit-available-numbers").first();
+                var availableVal = $availableField.length ? $availableField.val().trim() : "";
+                var availableArr = availableVal ? availableVal.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
+
+                if (availableArr.length === 0) {
+                    var $qtyErr = $wrapper.find(".woo-limit-quantity-message").first();
+                    if ($qtyErr.length) {
+                        showTimedError($qtyErr, "All numbers are taken", 5000);
+                    } else {
+                        showClientNotice("All numbers are taken");
+                    }
                     $qty.val(oldQty);
                     finalizeQty(oldQty);
                     return;
