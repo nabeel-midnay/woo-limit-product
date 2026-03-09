@@ -441,7 +441,7 @@ class IJWLP_Frontend_Common
         $manual_soldout = get_post_meta($product_id, '_woo_limit_soldout', true);
 
         if ($manual_soldout === 'yes') {
-            return '<p class="stock out-of-stock">' . esc_html__('Sold Out', 'woolimited') . '</p>';
+            return '<p class="soldout-label">' . esc_html__('Sold Out', 'woolimited') . '</p>';
         }
 
         return $html;
