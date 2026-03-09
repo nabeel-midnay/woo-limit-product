@@ -175,6 +175,13 @@ class IJWLP_Frontend_Product
         }
 
         $pro_id = $product->get_id();
+        $is_soldout = get_post_meta($pro_id, '_woo_limit_soldout', true);
+
+        if ($is_soldout === 'yes') {
+            echo '<div class="soldout_wrapper"><span class="soldout-label">' . esc_html__('Sold Out', 'woolimited') . '</span></div>';
+            return;
+        }
+
         $is_limited = get_post_meta($pro_id, '_woo_limit_status', true);
 
         // Get max quantity limit per user from product meta

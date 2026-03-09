@@ -68,6 +68,11 @@ class IJWLP_Frontend_Common
 
         // Render logout modal in footer
         add_action('wp_footer', array($this, 'render_logout_modal'), 10);
+
+        // Handle manual soldout status
+        add_filter('woocommerce_is_purchasable', array($this, 'check_manual_soldout_status'), 10, 2);
+        add_filter('woocommerce_get_availability', array($this, 'modify_availability_for_manual_soldout'), 10, 2);
+        add_filter('woocommerce_get_stock_html', array($this, 'modify_stock_html_for_manual_soldout'), 10, 2);
     }
 
     /**
@@ -268,6 +273,13 @@ class IJWLP_Frontend_Common
         global $product;
         $product_id = get_the_ID();
 
+        $manual_soldout = get_post_meta($product_id, '_woo_limit_soldout', true);
+
+        if ($manual_soldout === 'yes') {
+            echo '<div class="soldout_wrapper shop-loop-soldout"><span class="soldout-label">' . esc_html__('Sold Out', 'woolimited') . '</span></div>';
+            return;
+        }
+
         // Check if this product has limited edition feature enabled
         $status = get_post_meta($product_id, '_woo_limit_status', true);
 
@@ -275,7 +287,7 @@ class IJWLP_Frontend_Common
         if ($status == 'yes') {
             $limitedNosAvailableCount = limitedNosAvailableCount($product_id);
             if ($limitedNosAvailableCount == 0) {
-                echo '<div class="soldout_wrapper shop-loop-soldout"><span class="soldout-label">' . esc_html__('Sold Out', 'woolimit') . '</span></div>';
+                echo '<div class="soldout_wrapper shop-loop-soldout"><span class="soldout-label">' . esc_html__('Sold Out', 'woolimited') . '</span></div>';
             }
         }
     }
@@ -286,7 +298,7 @@ class IJWLP_Frontend_Common
 
         // Check if product is out of stock
         if (!$product->is_in_stock()) {
-            echo '<div class="outofstock_wrapper shop-loop-outofstock"><span class="outofstock-label">' . esc_html__('Out of Stock', 'woolimit') . '</span></div>';
+            echo '<div class="outofstock_wrapper shop-loop-outofstock"><span class="outofstock-label">' . esc_html__('Out of Stock', 'woolimited') . '</span></div>';
         }
     }
 
@@ -334,12 +346,20 @@ class IJWLP_Frontend_Common
             return $classes;
         }
 
+        // Manual soldout
+        $manual_soldout = get_post_meta($post_id, '_woo_limit_soldout', true);
+        if ($manual_soldout === 'yes') {
+            $classes[] = 'product-soldout';
+        }
+
         // Limited edition sold-out (custom logic in this plugin)
         $status = get_post_meta($post_id, '_woo_limit_status', true);
         if ($status === 'yes') {
             $limitedNosAvailableCount = function_exists('limitedNosAvailableCount') ? limitedNosAvailableCount($post_id) : null;
             if ($limitedNosAvailableCount !== null && (int) $limitedNosAvailableCount === 0) {
-                $classes[] = 'product-soldout';
+                if (!in_array('product-soldout', $classes)) {
+                    $classes[] = 'product-soldout';
+                }
             }
         }
 
@@ -352,6 +372,80 @@ class IJWLP_Frontend_Common
     }
 
 
+
+    /**
+     * Check if product is manually marked as sold out
+     * 
+     * @param bool $status
+     * @param WC_Product $product
+     * @return bool
+     */
+    public function check_manual_soldout_status($status, $product)
+    {
+        $product_id = $product->get_id();
+        
+        // Check for parent product if it's a variation
+        if ($product->is_type('variation')) {
+            $product_id = $product->get_parent_id();
+        }
+
+        $manual_soldout = get_post_meta($product_id, '_woo_limit_soldout', true);
+
+        if ($manual_soldout === 'yes') {
+            return false;
+        }
+
+        return $status;
+    }
+
+    /**
+     * Modify availability text for manually sold out products
+     * 
+     * @param array $availability
+     * @param WC_Product $product
+     * @return array
+     */
+    public function modify_availability_for_manual_soldout($availability, $product)
+    {
+        $product_id = $product->get_id();
+        
+        if ($product->is_type('variation')) {
+            $product_id = $product->get_parent_id();
+        }
+
+        $manual_soldout = get_post_meta($product_id, '_woo_limit_soldout', true);
+
+        if ($manual_soldout === 'yes') {
+            $availability['availability'] = __('Sold Out', 'woolimited');
+            $availability['class'] = 'out-of-stock';
+        }
+
+        return $availability;
+    }
+
+    /**
+     * Modify stock HTML for manually sold out products
+     * 
+     * @param string $html
+     * @param WC_Product $product
+     * @return string
+     */
+    public function modify_stock_html_for_manual_soldout($html, $product)
+    {
+        $product_id = $product->get_id();
+        
+        if ($product->is_type('variation')) {
+            $product_id = $product->get_parent_id();
+        }
+
+        $manual_soldout = get_post_meta($product_id, '_woo_limit_soldout', true);
+
+        if ($manual_soldout === 'yes') {
+            return '<p class="stock out-of-stock">' . esc_html__('Sold Out', 'woolimited') . '</p>';
+        }
+
+        return $html;
+    }
 
     /**
      * Render logout confirmation modal
@@ -370,5 +464,4 @@ class IJWLP_Frontend_Common
         </div>
         <?php
     }
-
 }
