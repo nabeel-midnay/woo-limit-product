@@ -295,19 +295,28 @@ class IJWLP_Frontend_Cart
         $limit_label_cart = IJWLP_Options::get_setting('limitlabelcart', __('Limited Edition Number(s)', 'woolimited'));
 
         // Get stock quantities
+        // $parent_product may be null if ID is stale/trashed default to 0
+        // get_stock_quantity() returns null when manage_stock is off default to 0
+        // $variation may be null or variation_id may be 0 for simple products guard both
         if ($product && $product->is_type('variation')) {
-            // If it's a variation, get the parent product's stock quantity
+            // Variation: get parent stock and this variation's stock
             $parent_product = wc_get_product($parent_product_id);
-            $parent_stock_quantity = $parent_product->get_stock_quantity(); // Parent product's stock quantity
+            $parent_stock_quantity = ($parent_product && $parent_product->get_manage_stock())
+                ? intval($parent_product->get_stock_quantity())
+                : 0;
 
-            // Get the stock quantity for the current variation
-            $variation = wc_get_product($variation_id);
-            $variation_stock_quantity = $variation->get_stock_quantity(); // Stock quantity for this variation
+            // Only fetch variation object if variation_id is valid
+            $variation = ($variation_id > 0) ? wc_get_product($variation_id) : null;
+            $variation_stock_quantity = ($variation && $variation->get_manage_stock())
+                ? intval($variation->get_stock_quantity())
+                : 0;
         } else {
-            // If it's a simple product, just get its own stock quantity
-            $product = wc_get_product($product_id);
-            $parent_stock_quantity = $product->get_stock_quantity(); // Stock of the simple product
-            $variation_stock_quantity = 0; // No variation, so variation stock is 0
+            // Simple product: use its own stock
+            $simple_product = wc_get_product($product_id);
+            $parent_stock_quantity = ($simple_product && $simple_product->get_manage_stock())
+                ? intval($simple_product->get_stock_quantity())
+                : 0;
+            $variation_stock_quantity = 0; // No variation for simple products
         }
 
         ?>

@@ -83,19 +83,22 @@ class IJWLP_Frontend_Product
             foreach ($product->get_children() as $variation_id) {
                 $variation = wc_get_product($variation_id);
                 if ($variation) {
-                if ($variation) {
-                    // Only include variation if it has a price (WooCommerce requirement for purchasable variations)
-                    if ($variation->get_price() !== '') {
+                    // Use WooCommerce's own purchasability and stock checks to robustly handle all edge cases:
+                    // - Disabled (draft/private/trashed) variations
+                    // - Manually set out-of-stock status (without manage_stock)
+                    // - Custom hooks on woocommerce_is_purchasable
+                    // - Parent product visibility/status affecting child purchasability
+                    if ($variation->is_purchasable() && $variation->is_in_stock()) {
                         if ($variation->get_manage_stock() && $variation->get_backorders() === 'no') {
                             $variation_quantities[$variation_id] = intval($variation->get_stock_quantity());
                         } else {
+                            // No manage_stock or backorders allowed: no quantity limit enforced
                             $variation_quantities[$variation_id] = null;
                         }
                     } else {
-                        // If no price, consider it as 0 stock (not available for purchase)
+                        // Not purchasable or out of stock: treat as 0 available
                         $variation_quantities[$variation_id] = 0;
                     }
-                }
                 }
             }
         }
@@ -107,7 +110,7 @@ class IJWLP_Frontend_Product
             if (did_action('wp_loaded') && !WC()->cart->get_cart_contents_count() && WC()->session) {
                 WC()->cart->get_cart_from_session();
             }
-            
+
             foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
                 $cart_product_id = isset($cart_item['product_id']) ? intval($cart_item['product_id']) : 0;
                 $cart_variation_id = isset($cart_item['variation_id']) ? intval($cart_item['variation_id']) : 0;
@@ -245,9 +248,9 @@ class IJWLP_Frontend_Product
                 <?php echo esc_html($start); ?> - <?php echo esc_html($end); ?>
             </span>
 
-            <?php 
+            <?php
             $limitedNosAvailableCount = limitedNosAvailableCount($pro_id);
-            $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $max_limit_setting, $product->get_name(), $limitedNosAvailableCount); 
+            $this->output_hidden_fields($stock_quantity, $variation_quantities_json, $effective_max_limit, $max_limit_setting, $product->get_name(), $limitedNosAvailableCount);
             ?>
 
             <div class="woo-limit-input-group">

@@ -298,7 +298,7 @@ class IJWLP_Frontend_Checkout
 
                 $attr_name = wc_attribute_label(str_replace('attribute_', '', $attr_key));
                 $taxonomy = str_replace('attribute_', '', $attr_key);
-                
+
                 if (taxonomy_exists($taxonomy)) {
                     $term = get_term_by('slug', $attr_value, $taxonomy);
                     if ($term && !is_wp_error($term)) {
@@ -343,13 +343,13 @@ class IJWLP_Frontend_Checkout
     private function get_limited_edition_numbers($ci_item)
     {
         $numbers = array();
-        
+
         if (!empty($ci_item['woo_limit'])) {
             $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit']);
         } elseif (!empty($ci_item['woo_limit_display'])) {
             $numbers = IJWLP_Frontend_Common::normalize_limited_number_for_processing($ci_item['woo_limit_display']);
         }
-        
+
         return $numbers;
     }
 
@@ -363,11 +363,11 @@ class IJWLP_Frontend_Checkout
     {
         $start_range = get_post_meta($product_id, '_woo_limit_start_value', true);
         $end_range = get_post_meta($product_id, '_woo_limit_end_value', true);
-        
+
         if ($start_range !== '' && $end_range !== '') {
             return $start_range . ' - ' . $end_range;
         }
-        
+
         return '';
     }
 
@@ -380,15 +380,20 @@ class IJWLP_Frontend_Checkout
     {
         $cart = WC()->cart;
         $subtotal_with_tax = 0;
-        
-        // Calculate subtotal with tax
-		foreach ($cart->get_cart() as $cart_item) {
-			$product = $cart_item['data'];
-			$line_total = $product->get_price() * $cart_item['quantity'];
-			$tax_data = $this->calculate_geo_tax_for_price($line_total, $product->get_tax_class());
 
-			$subtotal_with_tax += $tax_data ? $tax_data['price_with_tax'] : $line_total;
-		}
+        // Calculate subtotal with tax
+        // $product may be null (deleted/draft product still in session),
+        // or get_price() may return '' for products with no price set — skip both.
+        foreach ($cart->get_cart() as $cart_item) {
+            $product = isset($cart_item['data']) ? $cart_item['data'] : null;
+            if (!$product || $product->get_price() === '') {
+                continue;
+            }
+            $line_total = floatval($product->get_price()) * intval($cart_item['quantity']);
+            $tax_data = $this->calculate_geo_tax_for_price($line_total, $product->get_tax_class());
+
+            $subtotal_with_tax += $tax_data ? $tax_data['price_with_tax'] : $line_total;
+        }
 
         // Calculate total
         $shipping_total = $cart->get_shipping_total();
@@ -398,20 +403,20 @@ class IJWLP_Frontend_Checkout
 
         $discount_total = $cart->get_discount_total();
         $total = $subtotal_with_tax + $shipping_total_with_tax - $discount_total;
-        
+
         // Add fees
         foreach ($cart->get_fees() as $fee) {
             $total += $fee->total + $fee->tax;
         }
-		
-		$total = $total;
+
+        $total = $total;
 
         // Get tax information
         $tax_info = $this->get_cart_tax_info();
 
         // Construct custom tax display suffix: (Prefix. Tax Percentage Tax Label, Tax Amount)
         $tax_display_suffix = '';
-        if ($tax_info && $tax_info['tax_amount'] > 0) {            
+        if ($tax_info && $tax_info['tax_amount'] > 0) {
             // Try to get prefix from WC settings if available, but default to 'Incl.' as it's the standard for this plugin
             $wc_suffix = get_option('woocommerce_price_display_suffix');
 
@@ -455,11 +460,15 @@ class IJWLP_Frontend_Checkout
         $tax_rates = array();
 
         // Calculate total tax from all cart items
+        // same null/empty-price guards as in calculate_cart_totals_with_tax
         foreach ($cart->get_cart() as $cart_item) {
-            $product = $cart_item['data'];
-            $line_total = $product->get_price() * $cart_item['quantity'];
+            $product = isset($cart_item['data']) ? $cart_item['data'] : null;
+            if (!$product || $product->get_price() === '') {
+                continue;
+            }
+            $line_total = floatval($product->get_price()) * intval($cart_item['quantity']);
             $tax_data = $this->calculate_geo_tax_for_price($line_total, $product->get_tax_class());
-            
+
             if ($tax_data) {
                 $total_tax += $tax_data['tax_amount'];
                 if (!empty($tax_data['tax_rates'])) {
@@ -485,7 +494,7 @@ class IJWLP_Frontend_Checkout
 
         // Get clean tax label
         $tax_label_only = $this->get_clean_tax_label($tax_rates);
-        
+
         // Get tax percentage
         $tax_percentage = '';
         if (!empty($tax_rates)) {
@@ -587,7 +596,7 @@ class IJWLP_Frontend_Checkout
 
     /**
      * Get customer country for tax calculation
-     * Priority: Shipping address → Geolocation
+     * Priority: Shipping address Geolocation
      */
     private function get_customer_country_for_tax()
     {
